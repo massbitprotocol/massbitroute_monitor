@@ -3,24 +3,25 @@ GRAFANA_VERSION=v8.2.1
 PROMETHEUS_VERSION=v2.30.3
 
 SITE_ROOT=$(realpath $(dirname $(realpath $0))/..)
-ASDF=$SITE_ROOT/bin/.asdf/installs
-GRAFANA_DIR=$ASDF/grafana/$GRAFANA_VERSION
-PROMETHEUS_DIR=$ASDF/prometheus/$PROMETHEUS_VERSION
 
 export HOME=/tmp
 cd $SITE_ROOT
 #source $SITE_ROOT/.env
 git="git -C $SITE_ROOT"
 type="monitor"
-mbr_cli="/massbit/massbitroute/app/src/sites/services/$type/mbr"
-script_run="/massbit/massbitroute/app/src/sites/services/$type/scripts/run"
-cmd="/massbit/massbitroute/app/src/sites/services/$type/cmd_server"
+dir="/massbit/massbitroute/app/src/sites/services/$type"
+mbr_cli="$dir/mbr"
+script_run="$dir/scripts/run"
+cmd="$dir/cmd_server"
 nginx="$cmd nginx"
 _git_config() {
 	$git config --global user.name "Vu Tran"
 	$git config --global user.email "baysao@gmail.com"
 }
 _reload() {
+
+	bash $dir/etc/mkagent/agents/server.sh _kill
+	bash $dir/etc/mkagent/agents/push.sh _kill
 	$cmd _update
 	$cmd update
 }
@@ -32,19 +33,27 @@ loop() {
 	done
 }
 _monitor() {
+	su - mbr -c 'cmk -I'
 	is_reload=0
-	echo mbr-monitor >vars/TYPE
+	# echo mbr-monitor >vars/TYPE
+	# rm vars/TYPE
 
-	if [ ! -d "$SITE_ROOT/vars" ]; then mkdir -p $SITE_ROOT/vars; fi
-	echo mbr-gw >$SITE_ROOT/vars/TYPE
-	stat_dir=/massbit/massbitroute/app/src/sites/services/stat/etc
-	if [ ! -d "$stat_dir" ]; then
-		mkdir -p $stat_dir
-		git clone http://mbr_gateway:6a796299bb72357770735a79019612af228586e7@git.massbitroute.com/massbitroute/mkagent.git $stat_dir/mkagent
+	# if [ ! -d "$SITE_ROOT/vars" ]; then mkdir -p $SITE_ROOT/vars; fi
+	# echo mbr-monitor >$SITE_ROOT/vars/TYPE
+	if [ ! -d "$SITE_ROOT/etc/mkagent/.git" ]; then
+		mkdir -p $SITE_ROOT/etc/mkagent
+		git clone http://mbr_gateway:6a796299bb72357770735a79019612af228586e7@git.massbitroute.com/massbitroute/mkagent.git $SITE_ROOT/etc/mkagent
 		is_reload=1
 	fi
 
-	for d in /massbit/massbitroute/app/gbc $SITE_ROOT $stat_dir/mkagent /etc/letsencrypt; do
+	if [ -f "/massbit/massbitroute/app/src/sites/services/monitor/etc/main.mk" ]; then
+		ln -sf /massbit/massbitroute/app/src/sites/services/monitor/etc/main.mk /opt/omd/sites/mbr/etc/check_mk/main.mk
+	fi
+
+	for d in \
+		/massbit/massbitroute/app/gbc \
+		$SITE_ROOT $SITE_ROOT/etc/mkagent \
+		/etc/letsencrypt; do
 		git -C $d pull | grep -i "updating"
 		if [ $? -eq 0 ]; then
 			is_reload=1

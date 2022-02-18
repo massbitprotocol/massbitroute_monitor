@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 //use logger::core::init_logger;
-use mbr_check_component::generator::CheckComponent;
+use mbr_check_component::check_module::check_module::CheckComponent;
 
 #[tokio::main]
 async fn main() {
@@ -10,16 +10,27 @@ async fn main() {
         .subcommand(create_check_component())
         .get_matches();
     if let Some(ref matches) = matches.subcommand_matches("check-kind") {
-        let list_id_file = matches.value_of("list-id-file").unwrap_or("src/example/listid");
-        let check_flow_file = matches.value_of("check-flow").unwrap_or("src/example/check-flow.json");
-        let output = matches.value_of("output").unwrap_or("src/example/output.json");
+        let list_id_file = matches
+            .value_of("list-id-file")
+            .unwrap_or("src/example/listid");
+        let check_flow_file = matches
+            .value_of("check-flow")
+            .unwrap_or("src/example/check-flow.json");
+        let base_endpoint_file = matches
+            .value_of("base-endpoint")
+            .unwrap_or("src/example/base-endpoint.json");
+        let output = matches
+            .value_of("output")
+            .unwrap_or("src/example/output.json");
         let check_component = CheckComponent::builder()
-            .with_list_id_file(list_id_file).await
+            .with_list_id_file(list_id_file)
+            .await
             .with_check_flow_file(check_flow_file)
+            .with_base_endpoint_file(base_endpoint_file)
             .with_output_file(output)
             .build();
-        println!("check_component: {:?}",check_component);
-        let _ = check_component.run_check();
+        println!("check_component: {:?}", check_component);
+        let _ = check_component.run_check().await;
     }
 }
 fn create_check_component() -> App<'static> {
@@ -39,6 +50,14 @@ fn create_check_component() -> App<'static> {
                 .long("check-flow")
                 .value_name("check-flow")
                 .help("Input check-flow file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("base-endpoint")
+                .short('b')
+                .long("base-endpoint")
+                .value_name("base-endpoint")
+                .help("Input base-endpoint file")
                 .takes_value(true),
         )
         .arg(

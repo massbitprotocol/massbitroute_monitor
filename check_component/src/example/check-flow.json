@@ -6,11 +6,11 @@
       "check_steps": [
         {
           "action": {
-            "type": "call",
+            "action_type": "call",
             "is_base_node": true,
             "request_type":"POST",
             "header":{"content-type":"application/json"},
-            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0x1\",  true]",
+            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xaf5303\",  true],\"id\": 1}",
             "time_out":10000,
             "return_fields":{"hash":"result/hash","block_number":"result/number"}
           },
@@ -22,11 +22,11 @@
         },
         {
           "action":{
-            "type": "call",
+            "action_type": "call",
             "is_base_node": false,
             "request_type":"POST",
             "header":{"content-type":"application/json"},
-            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0x1\",  true]}",
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xaf5303\",  true],\"id\": 1}",
             "time_out":10000,
             "return_fields":{ "hash":"result/hash","block_number":"result/number"}
           },
@@ -38,7 +38,7 @@
         },
         {
           "action":{
-            "type":"compare",
+            "action_type":"compare",
             "compare_items": {
               "operator": "and",
               "params": [

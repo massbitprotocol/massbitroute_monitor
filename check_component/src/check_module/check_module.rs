@@ -1,9 +1,15 @@
+use anyhow::{anyhow, Error};
 use chrono::Duration;
 use clap::StructOpt;
+use futures_util::future::err;
 use minifier::json::minify;
-use serde::{Deserialize, Serialize};
+use reqwest::Body;
+use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 use serde_json::{to_string, Number, Value};
+use std::any::Any;
 use std::collections::HashMap;
+use std::convert::TryInto;
+use std::fmt::format;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ptr::hash;
@@ -17,15 +23,39 @@ type UrlType = String;
 type TaskType = String;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct ActionCall {
+    action_type: String,
+    is_base_node: bool,
+    request_type: String,
+    header: HashMap<String, String>,
+    body: String,
+    time_out: usize,
+    return_fields: HashMap<String, String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct ActionCompare {
+    action_type: String,
+    is_base_node: bool,
+    compare_items: Value,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct NodeInfo {
     pub blockchain: BlockChainType,
     pub network: String,
-    pub gateway_id: String,
+    pub id: String,
     pub user_id: String,
     pub ip: String,
     pub zone: String,
     pub country_code: String,
     pub token: String,
+}
+
+impl NodeInfo {
+    fn get_url(&self) -> UrlType {
+        format!("http://{}.node.mbr.massbitroute.com", self.id)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -86,7 +116,7 @@ pub struct FailedCase {
 pub struct CheckMkReport {
     status: u8,
     service_name: String,
-    metric: CheckMkMetric,
+    metric: Option<CheckMkMetric>,
     status_detail: String,
 }
 
@@ -96,17 +126,37 @@ struct CheckMkMetric {
     values: Vec<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+struct ActionResponse {
+    success: bool,
+    return_name: String,
+    result: HashMap<String, String>,
+}
+
+enum CheckMkStatus {
+    Ok = 0,
+    Warning = 1,
+    Critical = 2,
+}
+
 impl ToString for CheckMkReport {
     fn to_string(&self) -> String {
-        let values: String = self.metric.values.join(";");
-        format!(
-            r#"{status} "{service_name}" {value_name}={values} {status_detail}"#,
-            status = &self.status,
-            service_name = &self.service_name,
-            value_name = self.metric.name,
-            values = values,
-            status_detail = self.status_detail
-        )
+        match self.metric.clone() {
+            None => format!(
+                r#"{status} "{service_name}" {status_detail}"#,
+                status = &self.status,
+                service_name = &self.service_name,
+                status_detail = self.status_detail
+            ),
+            Some(metric) => format!(
+                r#"{status} "{service_name}" {value_name}={values} {status_detail}"#,
+                status = &self.status,
+                service_name = &self.service_name,
+                value_name = metric.name,
+                values = metric.values.join(";"),
+                status_detail = self.status_detail
+            ),
+        }
     }
 }
 
@@ -139,20 +189,132 @@ impl<'a> CheckComponent<'a> {
         }
     }
 
-    fn run_check_steps(
+    async fn call_action(
+        &self,
+        action: &ActionCall,
+        node: &NodeInfo,
+        return_name: &String,
+    ) -> Result<ActionResponse, anyhow::Error> {
+        // Get url
+        //println!("self.base_nodes: {:?}", self.base_nodes);
+        let node_url = node.get_url();
+        let url = match action.is_base_node {
+            true => self.base_nodes.get(node.blockchain.as_str()),
+            false => Some(&node_url),
+        }
+        .ok_or(anyhow::Error::msg("Cannot get url"))?;
+        let body = action.body.clone();
+        println!("body: {}", body);
+        let client = reqwest::Client::new()
+            .post(url)
+            .header("content-type", "application/json")
+            .header("X-Api-Key", node.token.as_str())
+            .body(body);
+        println!("client: {:?}", client);
+
+        let resp = client.send().await?.text().await?;
+        let resp: Value = serde_json::from_str(&resp)?;
+        //println!("resp: {:?}", resp);
+
+        //get result
+        let mut result: HashMap<String, String> = HashMap::new();
+        for (name, path) in action.return_fields.clone() {
+            let mut value = resp.clone();
+            let path: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
+            println!("path: {:?}", path);
+            for key in path.into_iter() {
+                println!("key: {:?}", key);
+                value = value
+                    .get(key.clone())
+                    .ok_or(anyhow::Error::msg(format!(
+                        "cannot find key {} in result ",
+                        &key
+                    )))?
+                    .clone();
+                //println!("value: {:?}", value);
+            }
+            result.insert(name, value.to_string());
+        }
+
+        let action_resp = ActionResponse {
+            success: true,
+            return_name: return_name.clone(),
+            result,
+        };
+
+        println!("action_resp: {:#?}", action_resp);
+
+        Ok(action_resp)
+    }
+
+    async fn run_check_steps(
         &self,
         steps: &Vec<CheckStep>,
         node: &NodeInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
-        // Todo: add code
+        let mut step_result: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut status = CheckMkStatus::Ok;
+        let mut message = String::new();
+
         for step in steps {
             println!("step: {:?}", step);
+            let report = match step
+                .action
+                .get("action_type")
+                .unwrap()
+                .as_str()
+                .unwrap_or_default()
+            {
+                "call" => {
+                    let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
+                    println!("call action: {:?}", &action);
+                    self.call_action(&action, node, &step.return_name).await
+                }
+                "compare" => Ok(ActionResponse::default()),
+                _ => Err(anyhow::Error::msg("not support action")),
+            };
+
+            println!("report: {:?}", report);
+
+            // Handle report
+            match report {
+                Ok(report) => match report.success {
+                    true => {
+                        step_result.insert(report.return_name, report.result);
+                    }
+                    false => {
+                        if step.failed_case.critical {
+                            status = CheckMkStatus::Critical;
+                            message =
+                                format!("Stop at step {} due to critical error", &step.return_name);
+                            break;
+                        } else {
+                            status = CheckMkStatus::Warning;
+                            message.push_str(&format!("Failed at step {}.\n", &step.return_name));
+                        }
+                    }
+                },
+                Err(e) => {
+                    if step.failed_case.critical {
+                        status = CheckMkStatus::Critical;
+                        break;
+                    } else {
+                        status = CheckMkStatus::Warning;
+                        message.push_str(&format!("Failed at step {}.\n", &step.return_name));
+                    }
+                }
+            }
         }
 
-        Ok(CheckMkReport::default())
+        Ok(CheckMkReport {
+            status: status as u8,
+            service_name: format!("id:{},ip:{}", node.id, node.ip),
+            metric: None,
+            status_detail: message,
+        })
     }
 
-    pub fn check_components(&self) -> Result<Vec<CheckMkReport>, anyhow::Error> {
+    async fn check_components(&self) -> Result<Vec<CheckMkReport>, anyhow::Error> {
         println!("Check component");
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
@@ -173,7 +335,7 @@ impl<'a> CheckComponent<'a> {
                 Ok(steps) => {
                     //println!("steps:{:#?}", steps);
                     println!("Do the check steps");
-                    self.run_check_steps(&steps, node)
+                    self.run_check_steps(&steps, node).await
                 }
                 Err(err) => {
                     println!("There are no check steps");
@@ -187,14 +349,15 @@ impl<'a> CheckComponent<'a> {
             }
         }
 
-        Ok(vec![CheckMkReport::default(), CheckMkReport::default()])
+        Ok(reports)
     }
-    pub fn run_check(&self) -> Result<(), anyhow::Error> {
+
+    pub async fn run_check(&self) -> Result<(), anyhow::Error> {
         // Begin run check
         println!("run_check");
         // Infinity run check loop
         loop {
-            let reports = self.check_components();
+            let reports = self.check_components().await;
 
             // Write reports to file
             match reports {
@@ -267,14 +430,14 @@ impl<'a> GeneratorBuilder<'a> {
             let node = NodeInfo {
                 blockchain: data[2].clone(),
                 network: data[3].clone(),
-                gateway_id: data[0].clone(),
+                id: data[0].clone(),
                 user_id: data[1].clone(),
                 ip: data[4].clone(),
                 zone: data[5].clone(),
                 country_code: data[6].clone(),
                 token: data[7].clone(),
             };
-            println!("node: {:#?}", &node);
+            //println!("node: {:#?}", &node);
             nodes.push(node);
 
             //d39ba1ce-d1fd-4a85-b25c-0ec0f4f0517c 7dd6caf2-7dc1-45ee-8fe3-744259fabf81 eth mainnet 34.88.228.190 EU FI

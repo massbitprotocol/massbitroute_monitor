@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Error};
 use chrono::Duration;
 use clap::StructOpt;
+use futures::pin_mut;
 use futures_util::future::err;
 use minifier::json::minify;
-use reqwest::Body;
+use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 use serde_json::{to_string, Number, Value};
 use std::any::Any;
@@ -15,6 +16,7 @@ use std::io::{BufRead, BufReader};
 use std::ptr::hash;
 use std::thread;
 use timer::Timer;
+use tokio::time::error::Elapsed;
 
 // use futures_util::future::try_future::TryFutureExt;
 
@@ -36,8 +38,13 @@ pub struct ActionCall {
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCompare {
     action_type: String,
-    is_base_node: bool,
-    compare_items: Value,
+    operator_items: OperatorCompare,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct OperatorCompare {
+    operator_type: String,
+    params: Value,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -189,11 +196,79 @@ impl<'a> CheckComponent<'a> {
         }
     }
 
+    fn do_compare(
+        operator: &OperatorCompare,
+        step_result: &HashMap<String, HashMap<String, String>>,
+    ) -> Result<bool, anyhow::Error> {
+        match operator.operator_type.as_str() {
+            "and" => {
+                let sub_actions: Vec<OperatorCompare> =
+                    serde_json::from_value(operator.params.clone())?;
+                let mut result = true;
+                for sub_operator in sub_actions {
+                    result = result && CheckComponent::do_compare(&sub_operator, step_result)?;
+                }
+                return Ok(result);
+            }
+            "eq" => {
+                let items: Vec<String> = serde_json::from_value(operator.params.clone())?;
+                let mut item_values = Vec::new();
+                for item in items {
+                    let item_path: Vec<String> = item.split("/").map(|s| s.to_string()).collect();
+                    let item_value = step_result
+                        .get(item_path[0].as_str())
+                        .ok_or(anyhow::Error::msg("Cannot find key"))?
+                        .get(item_path[1].as_str())
+                        .ok_or(anyhow::Error::msg("Cannot find key"))?;
+                    item_values.push(item_value);
+                }
+                println!("item_values: {:?}", item_values);
+                if item_values.len() > 1 {
+                    let first = item_values[0];
+                    for item_value in item_values {
+                        if item_value != first {
+                            return Ok(false);
+                        }
+                    }
+                    return Ok(true);
+                } else {
+                    return Ok(false);
+                }
+            }
+            _ => return Err(anyhow::Error::msg("Cannot find key")),
+        }
+    }
+
+    fn compare_action(
+        &self,
+        action: &ActionCompare,
+        node: &NodeInfo,
+        return_name: &String,
+        step_result: &HashMap<String, HashMap<String, String>>,
+    ) -> Result<ActionResponse, anyhow::Error> {
+        println!(
+            "Run Compare Action: {:?}, step_result: {:?}",
+            action, step_result
+        );
+
+        let success = CheckComponent::do_compare(&action.operator_items, step_result)?;
+
+        println!("Run Compare Action success: {}", success);
+
+        let mut result: HashMap<String, String> = HashMap::new();
+        result.insert(return_name.clone(), success.to_string());
+        return Ok(ActionResponse {
+            success,
+            return_name: return_name.clone(),
+            result,
+        });
+    }
     async fn call_action(
         &self,
         action: &ActionCall,
         node: &NodeInfo,
         return_name: &String,
+        step_result: &HashMap<String, HashMap<String, String>>,
     ) -> Result<ActionResponse, anyhow::Error> {
         // Get url
         //println!("self.base_nodes: {:?}", self.base_nodes);
@@ -212,7 +287,16 @@ impl<'a> CheckComponent<'a> {
             .body(body);
         println!("client: {:?}", client);
 
-        let resp = client.send().await?.text().await?;
+        let sender = client.send();
+        pin_mut!(sender);
+
+        let res = tokio::time::timeout(
+            std::time::Duration::from_secs(action.time_out as u64),
+            &mut sender,
+        )
+        .await;
+        let resp = res??.text().await?;
+        //let resp = client.send().await?.text().await?;
         let resp: Value = serde_json::from_str(&resp)?;
         //println!("resp: {:?}", resp);
 
@@ -268,18 +352,28 @@ impl<'a> CheckComponent<'a> {
                 "call" => {
                     let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
                     println!("call action: {:?}", &action);
-                    self.call_action(&action, node, &step.return_name).await
+                    self.call_action(&action, node, &step.return_name, &step_result)
+                        .await
                 }
-                "compare" => Ok(ActionResponse::default()),
+                "compare" => {
+                    let action: ActionCompare =
+                        serde_json::from_value(step.action.clone()).unwrap();
+                    println!("compare action: {:?}", &action);
+                    self.compare_action(&action, node, &step.return_name, &step_result)
+                }
                 _ => Err(anyhow::Error::msg("not support action")),
             };
 
-            println!("report: {:?}", report);
+            //println!("report: {:?}", report);
 
             // Handle report
             match report {
                 Ok(report) => match report.success {
                     true => {
+                        println!(
+                            "Success step: {:?}, report: {:?}",
+                            &step.return_name, report
+                        );
                         step_result.insert(report.return_name, report.result);
                     }
                     false => {

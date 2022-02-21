@@ -11,7 +11,7 @@
             "request_type":"POST",
             "header":{"content-type":"application/json"},
             "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xaf5303\",  true],\"id\": 1}",
-            "time_out":10000,
+            "time_out":5,
             "return_fields":{"hash":"result/hash","block_number":"result/number"}
           },
           "return_name": "base_return",
@@ -27,7 +27,7 @@
             "request_type":"POST",
             "header":{"content-type":"application/json"},
             "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xaf5303\",  true],\"id\": 1}",
-            "time_out":10000,
+            "time_out":5,
             "return_fields":{ "hash":"result/hash","block_number":"result/number"}
           },
           "return_name":"check_return",
@@ -39,15 +39,15 @@
         {
           "action":{
             "action_type":"compare",
-            "compare_items": {
-              "operator": "and",
+            "operator_items": {
+              "operator_type": "and",
               "params": [
                 {
-                  "operator": "eq",
+                  "operator_type": "eq",
                   "params": ["base_return/hash","check_return/hash"]
                 },
                 {
-                  "operator": "eq",
+                  "operator_type": "eq",
                   "params": ["base_return/block_number","check_return/block_number"]
                 }
               ]

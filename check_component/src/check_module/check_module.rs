@@ -7,6 +7,7 @@ use minifier::json::minify;
 use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 
+use log::{debug, error, info, log_enabled, Level};
 use serde_json::{to_string, Number, Value};
 use std::any::Any;
 use std::collections::HashMap;
@@ -79,6 +80,8 @@ pub struct CheckComponent<'a> {
     pub list_nodes: Vec<NodeInfo>,
     pub base_nodes: HashMap<BlockChainType, UrlType>,
     pub check_flows: CheckFlows,
+    pub is_loop_check: bool,
+    pub is_write_to_file: bool,
 }
 
 type CheckFlows = HashMap<TaskType, Vec<CheckFlow>>;
@@ -183,7 +186,7 @@ impl<'a> CheckComponent<'a> {
         match self.check_flows.get(task.as_str()) {
             Some(check_flows) => {
                 for check_flow in check_flows {
-                    //println!("check_flow.blockchain: {},blockchain: {}\ncheck_flow.component:{},component:{}",&check_flow.blockchain,&blockchain,check_flow.component,component);
+                    //log::debug!("check_flow.blockchain: {},blockchain: {}\ncheck_flow.component:{},component:{}",&check_flow.blockchain,&blockchain,check_flow.component,component);
                     if &check_flow.blockchain == blockchain && &check_flow.component == component {
                         return Ok(check_flow.check_steps.clone());
                     }
@@ -224,7 +227,7 @@ impl<'a> CheckComponent<'a> {
                         .ok_or(anyhow::Error::msg("Cannot find key"))?;
                     item_values.push(item_value);
                 }
-                println!("item_values: {:?}", item_values);
+                log::debug!("item_values: {:?}", item_values);
                 if item_values.len() > 1 {
                     let first = item_values[0];
                     for item_value in item_values {
@@ -248,14 +251,15 @@ impl<'a> CheckComponent<'a> {
         return_name: &String,
         step_result: &HashMap<String, HashMap<String, String>>,
     ) -> Result<ActionResponse, anyhow::Error> {
-        println!(
+        log::debug!(
             "Run Compare Action: {:?}, step_result: {:?}",
-            action, step_result
+            action,
+            step_result
         );
 
         let success = CheckComponent::do_compare(&action.operator_items, step_result)?;
 
-        println!("Run Compare Action success: {}", success);
+        log::debug!("Run Compare Action success: {}", success);
 
         let mut result: HashMap<String, String> = HashMap::new();
         result.insert(return_name.clone(), success.to_string());
@@ -273,7 +277,7 @@ impl<'a> CheckComponent<'a> {
         step_result: &HashMap<String, HashMap<String, String>>,
     ) -> Result<ActionResponse, anyhow::Error> {
         // Get url
-        //println!("self.base_nodes: {:?}", self.base_nodes);
+        //log::debug!("self.base_nodes: {:?}", self.base_nodes);
         let node_url = node.get_url();
         let url = match action.is_base_node {
             true => self.base_nodes.get(node.blockchain.as_str()),
@@ -281,13 +285,13 @@ impl<'a> CheckComponent<'a> {
         }
         .ok_or(anyhow::Error::msg("Cannot get url"))?;
         let body = action.body.clone();
-        println!("body: {}", body);
+        log::debug!("body: {}", body);
         let client = reqwest::Client::new()
             .post(url)
             .header("content-type", "application/json")
             .header("X-Api-Key", node.token.as_str())
             .body(body);
-        println!("client: {:?}", client);
+        log::debug!("client: {:?}", client);
 
         let sender = client.send();
         pin_mut!(sender);
@@ -300,16 +304,16 @@ impl<'a> CheckComponent<'a> {
         let resp = res??.text().await?;
         //let resp = client.send().await?.text().await?;
         let resp: Value = serde_json::from_str(&resp)?;
-        //println!("resp: {:?}", resp);
+        //log::debug!("resp: {:?}", resp);
 
         //get result
         let mut result: HashMap<String, String> = HashMap::new();
         for (name, path) in action.return_fields.clone() {
             let mut value = resp.clone();
             let path: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
-            //println!("path: {:?}", path);
+            //log::debug!("path: {:?}", path);
             for key in path.into_iter() {
-                //println!("key: {:?}", key);
+                //log::debug!("key: {:?}", key);
                 value = value
                     .get(key.clone())
                     .ok_or(anyhow::Error::msg(format!(
@@ -317,7 +321,7 @@ impl<'a> CheckComponent<'a> {
                         &key
                     )))?
                     .clone();
-                //println!("value: {:?}", value);
+                //log::debug!("value: {:?}", value);
             }
             result.insert(name, value.to_string());
         }
@@ -328,7 +332,7 @@ impl<'a> CheckComponent<'a> {
             result,
         };
 
-        println!("action_resp: {:#?}", action_resp);
+        log::debug!("action_resp: {:#?}", action_resp);
 
         Ok(action_resp)
     }
@@ -343,7 +347,7 @@ impl<'a> CheckComponent<'a> {
         let mut message = String::new();
 
         for step in steps {
-            println!("step: {:?}", step);
+            log::debug!("step: {:?}", step);
             let report = match step
                 .action
                 .get("action_type")
@@ -353,28 +357,29 @@ impl<'a> CheckComponent<'a> {
             {
                 "call" => {
                     let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
-                    println!("call action: {:?}", &action);
+                    log::debug!("call action: {:?}", &action);
                     self.call_action(&action, node, &step.return_name, &step_result)
                         .await
                 }
                 "compare" => {
                     let action: ActionCompare =
                         serde_json::from_value(step.action.clone()).unwrap();
-                    println!("compare action: {:?}", &action);
+                    log::debug!("compare action: {:?}", &action);
                     self.compare_action(&action, node, &step.return_name, &step_result)
                 }
                 _ => Err(anyhow::Error::msg("not support action")),
             };
 
-            //println!("report: {:?}", report);
+            //log::debug!("report: {:?}", report);
 
             // Handle report
             match report {
                 Ok(report) => match report.success {
                     true => {
-                        println!(
+                        log::debug!(
                             "Success step: {:?}, report: {:?}",
-                            &step.return_name, report
+                            &step.return_name,
+                            report
                         );
                         step_result.insert(report.return_name, report.result);
                     }
@@ -411,7 +416,7 @@ impl<'a> CheckComponent<'a> {
     }
 
     async fn check_components(&self) -> Result<Vec<CheckMkReport>, anyhow::Error> {
-        println!("Check component");
+        log::debug!("Check component");
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
         //header 'x-api-key: vnihqf14qk5km71aatvfr7c3djiej9l6mppd5k20uhs62p0b1cm79bfkmcubal9ug44e8cu2c74m29jpusokv6ft6r01o5bnv5v4gb8='
@@ -419,7 +424,7 @@ impl<'a> CheckComponent<'a> {
 
         // Check node
         let nodes = &self.list_nodes;
-        // Check each node
+
         for node in nodes {
             let steps = self.get_check_steps(
                 &node.blockchain,
@@ -429,18 +434,18 @@ impl<'a> CheckComponent<'a> {
 
             let report = match steps {
                 Ok(steps) => {
-                    //println!("steps:{:#?}", steps);
-                    println!("Do the check steps");
+                    //log::debug!("steps:{:#?}", steps);
+                    log::debug!("Do the check steps");
                     self.run_check_steps(&steps, node).await
                 }
                 Err(err) => {
-                    println!("There are no check steps");
+                    log::debug!("There are no check steps");
                     Err(anyhow::Error::msg("There are no check steps"))
                 }
             };
 
             if let Ok(report) = report {
-                println!("add report: {:?}", &report);
+                log::debug!("add report: {:?}", &report);
                 reports.push(report);
             }
         }
@@ -450,7 +455,7 @@ impl<'a> CheckComponent<'a> {
 
     pub async fn run_check(&self) -> Result<(), anyhow::Error> {
         // Begin run check
-        println!("run_check");
+        log::debug!("run_check");
         // Infinity run check loop
         loop {
             let reports = self.check_components().await;
@@ -463,9 +468,17 @@ impl<'a> CheckComponent<'a> {
                         .map(|report| report.to_string())
                         .collect::<Vec<String>>()
                         .join("\n");
-                    std::fs::write(self.output_file, report_content).expect("Unable to write file");
+                    if self.is_write_to_file {
+                        std::fs::write(self.output_file, report_content)
+                            .expect("Unable to write file");
+                    } else {
+                        println!("{}", report_content);
+                    }
                 }
                 Err(err) => (),
+            }
+            if !self.is_loop_check {
+                break;
             }
             // Repeat every CHECK_INTERVAL secs
             thread::sleep(::std::time::Duration::new(CHECK_INTERVAL, 0));
@@ -491,6 +504,8 @@ impl<'a> Default for GeneratorBuilder<'a> {
                 list_nodes: vec![],
                 base_nodes: Default::default(),
                 check_flows: Default::default(),
+                is_loop_check: false,
+                is_write_to_file: false,
             },
         }
     }
@@ -511,15 +526,15 @@ impl<'a> GeneratorBuilder<'a> {
     async fn get_list_nodes(&self) -> Result<Vec<NodeInfo>, anyhow::Error> {
         let mut nodes: Vec<NodeInfo> = Vec::new();
         let prefix_url = "https://dapi.massbit.io/deploy/gateway".to_string();
-        println!("get_list_nodes");
+        log::debug!("get_list_nodes");
 
-        println!("----------Create list of nodes info details----------");
+        log::debug!("----------Create list of nodes info details----------");
         let lines: Vec<String> = match self.inner.list_node_id_file.starts_with("http") {
             true => {
                 let url = self.inner.list_node_id_file;
-                println!("url:{}", url);
+                log::debug!("url:{}", url);
                 let node_data = reqwest::get(url).await?.text().await?;
-                println!("node_data: {}", node_data);
+                log::debug!("node_data: {}", node_data);
                 let lines: Vec<String> = node_data.split("\n").map(|s| s.to_string()).collect();
                 lines
             }
@@ -532,9 +547,9 @@ impl<'a> GeneratorBuilder<'a> {
 
         for line in lines {
             if !line.is_empty() {
-                //println!("line: {:?}", &line);
+                //log::debug!("line: {:?}", &line);
                 let data: Vec<String> = line.split(' ').map(|piece| piece.to_string()).collect();
-                //println!("data: {:?}", &data);
+                //log::debug!("data: {:?}", &data);
 
                 let node = NodeInfo {
                     blockchain: data[2].clone(),
@@ -557,7 +572,7 @@ impl<'a> GeneratorBuilder<'a> {
     //     let data: Value = serde_json::from_str(&minify(&node_data))?;
     //     let token: Option<String> = data.get("token").and_then(|value| Some(value.to_string()));
     //
-    //     println!("data: {:#?}",data);
+    //     log::debug!("data: {:#?}",data);
     //     Ok(token.expect("cannot get token"))
     // }
 

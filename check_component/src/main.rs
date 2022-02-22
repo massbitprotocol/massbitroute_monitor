@@ -1,9 +1,13 @@
 use clap::{App, Arg};
-//use logger::core::init_logger;
+use logger::core::init_logger;
+
 use mbr_check_component::check_module::check_module::CheckComponent;
 
 #[tokio::main]
 async fn main() {
+    let res = init_logger(&String::from("CheckComponent"));
+    //println!("Log output: {}", res); // Print log output type
+
     let matches = App::new("mbr-check-component")
         .version("0.1")
         .about("mbr-check-component")
@@ -32,7 +36,7 @@ async fn main() {
             .with_base_endpoint_file(base_endpoint_file)
             .with_output_file(output)
             .build();
-        println!("check_component: {:?}", check_component);
+        log::debug!("check_component: {:?}", check_component);
         let _ = check_component.run_check().await;
     }
 }

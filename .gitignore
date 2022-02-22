@@ -12,7 +12,8 @@ check_component/target/*
 !check_component/target/release/
 check_component/target/release/*
 !check_component/target/release/mbr-check-component
-
+!check_component/target/release/check-flow.json
+!check_component/target/release/base-endpoint.json
 !code-compiler/stub/target
 
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries

@@ -85,6 +85,7 @@ pub struct CheckComponent<'a> {
     pub output_file: &'a str,
     // inner data
     pub list_nodes: Vec<NodeInfo>,
+    pub list_gateways: Vec<NodeInfo>,
     pub base_nodes: HashMap<BlockChainType, UrlType>,
     pub check_flows: CheckFlows,
     pub is_loop_check: bool,
@@ -119,6 +120,12 @@ enum Component {
     Node(NodeInfo),
     Gateway(GatewayInfo),
     DApi(DApiInfo),
+}
+
+enum ComponentType {
+    Node,
+    Gateway,
+    DApi,
 }
 
 const CHECK_INTERVAL: u64 = 2; // sec unit
@@ -352,10 +359,11 @@ impl<'a> CheckComponent<'a> {
         Ok(action_resp)
     }
 
+    //Todo: Edit this function for checking gateway or redesign.
     async fn run_check_steps(
         &self,
         steps: Vec<CheckStep>,
-        node: &NodeInfo,
+        component: &NodeInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
         let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
@@ -373,14 +381,14 @@ impl<'a> CheckComponent<'a> {
                 "call" => {
                     let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
                     log::debug!("call action: {:?}", &action);
-                    self.call_action(&action, node, &step.return_name, &step_result)
+                    self.call_action(&action, component, &step.return_name, &step_result)
                         .await
                 }
                 "compare" => {
                     let action: ActionCompare =
                         serde_json::from_value(step.action.clone()).unwrap();
                     log::debug!("compare action: {:?}", &action);
-                    self.compare_action(&action, node, &step.return_name, &step_result)
+                    self.compare_action(&action, component, &step.return_name, &step_result)
                 }
                 _ => Err(anyhow::Error::msg("not support action")),
             };
@@ -424,7 +432,10 @@ impl<'a> CheckComponent<'a> {
 
         Ok(CheckMkReport {
             status: status as u8,
-            service_name: format!("node-http-{}-{}-{}", node.blockchain, node.network, node.id),
+            service_name: format!(
+                "node-http-{}-{}-{}",
+                component.blockchain, component.network, component.id
+            ),
             metric: None,
             status_detail: message,
         })
@@ -452,6 +463,27 @@ impl<'a> CheckComponent<'a> {
                     //log::debug!("steps:{:#?}", steps);
                     log::debug!("Do the check steps");
                     tasks.push(self.run_check_steps(steps, node));
+                }
+                Err(err) => {
+                    log::debug!("There are no check steps");
+                }
+            };
+        }
+        // Check Gateway
+        let gateways = &self.list_gateways;
+        let mut tasks = Vec::new();
+        for gateway in gateways {
+            let steps = self.get_check_steps(
+                &node.blockchain,
+                &"gateway".to_string(),
+                &"checking_chain_type".to_string(),
+            );
+
+            match steps {
+                Ok(steps) => {
+                    //log::debug!("steps:{:#?}", steps);
+                    log::debug!("Do the check steps");
+                    tasks.push(self.run_check_steps(steps, gateway));
                 }
                 Err(err) => {
                     log::debug!("There are no check steps");
@@ -517,6 +549,7 @@ impl<'a> Default for GeneratorBuilder<'a> {
                 base_endpoint_file: "",
                 output_file: "",
                 list_nodes: vec![],
+                list_gateways: vec![],
                 base_nodes: Default::default(),
                 check_flows: Default::default(),
                 is_loop_check: false,
@@ -527,26 +560,40 @@ impl<'a> Default for GeneratorBuilder<'a> {
 }
 
 impl<'a> GeneratorBuilder<'a> {
-    pub async fn with_list_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
+    pub async fn with_list_node_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
         self.inner.list_node_id_file = path;
 
         let list_nodes: Vec<NodeInfo> = self
-            .get_list_nodes()
+            .get_list_component(ComponentType::Node)
             .await
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
         self.inner.list_nodes = list_nodes;
         self
     }
+    pub async fn with_list_gateway_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
+        self.inner.list_gateway_id_file = path;
 
-    async fn get_list_nodes(&self) -> Result<Vec<NodeInfo>, anyhow::Error> {
+        let list_gateways: Vec<NodeInfo> = self
+            .get_list_component(ComponentType::Gateway)
+            .await
+            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        self.inner.list_nodes = list_gateways;
+        self
+    }
+    async fn get_list_component(
+        &self,
+        component_type: ComponentType,
+    ) -> Result<Vec<NodeInfo>, anyhow::Error> {
         let mut nodes: Vec<NodeInfo> = Vec::new();
-        let prefix_url = "https://dapi.massbit.io/deploy/gateway".to_string();
-        log::debug!("get_list_nodes");
-
         log::debug!("----------Create list of nodes info details----------");
-        let lines: Vec<String> = match self.inner.list_node_id_file.starts_with("http") {
+        let list_id_file = match component_type {
+            ComponentType::Node => self.inner.list_node_id_file,
+            ComponentType::Gateway => self.inner.list_gateway_id_file,
+            ComponentType::DApi => Default::default(),
+        };
+        let lines: Vec<String> = match list_id_file.starts_with("http") {
             true => {
-                let url = self.inner.list_node_id_file;
+                let url = list_id_file;
                 log::debug!("url:{}", url);
                 let node_data = reqwest::get(url).await?.text().await?;
                 log::debug!("node_data: {}", node_data);
@@ -554,7 +601,7 @@ impl<'a> GeneratorBuilder<'a> {
                 lines
             }
             false => {
-                let file = File::open(self.inner.list_node_id_file)?;
+                let file = File::open(list_id_file)?;
                 let reader = BufReader::new(file);
                 reader.lines().into_iter().filter_map(|s| s.ok()).collect()
             }

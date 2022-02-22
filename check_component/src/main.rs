@@ -30,7 +30,9 @@ async fn main() {
             .value_of("output")
             .unwrap_or("src/example/output.json");
         let check_component = CheckComponent::builder()
-            .with_list_id_file(list_node_id_file)
+            .with_list_node_id_file(list_node_id_file)
+            .await
+            .with_list_gateway_id_file(list_gateway_id_file)
             .await
             .with_check_flow_file(check_flow_file)
             .with_base_endpoint_file(base_endpoint_file)

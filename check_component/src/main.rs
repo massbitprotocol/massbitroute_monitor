@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 use logger::core::init_logger;
-
 use mbr_check_component::check_module::check_module::CheckComponent;
+// use regex::Regex;
 
 #[tokio::main]
 async fn main() {

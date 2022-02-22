@@ -25,6 +25,7 @@ use tokio::time::error::Elapsed;
 type BlockChainType = String;
 type UrlType = String;
 type TaskType = String;
+type StepResult = HashMap<String, HashMap<String, String>>;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
@@ -35,6 +36,12 @@ pub struct ActionCall {
     body: String,
     time_out: usize,
     return_fields: HashMap<String, String>,
+}
+
+impl ActionCall {
+    fn replace_string(org: &str, step_result: StepResult) -> String {
+        todo!()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -134,8 +141,17 @@ pub struct CheckMkReport {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 struct CheckMkMetric {
-    name: String,
-    values: Vec<String>,
+    metric: HashMap<String, Vec<String>>,
+}
+
+impl ToString for CheckMkMetric {
+    fn to_string(&self) -> String {
+        self.metric
+            .iter()
+            .map(|(key, val)| format!("{}={}", key, val.join(";")))
+            .collect::<Vec<String>>()
+            .join("|")
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -161,11 +177,10 @@ impl ToString for CheckMkReport {
                 status_detail = self.status_detail
             ),
             Some(metric) => format!(
-                r#"{status} "{service_name}" {value_name}={values} {status_detail}"#,
+                r#"{status} {service_name} {metric} {status_detail}"#,
                 status = &self.status,
                 service_name = &self.service_name,
-                value_name = metric.name,
-                values = metric.values.join(";"),
+                metric = metric.to_string(),
                 status_detail = self.status_detail
             ),
         }
@@ -203,7 +218,7 @@ impl<'a> CheckComponent<'a> {
 
     fn do_compare(
         operator: &OperatorCompare,
-        step_result: &HashMap<String, HashMap<String, String>>,
+        step_result: &StepResult,
     ) -> Result<bool, anyhow::Error> {
         match operator.operator_type.as_str() {
             "and" => {
@@ -249,7 +264,7 @@ impl<'a> CheckComponent<'a> {
         action: &ActionCompare,
         node: &NodeInfo,
         return_name: &String,
-        step_result: &HashMap<String, HashMap<String, String>>,
+        step_result: &StepResult,
     ) -> Result<ActionResponse, anyhow::Error> {
         log::debug!(
             "Run Compare Action: {:?}, step_result: {:?}",
@@ -274,7 +289,7 @@ impl<'a> CheckComponent<'a> {
         action: &ActionCall,
         node: &NodeInfo,
         return_name: &String,
-        step_result: &HashMap<String, HashMap<String, String>>,
+        step_result: &StepResult,
     ) -> Result<ActionResponse, anyhow::Error> {
         // Get url
         //log::debug!("self.base_nodes: {:?}", self.base_nodes);
@@ -342,7 +357,7 @@ impl<'a> CheckComponent<'a> {
         steps: Vec<CheckStep>,
         node: &NodeInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
-        let mut step_result: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
         let mut message = String::new();
 
@@ -409,7 +424,7 @@ impl<'a> CheckComponent<'a> {
 
         Ok(CheckMkReport {
             status: status as u8,
-            service_name: format!("id:{},ip:{}", node.id, node.ip),
+            service_name: format!("node-http-{}-{}-{}", node.blockchain, node.network, node.id),
             metric: None,
             status_detail: message,
         })

@@ -10,9 +10,12 @@ async fn main() {
         .subcommand(create_check_component())
         .get_matches();
     if let Some(ref matches) = matches.subcommand_matches("check-kind") {
-        let list_id_file = matches
-            .value_of("list-id-file")
-            .unwrap_or("src/example/listid");
+        let list_node_id_file = matches
+            .value_of("list-node-id-file")
+            .unwrap_or("src/example/list-node-id");
+        let list_gateway_id_file = matches
+            .value_of("list-gateway-id-file")
+            .unwrap_or("src/example/list-gateway-id");
         let check_flow_file = matches
             .value_of("check-flow")
             .unwrap_or("src/example/check-flow.json");
@@ -23,7 +26,7 @@ async fn main() {
             .value_of("output")
             .unwrap_or("src/example/output.json");
         let check_component = CheckComponent::builder()
-            .with_list_id_file(list_id_file)
+            .with_list_id_file(list_node_id_file)
             .await
             .with_check_flow_file(check_flow_file)
             .with_base_endpoint_file(base_endpoint_file)
@@ -37,11 +40,19 @@ fn create_check_component() -> App<'static> {
     App::new("check-kind")
         .about("check node kind is correct")
         .arg(
-            Arg::new("list-id-file")
-                .short('l')
-                .long("list-id-file")
-                .value_name("list-id-file")
-                .help("Input list-id file")
+            Arg::new("list-node-id-file")
+                .short('n')
+                .long("list-node-id-file")
+                .value_name("list-node-id-file")
+                .help("Input list-node-id file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("list-gateway-id-file")
+                .short('g')
+                .long("list-gateway-id-file")
+                .value_name("list-gateway-id-file")
+                .help("Input list-gateway-id file")
                 .takes_value(true),
         )
         .arg(

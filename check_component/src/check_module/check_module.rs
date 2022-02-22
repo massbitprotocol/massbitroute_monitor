@@ -6,6 +6,7 @@ use futures_util::future::err;
 use minifier::json::minify;
 use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
+
 use serde_json::{to_string, Number, Value};
 use std::any::Any;
 use std::collections::HashMap;
@@ -68,7 +69,8 @@ impl NodeInfo {
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct CheckComponent<'a> {
     // input file
-    pub list_id_file: &'a str,
+    pub list_node_id_file: &'a str,
+    pub list_gateway_id_file: &'a str,
     pub check_flow_file: &'a str,
     pub base_endpoint_file: &'a str,
     // The output file
@@ -305,9 +307,9 @@ impl<'a> CheckComponent<'a> {
         for (name, path) in action.return_fields.clone() {
             let mut value = resp.clone();
             let path: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
-            println!("path: {:?}", path);
+            //println!("path: {:?}", path);
             for key in path.into_iter() {
-                println!("key: {:?}", key);
+                //println!("key: {:?}", key);
                 value = value
                     .get(key.clone())
                     .ok_or(anyhow::Error::msg(format!(
@@ -481,7 +483,8 @@ impl<'a> Default for GeneratorBuilder<'a> {
     fn default() -> Self {
         Self {
             inner: CheckComponent {
-                list_id_file: "",
+                list_node_id_file: "",
+                list_gateway_id_file: "",
                 check_flow_file: "",
                 base_endpoint_file: "",
                 output_file: "",
@@ -495,9 +498,7 @@ impl<'a> Default for GeneratorBuilder<'a> {
 
 impl<'a> GeneratorBuilder<'a> {
     pub async fn with_list_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
-        self.inner.list_id_file = path;
-        let list_id_file = std::fs::read_to_string(path)
-            .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
+        self.inner.list_node_id_file = path;
 
         let list_nodes: Vec<NodeInfo> = self
             .get_list_nodes()
@@ -513,38 +514,40 @@ impl<'a> GeneratorBuilder<'a> {
         println!("get_list_nodes");
 
         println!("----------Create list of nodes info details----------");
-        let file = File::open(self.inner.list_id_file)?;
-        let reader = BufReader::new(file);
-        for line in reader.lines().into_iter() {
-            let data: Vec<String> = line
-                .unwrap()
-                .split(' ')
-                .map(|piece| piece.to_string())
-                .collect();
-            let node = NodeInfo {
-                blockchain: data[2].clone(),
-                network: data[3].clone(),
-                id: data[0].clone(),
-                user_id: data[1].clone(),
-                ip: data[4].clone(),
-                zone: data[5].clone(),
-                country_code: data[6].clone(),
-                token: data[7].clone(),
-            };
-            //println!("node: {:#?}", &node);
-            nodes.push(node);
+        let lines: Vec<String> = match self.inner.list_node_id_file.starts_with("http") {
+            true => {
+                let url = self.inner.list_node_id_file;
+                println!("url:{}", url);
+                let node_data = reqwest::get(url).await?.text().await?;
+                println!("node_data: {}", node_data);
+                let lines: Vec<String> = node_data.split("\n").map(|s| s.to_string()).collect();
+                lines
+            }
+            false => {
+                let file = File::open(self.inner.list_node_id_file)?;
+                let reader = BufReader::new(file);
+                reader.lines().into_iter().filter_map(|s| s.ok()).collect()
+            }
+        };
 
-            //d39ba1ce-d1fd-4a85-b25c-0ec0f4f0517c 7dd6caf2-7dc1-45ee-8fe3-744259fabf81 eth mainnet 34.88.228.190 EU FI
-            //https://dapi.massbit.io/deploy/gateway/eth/mainnet/EU/FI/7dd6caf2-7dc1-45ee-8fe3-744259fabf81/d39ba1ce-d1fd-4a85-b25c-0ec0f4f0517c
-            // let url = format!("{}/{}/{}/{}/{}/{}/{}",prefix_url,node.blockchain,node.network,node.zone,node.country_code,node.user_id,node.gateway_id);
-            // println!("url:{}",&url);
-            // let node_data = reqwest::get(url.as_str())
-            //     .await?
-            //     .text()
-            //     .await?;
-            // println!("node_data: {:#?}", &node_data);
-            // let token = Self::get_token(node_data)?;
-            // node.token = token;
+        for line in lines {
+            if !line.is_empty() {
+                //println!("line: {:?}", &line);
+                let data: Vec<String> = line.split(' ').map(|piece| piece.to_string()).collect();
+                //println!("data: {:?}", &data);
+
+                let node = NodeInfo {
+                    blockchain: data[2].clone(),
+                    network: data[3].clone(),
+                    id: data[0].clone(),
+                    user_id: data[1].clone(),
+                    ip: data[4].clone(),
+                    zone: data[5].clone(),
+                    country_code: data[6].clone(),
+                    token: data[7].clone(),
+                };
+                nodes.push(node);
+            }
         }
 
         return Ok(nodes);

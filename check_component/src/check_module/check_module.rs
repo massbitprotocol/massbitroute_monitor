@@ -2,7 +2,7 @@ use anyhow::{anyhow, Error};
 use chrono::Duration;
 use clap::StructOpt;
 use futures::pin_mut;
-use futures_util::future::err;
+use futures_util::future::{err, join_all};
 use minifier::json::minify;
 use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
@@ -339,7 +339,7 @@ impl<'a> CheckComponent<'a> {
 
     async fn run_check_steps(
         &self,
-        steps: &Vec<CheckStep>,
+        steps: Vec<CheckStep>,
         node: &NodeInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
         let mut step_result: HashMap<String, HashMap<String, String>> = HashMap::new();
@@ -424,7 +424,7 @@ impl<'a> CheckComponent<'a> {
 
         // Check node
         let nodes = &self.list_nodes;
-
+        let mut tasks = Vec::new();
         for node in nodes {
             let steps = self.get_check_steps(
                 &node.blockchain,
@@ -432,23 +432,23 @@ impl<'a> CheckComponent<'a> {
                 &"checking_chain_type".to_string(),
             );
 
-            let report = match steps {
+            match steps {
                 Ok(steps) => {
                     //log::debug!("steps:{:#?}", steps);
                     log::debug!("Do the check steps");
-                    self.run_check_steps(&steps, node).await
+                    tasks.push(self.run_check_steps(steps, node));
                 }
                 Err(err) => {
                     log::debug!("There are no check steps");
-                    Err(anyhow::Error::msg("There are no check steps"))
                 }
             };
-
-            if let Ok(report) = report {
-                log::debug!("add report: {:?}", &report);
-                reports.push(report);
-            }
         }
+
+        let responses = join_all(tasks).await;
+        let reports = responses
+            .into_iter()
+            .filter_map(|report| report.ok())
+            .collect();
 
         Ok(reports)
     }

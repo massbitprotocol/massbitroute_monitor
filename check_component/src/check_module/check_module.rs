@@ -66,11 +66,24 @@ pub struct NodeInfo {
     pub zone: String,
     pub country_code: String,
     pub token: String,
+    pub component_type: ComponentType,
+    pub endpoint: String,
 }
 
 impl NodeInfo {
-    fn get_url(&self) -> UrlType {
+    fn get_node_url(&self) -> UrlType {
         format!("http://{}.node.mbr.massbitroute.com", self.id)
+    }
+
+    fn get_gateway_url(&self, list_dapis: &Vec<NodeInfo>) -> UrlType {
+        let mut dapi_id = "".to_string();
+        for dapi in list_dapis {
+            if dapi.component_type == self.component_type {
+                dapi_id = dapi.id.clone()
+            }
+        }
+        // http://34.88.83.191/cb8a7cef-0ebd-4ce7-a39f-6c0d4ddd5f3a
+        format!("http://{ip}/{dapi_id}", ip = self.ip, dapi_id = dapi_id)
     }
 }
 
@@ -79,12 +92,16 @@ pub struct CheckComponent<'a> {
     // input file
     pub list_node_id_file: &'a str,
     pub list_gateway_id_file: &'a str,
+    pub list_dapi_id_file: &'a str,
     pub check_flow_file: &'a str,
     pub base_endpoint_file: &'a str,
     // The output file
     pub output_file: &'a str,
     // inner data
     pub list_nodes: Vec<NodeInfo>,
+    pub list_gateways: Vec<NodeInfo>,
+    pub list_dapis: Vec<NodeInfo>,
+    pub list_users: Vec<NodeInfo>,
     pub base_nodes: HashMap<BlockChainType, UrlType>,
     pub check_flows: CheckFlows,
     pub is_loop_check: bool,
@@ -119,6 +136,28 @@ enum Component {
     Node(NodeInfo),
     Gateway(GatewayInfo),
     DApi(DApiInfo),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum ComponentType {
+    Node,
+    Gateway,
+    DApi,
+}
+impl ToString for ComponentType {
+    fn to_string(&self) -> String {
+        match self {
+            ComponentType::Node => "node".to_string(),
+            ComponentType::Gateway => "gateway".to_string(),
+            ComponentType::DApi => "dapi".to_string(),
+        }
+    }
+}
+
+impl std::default::Default for ComponentType {
+    fn default() -> Self {
+        ComponentType::Node
+    }
 }
 
 const CHECK_INTERVAL: u64 = 2; // sec unit
@@ -293,7 +332,11 @@ impl<'a> CheckComponent<'a> {
     ) -> Result<ActionResponse, anyhow::Error> {
         // Get url
         //log::debug!("self.base_nodes: {:?}", self.base_nodes);
-        let node_url = node.get_url();
+        let node_url = match node.component_type {
+            ComponentType::Node => node.get_node_url(),
+            ComponentType::Gateway => node.get_gateway_url(&self.list_dapis),
+            ComponentType::DApi => String::default(),
+        };
         let url = match action.is_base_node {
             true => self.base_nodes.get(node.blockchain.as_str()),
             false => Some(&node_url),
@@ -301,11 +344,14 @@ impl<'a> CheckComponent<'a> {
         .ok_or(anyhow::Error::msg("Cannot get url"))?;
         let body = action.body.clone();
         log::debug!("body: {}", body);
-        let client = reqwest::Client::new()
+        let mut client = reqwest::Client::new()
             .post(url)
-            .header("content-type", "application/json")
-            .header("X-Api-Key", node.token.as_str())
-            .body(body);
+            .header("content-type", "application/json");
+        client = match node.component_type {
+            ComponentType::Node => client.header("X-Api-Key", node.token.as_str()).body(body),
+            ComponentType::Gateway => client.header("Host", node.token.as_str()).body(body),
+            ComponentType::DApi => client,
+        };
         log::debug!("client: {:?}", client);
 
         let sender = client.send();
@@ -355,7 +401,7 @@ impl<'a> CheckComponent<'a> {
     async fn run_check_steps(
         &self,
         steps: Vec<CheckStep>,
-        node: &NodeInfo,
+        component: &NodeInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
         let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
@@ -373,14 +419,14 @@ impl<'a> CheckComponent<'a> {
                 "call" => {
                     let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
                     log::debug!("call action: {:?}", &action);
-                    self.call_action(&action, node, &step.return_name, &step_result)
+                    self.call_action(&action, component, &step.return_name, &step_result)
                         .await
                 }
                 "compare" => {
                     let action: ActionCompare =
                         serde_json::from_value(step.action.clone()).unwrap();
                     log::debug!("compare action: {:?}", &action);
-                    self.compare_action(&action, node, &step.return_name, &step_result)
+                    self.compare_action(&action, component, &step.return_name, &step_result)
                 }
                 _ => Err(anyhow::Error::msg("not support action")),
             };
@@ -424,7 +470,13 @@ impl<'a> CheckComponent<'a> {
 
         Ok(CheckMkReport {
             status: status as u8,
-            service_name: format!("node-http-{}-{}-{}", node.blockchain, node.network, node.id),
+            service_name: format!(
+                "{}-http-{}-{}-{}",
+                component.component_type.to_string(),
+                component.blockchain,
+                component.network,
+                component.id
+            ),
             metric: None,
             status_detail: message,
         })
@@ -452,6 +504,27 @@ impl<'a> CheckComponent<'a> {
                     //log::debug!("steps:{:#?}", steps);
                     log::debug!("Do the check steps");
                     tasks.push(self.run_check_steps(steps, node));
+                }
+                Err(err) => {
+                    log::debug!("There are no check steps");
+                }
+            };
+        }
+
+        // Check Gateway
+        let gateways = &self.list_gateways;
+        for gateway in gateways {
+            let steps = self.get_check_steps(
+                &gateway.blockchain,
+                &"gateway".to_string(),
+                &"checking_chain_type".to_string(),
+            );
+
+            match steps {
+                Ok(steps) => {
+                    //log::debug!("steps:{:#?}", steps);
+                    log::debug!("Do the check steps");
+                    tasks.push(self.run_check_steps(steps, gateway));
                 }
                 Err(err) => {
                     log::debug!("There are no check steps");
@@ -513,10 +586,14 @@ impl<'a> Default for GeneratorBuilder<'a> {
             inner: CheckComponent {
                 list_node_id_file: "",
                 list_gateway_id_file: "",
+                list_dapi_id_file: "",
                 check_flow_file: "",
                 base_endpoint_file: "",
                 output_file: "",
                 list_nodes: vec![],
+                list_gateways: vec![],
+                list_dapis: vec![],
+                list_users: vec![],
                 base_nodes: Default::default(),
                 check_flows: Default::default(),
                 is_loop_check: false,
@@ -527,26 +604,51 @@ impl<'a> Default for GeneratorBuilder<'a> {
 }
 
 impl<'a> GeneratorBuilder<'a> {
-    pub async fn with_list_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
+    pub async fn with_list_node_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
         self.inner.list_node_id_file = path;
 
         let list_nodes: Vec<NodeInfo> = self
-            .get_list_nodes()
+            .get_list_component(ComponentType::Node)
             .await
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
         self.inner.list_nodes = list_nodes;
         self
     }
+    pub async fn with_list_gateway_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
+        self.inner.list_gateway_id_file = path;
 
-    async fn get_list_nodes(&self) -> Result<Vec<NodeInfo>, anyhow::Error> {
+        let list_gateways: Vec<NodeInfo> = self
+            .get_list_component(ComponentType::Gateway)
+            .await
+            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        self.inner.list_gateways = list_gateways;
+        self
+    }
+    pub async fn with_list_dapi_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
+        self.inner.list_dapi_id_file = path;
+
+        let list_dapis: Vec<NodeInfo> = self
+            .get_list_component(ComponentType::DApi)
+            .await
+            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        self.inner.list_dapis = list_dapis;
+        self
+    }
+
+    async fn get_list_component(
+        &self,
+        component_type: ComponentType,
+    ) -> Result<Vec<NodeInfo>, anyhow::Error> {
         let mut nodes: Vec<NodeInfo> = Vec::new();
-        let prefix_url = "https://dapi.massbit.io/deploy/gateway".to_string();
-        log::debug!("get_list_nodes");
-
         log::debug!("----------Create list of nodes info details----------");
-        let lines: Vec<String> = match self.inner.list_node_id_file.starts_with("http") {
+        let list_id_file = match component_type {
+            ComponentType::Node => self.inner.list_node_id_file,
+            ComponentType::Gateway => self.inner.list_gateway_id_file,
+            ComponentType::DApi => self.inner.list_dapi_id_file,
+        };
+        let lines: Vec<String> = match list_id_file.starts_with("http") {
             true => {
-                let url = self.inner.list_node_id_file;
+                let url = list_id_file;
                 log::debug!("url:{}", url);
                 let node_data = reqwest::get(url).await?.text().await?;
                 log::debug!("node_data: {}", node_data);
@@ -554,7 +656,7 @@ impl<'a> GeneratorBuilder<'a> {
                 lines
             }
             false => {
-                let file = File::open(self.inner.list_node_id_file)?;
+                let file = File::open(list_id_file)?;
                 let reader = BufReader::new(file);
                 reader.lines().into_iter().filter_map(|s| s.ok()).collect()
             }
@@ -566,16 +668,34 @@ impl<'a> GeneratorBuilder<'a> {
                 let data: Vec<String> = line.split(' ').map(|piece| piece.to_string()).collect();
                 //log::debug!("data: {:?}", &data);
 
-                let node = NodeInfo {
-                    blockchain: data[2].clone(),
-                    network: data[3].clone(),
-                    id: data[0].clone(),
-                    user_id: data[1].clone(),
-                    ip: data[4].clone(),
-                    zone: data[5].clone(),
-                    country_code: data[6].clone(),
-                    token: data[7].clone(),
+                let node = match component_type {
+                    ComponentType::Node | ComponentType::Gateway => NodeInfo {
+                        blockchain: data[2].clone(),
+                        network: data[3].clone(),
+                        id: data[0].clone(),
+                        user_id: data[1].clone(),
+                        ip: data[4].clone(),
+                        zone: data[5].clone(),
+                        country_code: data[6].clone(),
+                        token: data[7].clone(),
+                        component_type: component_type.clone(),
+                        endpoint: Default::default(),
+                    },
+                    //77762f16-4344-4c58-9851-9e2e4488a2c0 87f54452-18e7-4582-b699-110e061a6248 ftm mainnet cd0pfbm2tjq3.ftm-mainnet.massbitroute.com 77762f16-4344-4c58-9851-9e2e4488a2c0
+                    ComponentType::DApi => NodeInfo {
+                        blockchain: data[2].clone(),
+                        network: data[3].clone(),
+                        id: data[0].clone(),
+                        user_id: data[1].clone(),
+                        ip: Default::default(),
+                        zone: Default::default(),
+                        country_code: Default::default(),
+                        token: Default::default(),
+                        component_type: component_type.clone(),
+                        endpoint: data[4].clone(),
+                    },
                 };
+
                 nodes.push(node);
             }
         }

@@ -349,7 +349,7 @@ impl<'a> CheckComponent<'a> {
             ComponentType::Node => node.get_node_url(),
             ComponentType::Gateway => {
                 let url = node.get_gateway_url(&ref_dapi);
-                println!("gateway url: {}", url);
+                //println!("gateway url: {}", url);
                 url
             }
             ComponentType::DApi => String::default(),
@@ -681,7 +681,7 @@ impl<'a> GeneratorBuilder<'a> {
         };
         for line in lines {
             if !line.is_empty() {
-                println!("line: {}", &line);
+                //println!("line: {}", &line);
                 //log::debug!("line: {:?}", &line);
                 let data: Vec<String> = line.split(' ').map(|piece| piece.to_string()).collect();
                 //log::debug!("data: {:?}", &data);

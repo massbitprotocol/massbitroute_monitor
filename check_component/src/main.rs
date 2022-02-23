@@ -20,6 +20,9 @@ async fn main() {
         let list_gateway_id_file = matches
             .value_of("list-gateway-id-file")
             .unwrap_or("src/example/list-gateway-id");
+        let list_dapi_id_file = matches
+            .value_of("list-dapi-id-file")
+            .unwrap_or("src/example/list-dapi-id");
         let check_flow_file = matches
             .value_of("check-flow")
             .unwrap_or("src/example/check-flow.json");
@@ -33,6 +36,8 @@ async fn main() {
             .with_list_node_id_file(list_node_id_file)
             .await
             .with_list_gateway_id_file(list_gateway_id_file)
+            .await
+            .with_list_dapi_id_file(list_dapi_id_file)
             .await
             .with_check_flow_file(check_flow_file)
             .with_base_endpoint_file(base_endpoint_file)
@@ -59,6 +64,14 @@ fn create_check_component() -> App<'static> {
                 .long("list-gateway-id-file")
                 .value_name("list-gateway-id-file")
                 .help("Input list-gateway-id file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("list-dapi-id-file")
+                .short('d')
+                .long("list-dapi-id-file")
+                .value_name("list-dapi-id-file")
+                .help("Input list-dapi-id file")
                 .takes_value(true),
         )
         .arg(

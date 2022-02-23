@@ -7,6 +7,7 @@ use minifier::json::minify;
 use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 
+use crate::check_module::check_module::ComponentType::Node;
 use log::{debug, error, info, log_enabled, Level};
 use serde_json::{to_string, Number, Value};
 use std::any::Any;
@@ -57,7 +58,7 @@ pub struct OperatorCompare {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct NodeInfo {
+pub struct ComponentInfo {
     pub blockchain: BlockChainType,
     pub network: String,
     pub id: String,
@@ -70,20 +71,29 @@ pub struct NodeInfo {
     pub endpoint: String,
 }
 
-impl NodeInfo {
+impl ComponentInfo {
     fn get_node_url(&self) -> UrlType {
         format!("http://{}.node.mbr.massbitroute.com", self.id)
     }
 
-    fn get_gateway_url(&self, list_dapis: &Vec<NodeInfo>) -> UrlType {
-        let mut dapi_id = "".to_string();
-        for dapi in list_dapis {
-            if dapi.component_type == self.component_type {
-                dapi_id = dapi.id.clone()
+    fn get_component_same_chain(
+        &self,
+        list_components: &Vec<ComponentInfo>,
+    ) -> Option<ComponentInfo> {
+        let mut result = None;
+
+        for component in list_components {
+            if (component.blockchain == self.blockchain) && (component.network == self.network) {
+                result = Some(component.clone());
+                break;
             }
         }
+        result
+    }
+
+    fn get_gateway_url(&self, fix_dapi: &ComponentInfo) -> UrlType {
         // http://34.88.83.191/cb8a7cef-0ebd-4ce7-a39f-6c0d4ddd5f3a
-        format!("http://{ip}/{dapi_id}", ip = self.ip, dapi_id = dapi_id)
+        format!("http://{ip}/{dapi_id}", ip = self.ip, dapi_id = fix_dapi.id)
     }
 }
 
@@ -98,10 +108,10 @@ pub struct CheckComponent<'a> {
     // The output file
     pub output_file: &'a str,
     // inner data
-    pub list_nodes: Vec<NodeInfo>,
-    pub list_gateways: Vec<NodeInfo>,
-    pub list_dapis: Vec<NodeInfo>,
-    pub list_users: Vec<NodeInfo>,
+    pub list_nodes: Vec<ComponentInfo>,
+    pub list_gateways: Vec<ComponentInfo>,
+    pub list_dapis: Vec<ComponentInfo>,
+    pub list_users: Vec<ComponentInfo>,
     pub base_nodes: HashMap<BlockChainType, UrlType>,
     pub check_flows: CheckFlows,
     pub is_loop_check: bool,
@@ -133,7 +143,7 @@ struct GatewayInfo;
 struct DApiInfo;
 
 enum Component {
-    Node(NodeInfo),
+    Node(ComponentInfo),
     Gateway(GatewayInfo),
     DApi(DApiInfo),
 }
@@ -301,7 +311,7 @@ impl<'a> CheckComponent<'a> {
     fn compare_action(
         &self,
         action: &ActionCompare,
-        node: &NodeInfo,
+        node: &ComponentInfo,
         return_name: &String,
         step_result: &StepResult,
     ) -> Result<ActionResponse, anyhow::Error> {
@@ -326,17 +336,25 @@ impl<'a> CheckComponent<'a> {
     async fn call_action(
         &self,
         action: &ActionCall,
-        node: &NodeInfo,
+        node: &ComponentInfo,
         return_name: &String,
         step_result: &StepResult,
     ) -> Result<ActionResponse, anyhow::Error> {
         // Get url
         //log::debug!("self.base_nodes: {:?}", self.base_nodes);
+
+        let ref_dapi = node.get_component_same_chain(&self.list_dapis).unwrap();
+
         let node_url = match node.component_type {
             ComponentType::Node => node.get_node_url(),
-            ComponentType::Gateway => node.get_gateway_url(&self.list_dapis),
+            ComponentType::Gateway => {
+                let url = node.get_gateway_url(&ref_dapi);
+                println!("gateway url: {}", url);
+                url
+            }
             ComponentType::DApi => String::default(),
         };
+
         let url = match action.is_base_node {
             true => self.base_nodes.get(node.blockchain.as_str()),
             false => Some(&node_url),
@@ -349,7 +367,7 @@ impl<'a> CheckComponent<'a> {
             .header("content-type", "application/json");
         client = match node.component_type {
             ComponentType::Node => client.header("X-Api-Key", node.token.as_str()).body(body),
-            ComponentType::Gateway => client.header("Host", node.token.as_str()).body(body),
+            ComponentType::Gateway => client.header("Host", ref_dapi.endpoint.as_str()).body(body),
             ComponentType::DApi => client,
         };
         log::debug!("client: {:?}", client);
@@ -401,7 +419,7 @@ impl<'a> CheckComponent<'a> {
     async fn run_check_steps(
         &self,
         steps: Vec<CheckStep>,
-        component: &NodeInfo,
+        component: &ComponentInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
         let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
@@ -607,7 +625,7 @@ impl<'a> GeneratorBuilder<'a> {
     pub async fn with_list_node_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
         self.inner.list_node_id_file = path;
 
-        let list_nodes: Vec<NodeInfo> = self
+        let list_nodes: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::Node)
             .await
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
@@ -617,7 +635,7 @@ impl<'a> GeneratorBuilder<'a> {
     pub async fn with_list_gateway_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
         self.inner.list_gateway_id_file = path;
 
-        let list_gateways: Vec<NodeInfo> = self
+        let list_gateways: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::Gateway)
             .await
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
@@ -627,7 +645,7 @@ impl<'a> GeneratorBuilder<'a> {
     pub async fn with_list_dapi_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
         self.inner.list_dapi_id_file = path;
 
-        let list_dapis: Vec<NodeInfo> = self
+        let list_dapis: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::DApi)
             .await
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
@@ -638,8 +656,8 @@ impl<'a> GeneratorBuilder<'a> {
     async fn get_list_component(
         &self,
         component_type: ComponentType,
-    ) -> Result<Vec<NodeInfo>, anyhow::Error> {
-        let mut nodes: Vec<NodeInfo> = Vec::new();
+    ) -> Result<Vec<ComponentInfo>, anyhow::Error> {
+        let mut nodes: Vec<ComponentInfo> = Vec::new();
         log::debug!("----------Create list of nodes info details----------");
         let list_id_file = match component_type {
             ComponentType::Node => self.inner.list_node_id_file,
@@ -661,15 +679,15 @@ impl<'a> GeneratorBuilder<'a> {
                 reader.lines().into_iter().filter_map(|s| s.ok()).collect()
             }
         };
-
         for line in lines {
             if !line.is_empty() {
+                println!("line: {}", &line);
                 //log::debug!("line: {:?}", &line);
                 let data: Vec<String> = line.split(' ').map(|piece| piece.to_string()).collect();
                 //log::debug!("data: {:?}", &data);
 
                 let node = match component_type {
-                    ComponentType::Node | ComponentType::Gateway => NodeInfo {
+                    ComponentType::Node | ComponentType::Gateway => ComponentInfo {
                         blockchain: data[2].clone(),
                         network: data[3].clone(),
                         id: data[0].clone(),
@@ -682,7 +700,7 @@ impl<'a> GeneratorBuilder<'a> {
                         endpoint: Default::default(),
                     },
                     //77762f16-4344-4c58-9851-9e2e4488a2c0 87f54452-18e7-4582-b699-110e061a6248 ftm mainnet cd0pfbm2tjq3.ftm-mainnet.massbitroute.com 77762f16-4344-4c58-9851-9e2e4488a2c0
-                    ComponentType::DApi => NodeInfo {
+                    ComponentType::DApi => ComponentInfo {
                         blockchain: data[2].clone(),
                         network: data[3].clone(),
                         id: data[0].clone(),

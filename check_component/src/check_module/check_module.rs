@@ -71,6 +71,14 @@ pub struct ComponentInfo {
     pub endpoint: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct UserInfo {
+    pub name: String,
+    pub id: String,
+    pub email: String,
+    pub verified: bool,
+}
+
 impl ComponentInfo {
     fn get_node_url(&self) -> UrlType {
         format!("http://{}.node.mbr.massbitroute.com", self.id)
@@ -103,6 +111,7 @@ pub struct CheckComponent<'a> {
     pub list_node_id_file: &'a str,
     pub list_gateway_id_file: &'a str,
     pub list_dapi_id_file: &'a str,
+    pub list_user_file: &'a str,
     pub check_flow_file: &'a str,
     pub base_endpoint_file: &'a str,
     // The output file
@@ -111,7 +120,7 @@ pub struct CheckComponent<'a> {
     pub list_nodes: Vec<ComponentInfo>,
     pub list_gateways: Vec<ComponentInfo>,
     pub list_dapis: Vec<ComponentInfo>,
-    pub list_users: Vec<ComponentInfo>,
+    pub list_users: Vec<UserInfo>,
     pub base_nodes: HashMap<BlockChainType, UrlType>,
     pub check_flows: CheckFlows,
     pub is_loop_check: bool,
@@ -239,6 +248,10 @@ impl ToString for CheckMkReport {
 impl<'a> CheckComponent<'a> {
     pub fn builder() -> GeneratorBuilder<'a> {
         GeneratorBuilder::default()
+    }
+
+    fn get_user(&self, user_id: &String) -> Option<&UserInfo> {
+        self.list_users.iter().find(|user| &user.id == user_id)
     }
 
     fn get_check_steps(
@@ -485,7 +498,15 @@ impl<'a> CheckComponent<'a> {
                 }
             }
         }
+        let user = self.get_user(&component.user_id);
+        let user_info = match user {
+            None => "".to_string(),
+            Some(user) => {
+                format!("id:{},{},email:{}", user.id, user.name, user.email)
+            }
+        };
 
+        message.push_str(&user_info);
         Ok(CheckMkReport {
             status: status as u8,
             service_name: format!(
@@ -493,7 +514,7 @@ impl<'a> CheckComponent<'a> {
                 component.component_type.to_string(),
                 component.blockchain,
                 component.network,
-                component.id
+                component.id,
             ),
             metric: None,
             status_detail: message,
@@ -605,6 +626,7 @@ impl<'a> Default for GeneratorBuilder<'a> {
                 list_node_id_file: "",
                 list_gateway_id_file: "",
                 list_dapi_id_file: "",
+                list_user_file: "",
                 check_flow_file: "",
                 base_endpoint_file: "",
                 output_file: "",
@@ -651,6 +673,59 @@ impl<'a> GeneratorBuilder<'a> {
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
         self.inner.list_dapis = list_dapis;
         self
+    }
+    pub async fn with_list_user_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
+        self.inner.list_user_file = path;
+
+        let list_users: Vec<UserInfo> = self
+            .get_list_user()
+            .await
+            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        log::debug!("list users: {:?}", &list_users);
+        self.inner.list_users = list_users;
+        self
+    }
+
+    async fn get_list_user(&self) -> Result<Vec<UserInfo>, anyhow::Error> {
+        let mut users: Vec<UserInfo> = Vec::new();
+        log::debug!("----------Create list of users info details----------");
+        let list_id_file = self.inner.list_user_file;
+        let lines: Vec<String> = match list_id_file.starts_with("http") {
+            true => {
+                let url = list_id_file;
+                log::debug!("url:{}", url);
+                let node_data = reqwest::get(url).await?.text().await?;
+                log::debug!("node_data: {}", node_data);
+                let lines: Vec<String> = node_data.split("\n").map(|s| s.to_string()).collect();
+                lines
+            }
+            false => {
+                let file = File::open(list_id_file)?;
+                let reader = BufReader::new(file);
+                reader.lines().into_iter().filter_map(|s| s.ok()).collect()
+            }
+        };
+        for line in lines {
+            if !line.is_empty() {
+                //println!("line: {}", &line);
+                //log::debug!("line: {:?}", &line);
+                let data: Vec<String> = line.split(' ').map(|piece| piece.to_string()).collect();
+                //log::debug!("data: {:?}", &data);
+
+                let user =
+                    // 298eef2b-5fa2-4a3d-b00c-fe95b01e237c zhangpanyi@live.com zhangpanyi@live.com true
+                    UserInfo {
+                        name: data[1].clone(),
+                        id: data[0].clone(),
+                        email: data[2].clone(),
+                        verified: data[3].clone().parse::<bool>().unwrap_or_default()
+                    };
+
+                users.push(user);
+            }
+        }
+
+        return Ok(users);
     }
 
     async fn get_list_component(

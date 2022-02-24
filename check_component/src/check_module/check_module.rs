@@ -510,11 +510,12 @@ impl<'a> CheckComponent<'a> {
         Ok(CheckMkReport {
             status: status as u8,
             service_name: format!(
-                "{}-http-{}-{}-{}",
+                "{}-http-{}-{}-{}-{}",
                 component.component_type.to_string(),
                 component.blockchain,
                 component.network,
                 component.id,
+                component.ip
             ),
             metric: None,
             status_detail: message,

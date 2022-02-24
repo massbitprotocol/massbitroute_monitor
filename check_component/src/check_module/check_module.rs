@@ -8,6 +8,7 @@ use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 
 use crate::check_module::check_module::ComponentType::Node;
+use handlebars::{Handlebars, RenderError};
 use log::{debug, error, info, log_enabled, Level};
 use serde_json::{to_string, Number, Value};
 use std::any::Any;
@@ -26,7 +27,7 @@ use tokio::time::error::Elapsed;
 type BlockChainType = String;
 type UrlType = String;
 type TaskType = String;
-type StepResult = HashMap<String, HashMap<String, String>>;
+type StepResult = HashMap<String, String>;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
@@ -296,11 +297,8 @@ impl<'a> CheckComponent<'a> {
                 let items: Vec<String> = serde_json::from_value(operator.params.clone())?;
                 let mut item_values = Vec::new();
                 for item in items {
-                    let item_path: Vec<String> = item.split("/").map(|s| s.to_string()).collect();
                     let item_value = step_result
-                        .get(item_path[0].as_str())
-                        .ok_or(anyhow::Error::msg("Cannot find key"))?
-                        .get(item_path[1].as_str())
+                        .get(item.as_str())
                         .ok_or(anyhow::Error::msg("Cannot find key"))?;
                     item_values.push(item_value);
                 }
@@ -346,6 +344,17 @@ impl<'a> CheckComponent<'a> {
             result,
         });
     }
+
+    fn replace_string(org: String, step_result: &StepResult) -> Result<String, anyhow::Error> {
+        let mut handlebars = Handlebars::new();
+        handlebars
+            .render_template(org.as_str(), step_result)
+            .map_err(|err| {
+                println!("err:{:?}", err);
+                anyhow::Error::msg(format!("{}", err))
+            })
+    }
+
     async fn call_action(
         &self,
         action: &ActionCall,
@@ -356,8 +365,8 @@ impl<'a> CheckComponent<'a> {
         // Get url
         //log::debug!("self.base_nodes: {:?}", self.base_nodes);
 
+        // prepare rpc call
         let ref_dapi = node.get_component_same_chain(&self.list_dapis).unwrap();
-
         let node_url = match node.component_type {
             ComponentType::Node => node.get_node_url(),
             ComponentType::Gateway => {
@@ -373,8 +382,12 @@ impl<'a> CheckComponent<'a> {
             false => Some(&node_url),
         }
         .ok_or(anyhow::Error::msg("Cannot get url"))?;
-        let body = action.body.clone();
-        log::debug!("body: {}", body);
+        //println!("org:  {}", action.body);
+        //println!("step_result:{:?}", step_result);
+        // Replace body for transport result of previous step
+        let body = Self::replace_string(action.body.clone(), step_result)?;
+        //println!("body: {}", body);
+
         let mut client = reqwest::Client::new()
             .post(url)
             .header("content-type", "application/json");
@@ -388,6 +401,7 @@ impl<'a> CheckComponent<'a> {
         let sender = client.send();
         pin_mut!(sender);
 
+        // Call rpc
         let res = tokio::time::timeout(
             std::time::Duration::from_secs(action.time_out as u64),
             &mut sender,
@@ -415,7 +429,7 @@ impl<'a> CheckComponent<'a> {
                     .clone();
                 //log::debug!("value: {:?}", value);
             }
-            result.insert(name, value.to_string());
+            result.insert(name, value.as_str().unwrap().to_string());
         }
 
         let action_resp = ActionResponse {
@@ -473,7 +487,10 @@ impl<'a> CheckComponent<'a> {
                             &step.return_name,
                             report
                         );
-                        step_result.insert(report.return_name, report.result);
+                        for (key, value) in &report.result {
+                            step_result
+                                .insert(format!("{}_{}", &report.return_name, key), value.clone());
+                        }
                     }
                     false => {
                         if step.failed_case.critical {

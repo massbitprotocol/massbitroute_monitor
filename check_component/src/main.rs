@@ -2,9 +2,22 @@ use clap::{App, Arg};
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
 // use regex::Regex;
+use handlebars::Handlebars;
+use std::collections::BTreeMap;
 
 #[tokio::main]
 async fn main() {
+    // let mut handlebars = Handlebars::new();
+    // let source = r#"{ "jsonrpc": "2.0",  "method": "eth_getBlockByNumber", "params": ["{{base_return:block_number}}",  true],"id": 1}"#;
+    //
+    // let mut data = BTreeMap::new();
+    // data.insert(
+    //     "base_return:block_number".to_string(),
+    //     "\"0xd9b51c\"".to_string(),
+    // );
+    // let res = handlebars.render_template(source, &data);
+    // println!("res: {:?}", res);
+
     let res = init_logger(&String::from("CheckComponent"));
     //println!("Log output: {}", res); // Print log output type
 

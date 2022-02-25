@@ -218,6 +218,7 @@ struct ActionResponse {
     success: bool,
     return_name: String,
     result: HashMap<String, String>,
+    message: String,
 }
 
 enum CheckMkStatus {
@@ -342,6 +343,7 @@ impl<'a> CheckComponent<'a> {
             success,
             return_name: return_name.clone(),
             result,
+            message: format!("compare items: {:?}", action.operator_items),
         });
     }
 
@@ -436,6 +438,7 @@ impl<'a> CheckComponent<'a> {
             success: true,
             return_name: return_name.clone(),
             result,
+            message: format!("call {}: {}", return_name.clone(), true),
         };
 
         log::debug!("action_resp: {:#?}", action_resp);
@@ -500,17 +503,18 @@ impl<'a> CheckComponent<'a> {
                             break;
                         } else {
                             status = CheckMkStatus::Warning;
-                            message.push_str(&format!("Failed at step {}.\n", &step.return_name));
+                            message.push_str(&format!("Failed at step {}.", &step.return_name));
                         }
                     }
                 },
                 Err(e) => {
                     if step.failed_case.critical {
                         status = CheckMkStatus::Critical;
+                        message.push_str(&format!("Failed at step {}.", &step.return_name));
                         break;
                     } else {
                         status = CheckMkStatus::Warning;
-                        message.push_str(&format!("Failed at step {}.\n", &step.return_name));
+                        message.push_str(&format!("Failed at step {}.", &step.return_name));
                     }
                 }
             }

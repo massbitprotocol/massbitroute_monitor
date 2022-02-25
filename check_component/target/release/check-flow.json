@@ -12,9 +12,9 @@
             "header":{"content-type":"application/json"},
             "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xd9824c\",  true],\"id\": 1}",
             "time_out":5,
-            "return_fields":{"hash":"result/hash","block_number":"result/number"}
+            "return_fields":{"hash":"result/hash","blockNumber":"result/number"}
           },
-          "return_name": "base_return",
+          "return_name": "baseCall",
           "failed_case":{
             "critical": true,
             "message": "cannot get call base_node_url"
@@ -28,9 +28,9 @@
             "header":{"content-type":"application/json"},
             "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xd9824c\",  true],\"id\": 1}",
             "time_out":5,
-            "return_fields":{ "hash":"result/hash","block_number":"result/number"}
+            "return_fields":{ "hash":"result/hash","blockNumber":"result/number"}
           },
-          "return_name":"check_return",
+          "return_name":"checkCall",
           "failed_case": {
             "critical": true,
             "message": "cannot get call check_node_url"
@@ -44,16 +44,16 @@
               "params": [
                 {
                   "operator_type": "eq",
-                  "params": ["base_return/hash","check_return/hash"]
+                  "params": ["baseCall/hash","checkCall/hash"]
                 },
                 {
                   "operator_type": "eq",
-                  "params": ["base_return/block_number","check_return/block_number"]
+                  "params": ["baseCall/blockNumber","checkCall/blockNumber"]
                 }
               ]
             }
           },
-          "return_name":"compare_return",
+          "return_name":"compareBaseAndCheckCall",
           "failed_case": {
             "critical": true,
             "message": "check node is difference from base_node"
@@ -74,9 +74,9 @@
             "header":{"content-type":"application/json"},
             "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xd9824c\",  true],\"id\": 1}",
             "time_out":5,
-            "return_fields":{"hash":"result/hash","block_number":"result/number"}
+            "return_fields":{"hash":"result/hash","blockNumber":"result/number"}
           },
-          "return_name": "base_return",
+          "return_name": "baseCall",
           "failed_case":{
             "critical": true,
             "message": "cannot get call base_node_url"
@@ -90,9 +90,9 @@
             "header":{"content-type":"application/json"},
             "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0xd9824c\",  true],\"id\": 1}",
             "time_out":5,
-            "return_fields":{ "hash":"result/hash","block_number":"result/number"}
+            "return_fields":{ "hash":"result/hash","blockNumber":"result/number"}
           },
-          "return_name":"check_return",
+          "return_name":"checkCall",
           "failed_case": {
             "critical": true,
             "message": "cannot get call check_node_url"
@@ -106,16 +106,16 @@
               "params": [
                 {
                   "operator_type": "eq",
-                  "params": ["base_return/hash","check_return/hash"]
+                  "params": ["baseCall/hash","checkCall/hash"]
                 },
                 {
                   "operator_type": "eq",
-                  "params": ["base_return/block_number","check_return/block_number"]
+                  "params": ["baseCall/blockNumber","checkCall/blockNumber"]
                 }
               ]
             }
           },
-          "return_name":"compare_return",
+          "return_name":"compareBaseAndCheckCall",
           "failed_case": {
             "critical": true,
             "message": "check node is difference from base_node"
@@ -138,7 +138,7 @@
             "time_out":5,
             "return_fields":{"hash":"result/hash"}
           },
-          "return_name": "base_return",
+          "return_name": "baseCall",
           "failed_case":{
             "critical": true,
             "message": "cannot get call base_node_url"
@@ -154,7 +154,7 @@
             "time_out":5,
             "return_fields":{ "hash":"result/hash"}
           },
-          "return_name":"check_return",
+          "return_name":"checkCall",
           "failed_case": {
             "critical": true,
             "message": "cannot get call check_node_url"
@@ -165,10 +165,10 @@
             "action_type":"compare",
             "operator_items": {
               "operator_type": "eq",
-              "params": ["base_return/hash","check_return/hash"]
+              "params": ["baseCall/hash","checkCall/hash"]
             }
           },
-          "return_name":"compare_return",
+          "return_name":"compareBaseAndCheckCall",
           "failed_case": {
             "critical": true,
             "message": "check node is difference from base_node"
@@ -191,7 +191,7 @@
             "time_out":5,
             "return_fields":{"hash":"result/hash"}
           },
-          "return_name": "base_return",
+          "return_name": "baseCall",
           "failed_case":{
             "critical": true,
             "message": "cannot get call base_node_url"
@@ -207,7 +207,7 @@
             "time_out":5,
             "return_fields":{ "hash":"result/hash"}
           },
-          "return_name":"check_return",
+          "return_name":"checkCall",
           "failed_case": {
             "critical": true,
             "message": "cannot get call check_node_url"
@@ -218,10 +218,10 @@
             "action_type":"compare",
             "operator_items": {
               "operator_type": "eq",
-              "params": ["base_return/hash","check_return/hash"]
+              "params": ["baseCall/hash","checkCall/hash"]
             }
           },
-          "return_name":"compare_return",
+          "return_name":"compareBaseAndCheckCall",
           "failed_case": {
             "critical": true,
             "message": "check node is difference from base_node"

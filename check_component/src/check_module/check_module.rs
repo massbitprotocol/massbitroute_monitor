@@ -498,8 +498,10 @@ impl<'a> CheckComponent<'a> {
                     false => {
                         if step.failed_case.critical {
                             status = CheckMkStatus::Critical;
-                            message =
-                                format!("Stop at step {} due to critical error", &step.return_name);
+                            message.push_str(&format!(
+                                "Stop at step {} due to critical error",
+                                &step.return_name
+                            ));
                             break;
                         } else {
                             status = CheckMkStatus::Warning;
@@ -523,7 +525,7 @@ impl<'a> CheckComponent<'a> {
         let user_info = match user {
             None => "".to_string(),
             Some(user) => {
-                format!("id:{},{},email:{}", user.id, user.name, user.email)
+                format!("Succeed id:{},{},email:{}", user.id, user.name, user.email)
             }
         };
 

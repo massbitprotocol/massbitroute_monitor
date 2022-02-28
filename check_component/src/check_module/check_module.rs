@@ -40,12 +40,6 @@ pub struct ActionCall {
     return_fields: HashMap<String, String>,
 }
 
-impl ActionCall {
-    fn replace_string(org: &str, step_result: StepResult) -> String {
-        todo!()
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCompare {
     action_type: String,
@@ -221,6 +215,7 @@ struct ActionResponse {
     message: String,
 }
 
+#[derive(PartialEq)]
 enum CheckMkStatus {
     Ok = 0,
     Warning = 1,
@@ -525,10 +520,12 @@ impl<'a> CheckComponent<'a> {
         let user_info = match user {
             None => "".to_string(),
             Some(user) => {
-                format!("Succeed id:{},{},email:{}", user.id, user.name, user.email)
+                format!("id:{},{},email:{}", user.id, user.name, user.email)
             }
         };
-
+        if status == CheckMkStatus::Ok {
+            message.push_str("Succeed ");
+        }
         message.push_str(&user_info);
         Ok(CheckMkReport {
             status: status as u8,

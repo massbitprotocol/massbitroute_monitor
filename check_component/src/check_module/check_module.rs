@@ -231,7 +231,7 @@ impl ToString for CheckMkReport {
     fn to_string(&self) -> String {
         match self.metric.clone() {
             None => format!(
-                r#"{status} "{service_name}" {status_detail}"#,
+                r#"{status} "{service_name}" - {status_detail}"#,
                 status = &self.status,
                 service_name = &self.service_name,
                 status_detail = self.status_detail

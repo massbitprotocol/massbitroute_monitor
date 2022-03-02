@@ -17,6 +17,8 @@ check_component/target/release/*
 !check_component/target/release/base-endpoint.json
 !code-compiler/stub/target
 
+mbr_stats/target/*
+
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
 # More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
 

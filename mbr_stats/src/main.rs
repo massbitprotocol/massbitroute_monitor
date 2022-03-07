@@ -1,7 +1,7 @@
-use clap::{Command, Arg};
+use clap::{Arg, Command};
+use handlebars::Handlebars;
 use logger::core::init_logger;
 use mbr_stats::component_stats::ComponentStats;
-use handlebars::Handlebars;
 use std::collections::BTreeMap;
 
 #[tokio::main]
@@ -15,24 +15,24 @@ async fn main() {
         .subcommand(create_component_stats())
         .get_matches();
     if let Some(ref matches) = matches.subcommand_matches("update-stats") {
-        let config_data = matches
-            .value_of("config-data")
-            .unwrap_or("");
+        let config_data = matches.value_of("config-data").unwrap_or("");
         let prometheus_gateway_url = matches
             .value_of("prometheus-gateway-url")
-            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_gw/api/v1/query");
+            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_gw");
         let prometheus_node_url = matches
             .value_of("prometheus-node-url")
-            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_node/api/v1/query");
+            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_node");
         let mvp_url = matches
             .value_of("mvp-url")
             .unwrap_or("wss://rpc.polkadot.io");
 
-
         let component_stats = ComponentStats::builder()
             .with_config_uri(config_data)
+            .await
             .with_prometheus_gateway_url(prometheus_gateway_url)
+            .await
             .with_prometheus_node_url(prometheus_node_url)
+            .await
             .with_mvp_url(mvp_url)
             .await
             .build();
@@ -76,5 +76,4 @@ fn create_component_stats() -> Command<'static> {
                 .help("Input config-data")
                 .takes_value(true),
         )
-
 }

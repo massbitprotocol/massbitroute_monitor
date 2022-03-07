@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use anyhow::{anyhow, Error};
 use chrono::Duration;
 use clap::StructOpt;
@@ -7,19 +6,30 @@ use futures_util::future::{err, join_all};
 use minifier::json::minify;
 use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
+use std::collections::HashMap;
 
+use jsonrpsee::core::client::{
+    Client as JsonRpcClient, ClientT, Subscription, SubscriptionClientT,
+};
+use jsonrpsee::types::ParamsSer;
+use jsonrpsee::ws_client::WsClientBuilder;
+use jsonrpsee::{rpc_params, tracing};
 use log::{debug, error, info, log_enabled, Level};
-use serde_json::{to_string, Number, Value};
+use prometheus_http_query::aggregations::{count_values, sum, topk};
+use prometheus_http_query::functions::round;
 use prometheus_http_query::{Aggregate, Client as PrometheusClient, InstantVector, Selector};
-use prometheus_http_query::aggregations::{sum, topk};
+use serde_json::{to_string, Number, Value};
 use std::convert::TryInto;
 use std::fmt::Formatter;
-use jsonrpsee::core::client::Client as JsonRpcClient;
+use std::os::unix::raw::time_t;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+type TimeStamp = i64;
 
+const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
 
 #[derive(Debug, Deserialize, Serialize, Default)]
-pub struct ConfigData ;
+pub struct ConfigData;
 
 #[derive(Debug, Default)]
 pub struct ComponentStats<'a> {
@@ -34,33 +44,33 @@ pub struct ComponentStats<'a> {
     pub mvp_url: &'a str,
 
     // For collecting data
-    pub data_collection_adapter: DataCollectionAdapter,
+    pub gateway_adapter: DataCollectionAdapter,
+    pub node_adapter: DataCollectionAdapter,
     // For submit data
-    pub mvp_adapter: MvpAdapter,
-
+    pub chain_adapter: ChainAdapter,
 }
 
 #[derive(Clone, Default)]
-pub struct DataCollectionAdapter{
-    data: HashMap<String,QueryData>,
+pub struct DataCollectionAdapter {
+    data: HashMap<String, QueryData>,
     client: Option<PrometheusClient>,
 }
 
 impl std::fmt::Debug for DataCollectionAdapter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DataCollectionAdapter<{:?}>",&self.data)
+        write!(f, "DataCollectionAdapter<{:?}>", &self.data)
     }
 }
 
 #[derive(Default)]
-pub struct MvpAdapter{
-    data: HashMap<String,SubmitData>,
+pub struct ChainAdapter {
+    data: HashMap<String, SubmitData>,
     client: Option<JsonRpcClient>,
 }
 
-impl std::fmt::Debug for MvpAdapter {
+impl std::fmt::Debug for ChainAdapter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MvpAdapter<{:?}>",&self.data)
+        write!(f, "MvpAdapter<{:?}>", &self.data)
     }
 }
 
@@ -76,7 +86,12 @@ pub struct SubmitData {
 pub struct QueryData {
     name: String,
     tags: Vec<String>,
-    value:  isize,
+    value: isize,
+    from_block_number: isize,
+    to_block_number: isize,
+    from_timestamp: i64,
+    to_timestamp: i64,
+    is_keep: bool,
 }
 
 pub struct StatsBuilder<'a> {
@@ -90,41 +105,153 @@ impl<'a> Default for StatsBuilder<'a> {
                 config_data_uri: "",
                 config_data: None,
                 prometheus_gateway_url: "",
-                prometheus_gateway_url: "",
+                prometheus_node_url: "",
                 mvp_url: "",
-                data_collection_adapter: Default::default(),
-                mvp_adapter: Default::default()
+                gateway_adapter: Default::default(),
+                node_adapter: Default::default(),
+                chain_adapter: Default::default(),
             },
         }
     }
 }
 
-
-
 impl<'a> ComponentStats<'a> {
     pub fn builder() -> StatsBuilder<'a> {
         StatsBuilder::default()
     }
-    pub async fn run(&self) -> anyhow::Result<()>{
 
-        // use std::convert::TryFrom;
-        // let client = Client::try_from("34.88.224.156:443").unwrap();
-        // let vector: InstantVector = Selector::new()
-        //     .metric("nginx_vts_filter_requests_total")
-        //     .try_into()?;
-        // let q = topk(vector, Some(Aggregate::By(&["code"])), 5);
-        //
-        // let response = client.query(q, None, None).await?;
-        //
-        // assert!(response.as_instant().is_some());
-        //
-        // if let Some(result) = response.as_instant() {
-        //     let first = result.get(0).unwrap();
-        //     println!("Received a total of {} HTTP requests", first.sample().value());
-        // };
+    async fn get_request_number(
+        &self,
+        filter: &str,
+        value: &str,
+        time: TimeStamp,
+    ) -> anyhow::Result<usize> {
+        let vector: InstantVector = Selector::new()
+            .metric(r#"nginx_vts_filter_requests_total"#)
+            .regex_match(filter, value)
+            .with("code", "2xx")
+            .try_into()?;
+        let q = sum(vector, None);
+        let response = self
+            .gateway_adapter
+            .client
+            .as_ref()
+            .ok_or(anyhow::Error::msg("None client"))?
+            .query(q, Some(time), None)
+            .await?;
+        Ok(response
+            .as_instant()
+            .ok_or(anyhow::Error::msg("None instant"))?
+            .get(0)
+            .ok_or(anyhow::Error::msg("No result"))?
+            .sample()
+            .value() as usize)
+    }
 
-        // Get data from prometheus
+    async fn get_request_number_in_duration(
+        &self,
+        start_time: TimeStamp,
+        end_time: TimeStamp,
+    ) -> anyhow::Result<usize> {
+        let dapi_id: &str = "b129eb60-9d60-401a-b7ad-5a5cc590ee4f::dapi::api_method";
+        let start_req_number = self
+            .get_request_number("filter", dapi_id, start_time)
+            .await?;
+        let end_req_number = self.get_request_number("filter", dapi_id, end_time).await?;
 
+        println!(
+            "start: {}, end: {}, diff: {}",
+            start_req_number,
+            end_req_number,
+            end_req_number - start_req_number
+        );
+        Ok(end_req_number - start_req_number)
+    }
+
+    pub async fn run(&self) -> anyhow::Result<()> {
+        // subscribe finalized header
+        let client = self
+            .chain_adapter
+            .client
+            .as_ref()
+            .ok_or(anyhow::Error::msg("None chain client"))?;
+        let mut subscribe_finalized_heads = client
+            .subscribe::<Value>(
+                "chain_subscribeFinalizedHeads",
+                rpc_params![],
+                "chain_unsubscribeFinalizedHeads",
+            )
+            .await;
+        println!("subscribe_finalized_heads: {:?}", subscribe_finalized_heads);
+        let mut subscribe_finalized_heads = subscribe_finalized_heads?;
+        let mut i = 0;
+        // wait for new block
+        let mut last_count_block: isize = -1;
+        let mut last_count_block_timestamp: TimeStamp = -1;
+
+        loop {
+            let res = subscribe_finalized_heads.next().await;
+            if let Some(Ok(res)) = res {
+                println!("received {:?}", res);
+                if let Some(block_number) = res.get("number") {
+                    let block_number = isize::from_str_radix(
+                        block_number.as_str().unwrap().trim_start_matches("0x"),
+                        16,
+                    )?;
+                    println!("block_number {:?}", block_number);
+                    if last_count_block == -1 {
+                        last_count_block = block_number;
+                        // Fixme: need decode block for getting timestamp. For now use system time.
+                        last_count_block_timestamp =
+                            (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() - 3600)
+                                as TimeStamp;
+                        continue;
+                    } else {
+                        if block_number - last_count_block >= NUMBER_BLOCK_FOR_COUNTING {
+                            // Set new count block
+                            let current_count_block = last_count_block + NUMBER_BLOCK_FOR_COUNTING;
+                            // Fixme: need decode block for getting timestamp. For now use system time.
+                            let current_count_block_timestamp =
+                                (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() - 3600)
+                                    as TimeStamp;
+                            // Get number of request in between 2 time
+                            // Collect gateway data
+                            if let Ok(res) = self
+                                .get_request_number_in_duration(
+                                    last_count_block_timestamp,
+                                    current_count_block_timestamp,
+                                )
+                                .await
+                            {
+                                println!(
+                                    "Number of requests from {} to {}: {}",
+                                    last_count_block_timestamp, current_count_block_timestamp, res
+                                );
+                            }
+                            last_count_block = current_count_block;
+                            last_count_block_timestamp = current_count_block_timestamp;
+                        }
+                    }
+                }
+                // if let Some(parent_hash) = res.get("parentHash") {
+                //     if let Some(parent_hash) = parent_hash.as_str() {
+                //         println!("parent_hash {:?}", parent_hash);
+                //         // Get block
+                //         let params: Vec<Value> = vec![parent_hash.into()];
+                //         let params = Some(ParamsSer::from(params));
+                //         println!("params {:?}", params);
+                //         let response: Value = client.request("chain_getBlock", params).await?;
+                //         println!("block {:#?}", response);
+                //     }
+                // }
+            }
+        }
+
+        //
+        let start_time = 1646275440;
+        let end_time = 1646448240;
+
+        self.get_request_number_in_duration(start_time, end_time);
 
         Ok(())
     }
@@ -133,43 +260,56 @@ impl<'a> StatsBuilder<'a> {
     pub async fn with_config_uri(mut self, path: &'a str) -> StatsBuilder<'a> {
         self.inner.config_data_uri = path;
 
-        let config_data: Option<ConfigData> = self
-            .get_config_data()
-            .await;
+        let config_data: Option<ConfigData> = self.get_config_data().await;
         self.inner.config_data = config_data;
         self
     }
 
-
-    async fn get_config_data(&self) -> Option<ConfigData>{
+    async fn get_config_data(&self) -> Option<ConfigData> {
         // todo!()
         None
     }
-    async fn get_prometheus_client(&self,url: &String) -> anyhow::Result<PrometheusClient>{
-        // todo!()
-        Ok(PrometheusClient::default())
+    async fn get_prometheus_client(&self, url: &String) -> anyhow::Result<PrometheusClient> {
+        use std::convert::TryFrom;
+        let client = PrometheusClient::try_from(url.as_str())
+            .map_err(|err| anyhow::Error::msg(format!("{:?}", err)));
+
+        client
     }
 
     pub async fn with_prometheus_gateway_url(mut self, path: &'a str) -> StatsBuilder<'a> {
         self.inner.prometheus_gateway_url = path;
 
-        self.inner.data_collection_adapter = DataCollectionAdapter{
+        self.inner.gateway_adapter = DataCollectionAdapter {
             data: Default::default(),
-            client: Some(self.get_prometheus_client(&self.inner.prometheus_gateway_url.to_string())?)
-        } ;
+            client: self
+                .get_prometheus_client(&self.inner.prometheus_gateway_url.to_string())
+                .await
+                .ok(),
+        };
         self
     }
 
     pub async fn with_prometheus_node_url(mut self, path: &'a str) -> StatsBuilder<'a> {
         self.inner.prometheus_node_url = path;
 
-        self.inner.data_collection_adapter = DataCollectionAdapter{
+        self.inner.node_adapter = DataCollectionAdapter {
             data: Default::default(),
-            client: Some(self.get_prometheus_client(&self.inner.prometheus_node_url.to_string())?)
-        } ;
+            client: self
+                .get_prometheus_client(&self.inner.prometheus_node_url.to_string())
+                .await
+                .ok(),
+        };
         self
     }
 
+    pub async fn with_mvp_url(mut self, path: &'a str) -> StatsBuilder<'a> {
+        self.inner.mvp_url = path;
+        let client = WsClientBuilder::default().build(&path).await;
+        println!("chain client: {:?}", client);
+        self.inner.chain_adapter.client = client.ok();
+        self
+    }
 
     pub fn build(self) -> ComponentStats<'a> {
         self.inner

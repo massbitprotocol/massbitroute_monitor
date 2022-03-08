@@ -26,7 +26,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 type TimeStamp = i64;
 
-const NUMBER_BLOCK_FOR_COUNTING: isize = 1;
+const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
+const DATA_NAME: &str = "nginx_vts_filter_requests_total";
+
+#[derive(Debug)]
+pub enum ComponentType {
+    Node,
+    Dapi,
+    Gateway,
+}
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct ConfigData;
@@ -46,19 +54,21 @@ pub struct ComponentStats<'a> {
     // For collecting data
     pub gateway_adapter: DataCollectionAdapter,
     pub node_adapter: DataCollectionAdapter,
+    // For collecting data
+
     // For submit data
     pub chain_adapter: ChainAdapter,
 }
 
 #[derive(Clone, Default)]
 pub struct DataCollectionAdapter {
-    data: HashMap<String, QueryData>,
+    //data: HashMap<String, QueryData>,
     client: Option<PrometheusClient>,
 }
 
 impl std::fmt::Debug for DataCollectionAdapter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DataCollectionAdapter<{:?}>", &self.data)
+        write!(f, "DataCollectionAdapter<>")
     }
 }
 
@@ -124,11 +134,12 @@ impl<'a> ComponentStats<'a> {
         &self,
         filter: &str,
         value: &str,
+        data_name: &str,
         time: TimeStamp,
     ) -> anyhow::Result<HashMap<String, usize>> {
         let res: HashMap<String, usize> = HashMap::new();
         let q: InstantVector = Selector::new()
-            .metric(r#"nginx_vts_filter_requests_total"#)
+            .metric(data_name)
             .regex_match(filter, value)
             .with("code", "2xx")
             .try_into()?;
@@ -141,7 +152,6 @@ impl<'a> ComponentStats<'a> {
             .query(q, Some(time), None)
             .await?;
 
-        //println!("response{:#?}", response);
         let res = if let Some(instant) = response.as_instant() {
             Ok(instant
                 .iter()
@@ -155,36 +165,33 @@ impl<'a> ComponentStats<'a> {
         } else {
             Err(anyhow::Error::msg("Cannot parse response"))
         };
-        println!("Hashmap res: {:#?}", res);
+        //println!("Hashmap res: {:#?}", res);
         res
-        // Ok(response
-        //     .as_instant()
-        //     .ok_or(anyhow::Error::msg("None instant"))?
-        //     .get(0)
-        //     .ok_or(anyhow::Error::msg("No result"))?
-        //     .sample()
-        //     .value() as usize)
+
     }
 
     async fn get_request_number_in_duration(
         &self,
         start_time: TimeStamp,
         end_time: TimeStamp,
-    ) -> anyhow::Result<usize> {
-        let dapi_id: &str = ".*gw::api_method.*";
+        data_name: &str,
+    ) -> anyhow::Result<HashMap<String,usize>> {
+        let dapi_id: &str = ".*gw::api_method.*|.*node::api_method.*|.*dapi::api_method.*";
         let start_req_number = self
-            .get_request_number("filter", dapi_id, start_time)
+            .get_request_number("filter", dapi_id, data_name,start_time)
             .await?;
-        let end_req_number = self.get_request_number("filter", dapi_id, end_time).await?;
+        let end_req_number = self.get_request_number("filter", dapi_id, data_name,end_time).await?;
+        let res = start_req_number.iter().filter_map(|(name,start_value)|{
+            if let Some(end_value) = end_req_number.get(name) {
+                Some((name.to_string(),end_value-start_value))
+            }
+            else {
+                None
+            }
+        }).collect::<HashMap<String,usize>>();
 
-        // println!(
-        //     "start: {}, end: {}, diff: {}",
-        //     start_req_number,
-        //     end_req_number,
-        //     end_req_number - start_req_number
-        // );
-        // Ok(end_req_number - start_req_number)
-        Ok(0)
+
+        Ok(res)
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
@@ -222,7 +229,7 @@ impl<'a> ComponentStats<'a> {
                         last_count_block = block_number;
                         // Fixme: need decode block for getting timestamp. For now use system time.
                         last_count_block_timestamp =
-                            (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() - 3600)
+                            (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
                                 as TimeStamp;
                         continue;
                     } else {
@@ -231,46 +238,31 @@ impl<'a> ComponentStats<'a> {
                             let current_count_block = last_count_block + NUMBER_BLOCK_FOR_COUNTING;
                             // Fixme: need decode block for getting timestamp. For now use system time.
                             let current_count_block_timestamp =
-                                (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() - 3600)
+                                (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
                                     as TimeStamp;
                             // Get number of request in between 2 time
-                            // Collect gateway data
+                            // Collect data
                             if let Ok(res) = self
                                 .get_request_number_in_duration(
                                     last_count_block_timestamp,
                                     current_count_block_timestamp,
+                                    DATA_NAME
                                 )
                                 .await
                             {
                                 println!(
-                                    "Number of requests from {} to {}: {}",
+                                    "Number of requests from {} to {}: {:#?}",
                                     last_count_block_timestamp, current_count_block_timestamp, res
                                 );
                             }
+
                             last_count_block = current_count_block;
                             last_count_block_timestamp = current_count_block_timestamp;
                         }
                     }
                 }
-                // if let Some(parent_hash) = res.get("parentHash") {
-                //     if let Some(parent_hash) = parent_hash.as_str() {
-                //         println!("parent_hash {:?}", parent_hash);
-                //         // Get block
-                //         let params: Vec<Value> = vec![parent_hash.into()];
-                //         let params = Some(ParamsSer::from(params));
-                //         println!("params {:?}", params);
-                //         let response: Value = client.request("chain_getBlock", params).await?;
-                //         println!("block {:#?}", response);
-                //     }
-                // }
             }
         }
-
-        //
-        let start_time = 1646275440;
-        let end_time = 1646448240;
-
-        self.get_request_number_in_duration(start_time, end_time);
 
         Ok(())
     }
@@ -300,7 +292,7 @@ impl<'a> StatsBuilder<'a> {
         self.inner.prometheus_gateway_url = path;
 
         self.inner.gateway_adapter = DataCollectionAdapter {
-            data: Default::default(),
+            //data: Default::default(),
             client: self
                 .get_prometheus_client(&self.inner.prometheus_gateway_url.to_string())
                 .await
@@ -313,7 +305,6 @@ impl<'a> StatsBuilder<'a> {
         self.inner.prometheus_node_url = path;
 
         self.inner.node_adapter = DataCollectionAdapter {
-            data: Default::default(),
             client: self
                 .get_prometheus_client(&self.inner.prometheus_node_url.to_string())
                 .await

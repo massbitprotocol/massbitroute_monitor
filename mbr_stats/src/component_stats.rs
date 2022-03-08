@@ -26,7 +26,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 type TimeStamp = i64;
 
-const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
+const NUMBER_BLOCK_FOR_COUNTING: isize = 1;
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct ConfigData;
@@ -125,13 +125,14 @@ impl<'a> ComponentStats<'a> {
         filter: &str,
         value: &str,
         time: TimeStamp,
-    ) -> anyhow::Result<usize> {
-        let vector: InstantVector = Selector::new()
+    ) -> anyhow::Result<HashMap<String, usize>> {
+        let res: HashMap<String, usize> = HashMap::new();
+        let q: InstantVector = Selector::new()
             .metric(r#"nginx_vts_filter_requests_total"#)
             .regex_match(filter, value)
             .with("code", "2xx")
             .try_into()?;
-        let q = sum(vector, None);
+        let q = sum(q, Some(Aggregate::By(&["filter"])));
         let response = self
             .gateway_adapter
             .client
@@ -139,13 +140,30 @@ impl<'a> ComponentStats<'a> {
             .ok_or(anyhow::Error::msg("None client"))?
             .query(q, Some(time), None)
             .await?;
-        Ok(response
-            .as_instant()
-            .ok_or(anyhow::Error::msg("None instant"))?
-            .get(0)
-            .ok_or(anyhow::Error::msg("No result"))?
-            .sample()
-            .value() as usize)
+
+        //println!("response{:#?}", response);
+        let res = if let Some(instant) = response.as_instant() {
+            Ok(instant
+                .iter()
+                .filter_map(|iv| {
+                    iv.metric().get("filter").and_then(|filter| {
+                        let value = iv.sample().value() as usize;
+                        Some((filter.to_string(), value))
+                    })
+                })
+                .collect::<HashMap<String, usize>>())
+        } else {
+            Err(anyhow::Error::msg("Cannot parse response"))
+        };
+        println!("Hashmap res: {:#?}", res);
+        res
+        // Ok(response
+        //     .as_instant()
+        //     .ok_or(anyhow::Error::msg("None instant"))?
+        //     .get(0)
+        //     .ok_or(anyhow::Error::msg("No result"))?
+        //     .sample()
+        //     .value() as usize)
     }
 
     async fn get_request_number_in_duration(
@@ -153,19 +171,20 @@ impl<'a> ComponentStats<'a> {
         start_time: TimeStamp,
         end_time: TimeStamp,
     ) -> anyhow::Result<usize> {
-        let dapi_id: &str = "b129eb60-9d60-401a-b7ad-5a5cc590ee4f::dapi::api_method";
+        let dapi_id: &str = ".*gw::api_method.*";
         let start_req_number = self
             .get_request_number("filter", dapi_id, start_time)
             .await?;
         let end_req_number = self.get_request_number("filter", dapi_id, end_time).await?;
 
-        println!(
-            "start: {}, end: {}, diff: {}",
-            start_req_number,
-            end_req_number,
-            end_req_number - start_req_number
-        );
-        Ok(end_req_number - start_req_number)
+        // println!(
+        //     "start: {}, end: {}, diff: {}",
+        //     start_req_number,
+        //     end_req_number,
+        //     end_req_number - start_req_number
+        // );
+        // Ok(end_req_number - start_req_number)
+        Ok(0)
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {

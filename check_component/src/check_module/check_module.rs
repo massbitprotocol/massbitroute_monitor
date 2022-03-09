@@ -21,6 +21,8 @@ use std::ptr::hash;
 use std::thread;
 use timer::Timer;
 use tokio::time::error::Elapsed;
+use warp::multipart::FormData;
+use warp::{Rejection, Reply};
 
 // use futures_util::future::try_future::TryFutureExt;
 
@@ -28,6 +30,7 @@ type BlockChainType = String;
 type UrlType = String;
 type TaskType = String;
 type StepResult = HashMap<String, String>;
+type ComponentId = String;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
@@ -56,7 +59,7 @@ pub struct OperatorCompare {
 pub struct ComponentInfo {
     pub blockchain: BlockChainType,
     pub network: String,
-    pub id: String,
+    pub id: ComponentId,
     pub user_id: String,
     pub ip: String,
     pub zone: String,
@@ -540,6 +543,14 @@ impl<'a> CheckComponent<'a> {
             metric: None,
             status_detail: message,
         })
+    }
+
+    pub(crate) fn get_components_status(
+        &self,
+        form_data: FormData,
+    ) -> Result<impl Reply, Rejection> {
+        //-> HashMap<String, CheckMkStatus>
+        Ok(warp::reply::json(&String::from("")))
     }
 
     async fn check_components(&self) -> Result<Vec<CheckMkReport>, anyhow::Error> {

@@ -3,21 +3,21 @@ use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
 // use regex::Regex;
 use handlebars::Handlebars;
+use lazy_static::lazy_static;
+use log::info;
+use logger;
+use mbr_check_component::config::AccessControl;
+use mbr_check_component::server_builder::ServerBuilder;
 use std::collections::BTreeMap;
+use std::env;
+
+lazy_static! {
+    pub static ref CHECK_COMPONENT_ENDPOINT: String =
+        env::var("CHECK_COMPONENT_ENDPOINT").unwrap_or(String::from("0.0.0.0:3030"));
+}
 
 #[tokio::main]
 async fn main() {
-    // let mut handlebars = Handlebars::new();
-    // let source = r#"{ "jsonrpc": "2.0",  "method": "eth_getBlockByNumber", "params": ["{{base_return:block_number}}",  true],"id": 1}"#;
-    //
-    // let mut data = BTreeMap::new();
-    // data.insert(
-    //     "base_return:block_number".to_string(),
-    //     "\"0xd9b51c\"".to_string(),
-    // );
-    // let res = handlebars.render_template(source, &data);
-    // println!("res: {:?}", res);
-
     let res = init_logger(&String::from("CheckComponent"));
     //println!("Log output: {}", res); // Print log output type
 
@@ -49,20 +49,31 @@ async fn main() {
             .value_of("output")
             .unwrap_or("src/example/output.json");
         let check_component = CheckComponent::builder()
-            .with_list_node_id_file(list_node_id_file)
+            .with_list_node_id_file(list_node_id_file.to_string())
             .await
-            .with_list_gateway_id_file(list_gateway_id_file)
+            .with_list_gateway_id_file(list_gateway_id_file.to_string())
             .await
-            .with_list_dapi_id_file(list_dapi_id_file)
+            .with_list_dapi_id_file(list_dapi_id_file.to_string())
             .await
-            .with_list_user_file(list_user_file)
+            .with_list_user_file(list_user_file.to_string())
             .await
-            .with_check_flow_file(check_flow_file)
-            .with_base_endpoint_file(base_endpoint_file)
-            .with_output_file(output)
+            .with_check_flow_file(check_flow_file.to_string())
+            .with_base_endpoint_file(base_endpoint_file.to_string())
+            .with_output_file(output.to_string())
             .build();
         log::debug!("check_component: {:?}", check_component);
-        let _ = check_component.run_check().await;
+        let socket_addr = CHECK_COMPONENT_ENDPOINT.as_str();
+        let server = ServerBuilder::default()
+            .with_entry_point(socket_addr)
+            .build(check_component);
+
+        let access_control = AccessControl::default();
+
+        info!("Run check component");
+        let _ = server.check_component_service.run_check().await;
+
+        info!("Run service");
+        server.serve(access_control).await;
     }
 }
 fn create_check_component() -> App<'static> {

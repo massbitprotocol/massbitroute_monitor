@@ -22,6 +22,7 @@ use std::thread;
 use timer::Timer;
 use tokio::time::error::Elapsed;
 use warp::multipart::FormData;
+use warp::reject::custom;
 use warp::{Rejection, Reply};
 
 // use futures_util::future::try_future::TryFutureExt;
@@ -66,7 +67,8 @@ pub struct ComponentInfo {
     pub country_code: String,
     pub token: String,
     pub component_type: ComponentType,
-    pub endpoint: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -104,16 +106,16 @@ impl ComponentInfo {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct CheckComponent<'a> {
+pub struct CheckComponent {
     // input file
-    pub list_node_id_file: &'a str,
-    pub list_gateway_id_file: &'a str,
-    pub list_dapi_id_file: &'a str,
-    pub list_user_file: &'a str,
-    pub check_flow_file: &'a str,
-    pub base_endpoint_file: &'a str,
+    pub list_node_id_file: String,
+    pub list_gateway_id_file: String,
+    pub list_dapi_id_file: String,
+    pub list_user_file: String,
+    pub check_flow_file: String,
+    pub base_endpoint_file: String,
     // The output file
-    pub output_file: &'a str,
+    pub output_file: String,
     // inner data
     pub list_nodes: Vec<ComponentInfo>,
     pub list_gateways: Vec<ComponentInfo>,
@@ -245,8 +247,8 @@ impl ToString for CheckMkReport {
     }
 }
 
-impl<'a> CheckComponent<'a> {
-    pub fn builder() -> GeneratorBuilder<'a> {
+impl CheckComponent {
+    pub fn builder() -> GeneratorBuilder {
         GeneratorBuilder::default()
     }
 
@@ -254,17 +256,18 @@ impl<'a> CheckComponent<'a> {
         self.list_users.iter().find(|user| &user.id == user_id)
     }
 
-    fn get_check_steps(
+    pub fn get_check_steps(
         &self,
         blockchain: &String,
-        component: &String,
+        component_type: &String,
         task: &TaskType,
     ) -> Result<Vec<CheckStep>, anyhow::Error> {
         match self.check_flows.get(task.as_str()) {
             Some(check_flows) => {
                 for check_flow in check_flows {
-                    //log::debug!("check_flow.blockchain: {},blockchain: {}\ncheck_flow.component:{},component:{}",&check_flow.blockchain,&blockchain,check_flow.component,component);
-                    if &check_flow.blockchain == blockchain && &check_flow.component == component {
+                    if &check_flow.blockchain == blockchain
+                        && &check_flow.component == component_type
+                    {
                         return Ok(check_flow.check_steps.clone());
                     }
                 }
@@ -393,7 +396,9 @@ impl<'a> CheckComponent<'a> {
             .header("content-type", "application/json");
         client = match node.component_type {
             ComponentType::Node => client.header("X-Api-Key", node.token.as_str()).body(body),
-            ComponentType::Gateway => client.header("Host", ref_dapi.endpoint.as_str()).body(body),
+            ComponentType::Gateway => client
+                .header("Host", ref_dapi.endpoint.unwrap_or_default().as_str())
+                .body(body),
             ComponentType::DApi => client,
         };
         log::debug!("client: {:?}", client);
@@ -444,7 +449,7 @@ impl<'a> CheckComponent<'a> {
         Ok(action_resp)
     }
 
-    async fn run_check_steps(
+    pub async fn run_check_steps(
         &self,
         steps: Vec<CheckStep>,
         component: &ComponentInfo,
@@ -545,15 +550,35 @@ impl<'a> CheckComponent<'a> {
         })
     }
 
-    pub(crate) fn get_components_status(
+    pub(crate) async fn get_components_status(
         &self,
-        form_data: FormData,
+        component_info: ComponentInfo,
     ) -> Result<impl Reply, Rejection> {
         //-> HashMap<String, CheckMkStatus>
-        Ok(warp::reply::json(&String::from("")))
+        info!("component_info:{:?}", component_info);
+
+        let check_steps = self
+            .get_check_steps(
+                &component_info.blockchain,
+                &component_info.component_type.to_string(),
+                &"checking_chain_type".to_string(),
+            )
+            .unwrap_or_default();
+        info!("check_steps:{:?}", check_steps);
+        if check_steps.is_empty() {
+            return Ok(warp::reply::json(&String::from(format!(
+                "check_steps is empty"
+            ))));
+        }
+        let res = self.run_check_steps(check_steps, &component_info).await;
+        info!("res:{:?}", res);
+        match res {
+            Ok(res) => Ok(warp::reply::json(&String::from(format!("{:?}", res)))),
+            Err(err) => Ok(warp::reply::json(&String::from(format!("{:?}", err)))),
+        }
     }
 
-    async fn check_components(&self) -> Result<Vec<CheckMkReport>, anyhow::Error> {
+    pub async fn check_components(&self) -> Result<Vec<CheckMkReport>, anyhow::Error> {
         log::debug!("Check component");
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
@@ -628,7 +653,7 @@ impl<'a> CheckComponent<'a> {
                         .collect::<Vec<String>>()
                         .join("\n");
                     if self.is_write_to_file {
-                        std::fs::write(self.output_file, report_content)
+                        std::fs::write(self.output_file.clone(), report_content)
                             .expect("Unable to write file");
                     } else {
                         println!("{}", report_content);
@@ -647,21 +672,21 @@ impl<'a> CheckComponent<'a> {
     }
 }
 
-pub struct GeneratorBuilder<'a> {
-    inner: CheckComponent<'a>,
+pub struct GeneratorBuilder {
+    inner: CheckComponent,
 }
 
-impl<'a> Default for GeneratorBuilder<'a> {
+impl Default for GeneratorBuilder {
     fn default() -> Self {
         Self {
             inner: CheckComponent {
-                list_node_id_file: "",
-                list_gateway_id_file: "",
-                list_dapi_id_file: "",
-                list_user_file: "",
-                check_flow_file: "",
-                base_endpoint_file: "",
-                output_file: "",
+                list_node_id_file: "".to_string(),
+                list_gateway_id_file: "".to_string(),
+                list_dapi_id_file: "".to_string(),
+                list_user_file: "".to_string(),
+                check_flow_file: "".to_string(),
+                base_endpoint_file: "".to_string(),
+                output_file: "".to_string(),
                 list_nodes: vec![],
                 list_gateways: vec![],
                 list_dapis: vec![],
@@ -675,9 +700,9 @@ impl<'a> Default for GeneratorBuilder<'a> {
     }
 }
 
-impl<'a> GeneratorBuilder<'a> {
-    pub async fn with_list_node_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
-        self.inner.list_node_id_file = path;
+impl GeneratorBuilder {
+    pub async fn with_list_node_id_file(mut self, path: String) -> GeneratorBuilder {
+        self.inner.list_node_id_file = path.clone();
 
         let list_nodes: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::Node)
@@ -686,8 +711,8 @@ impl<'a> GeneratorBuilder<'a> {
         self.inner.list_nodes = list_nodes;
         self
     }
-    pub async fn with_list_gateway_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
-        self.inner.list_gateway_id_file = path;
+    pub async fn with_list_gateway_id_file(mut self, path: String) -> GeneratorBuilder {
+        self.inner.list_gateway_id_file = path.clone();
 
         let list_gateways: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::Gateway)
@@ -696,8 +721,8 @@ impl<'a> GeneratorBuilder<'a> {
         self.inner.list_gateways = list_gateways;
         self
     }
-    pub async fn with_list_dapi_id_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
-        self.inner.list_dapi_id_file = path;
+    pub async fn with_list_dapi_id_file(mut self, path: String) -> GeneratorBuilder {
+        self.inner.list_dapi_id_file = path.clone();
 
         let list_dapis: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::DApi)
@@ -706,8 +731,8 @@ impl<'a> GeneratorBuilder<'a> {
         self.inner.list_dapis = list_dapis;
         self
     }
-    pub async fn with_list_user_file(mut self, path: &'a str) -> GeneratorBuilder<'a> {
-        self.inner.list_user_file = path;
+    pub async fn with_list_user_file(mut self, path: String) -> GeneratorBuilder {
+        self.inner.list_user_file = path.clone();
 
         let list_users: Vec<UserInfo> = self
             .get_list_user()
@@ -721,7 +746,7 @@ impl<'a> GeneratorBuilder<'a> {
     async fn get_list_user(&self) -> Result<Vec<UserInfo>, anyhow::Error> {
         let mut users: Vec<UserInfo> = Vec::new();
         log::debug!("----------Create list of users info details----------");
-        let list_id_file = self.inner.list_user_file;
+        let list_id_file = &self.inner.list_user_file;
         let lines: Vec<String> = match list_id_file.starts_with("http") {
             true => {
                 let url = list_id_file;
@@ -767,9 +792,9 @@ impl<'a> GeneratorBuilder<'a> {
         let mut nodes: Vec<ComponentInfo> = Vec::new();
         log::debug!("----------Create list of nodes info details----------");
         let list_id_file = match component_type {
-            ComponentType::Node => self.inner.list_node_id_file,
-            ComponentType::Gateway => self.inner.list_gateway_id_file,
-            ComponentType::DApi => self.inner.list_dapi_id_file,
+            ComponentType::Node => &self.inner.list_node_id_file,
+            ComponentType::Gateway => &self.inner.list_gateway_id_file,
+            ComponentType::DApi => &self.inner.list_dapi_id_file,
         };
         let lines: Vec<String> = match list_id_file.starts_with("http") {
             true => {
@@ -817,7 +842,7 @@ impl<'a> GeneratorBuilder<'a> {
                         country_code: Default::default(),
                         token: Default::default(),
                         component_type: component_type.clone(),
-                        endpoint: data[4].clone(),
+                        endpoint: Some(data[4].clone()),
                     },
                 };
 
@@ -836,33 +861,32 @@ impl<'a> GeneratorBuilder<'a> {
     //     Ok(token.expect("cannot get token"))
     // }
 
-    pub fn with_check_flow_file(mut self, path: &'a str) -> Self {
-        self.inner.check_flow_file = path;
-        let json = std::fs::read_to_string(path)
+    pub fn with_check_flow_file(mut self, path: String) -> Self {
+        let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
         let test_flow: CheckFlows = serde_json::from_str(&minify(&json))
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
-
+        self.inner.check_flow_file = path;
         self.inner.check_flows = test_flow;
         self
     }
 
-    pub fn with_base_endpoint_file(mut self, path: &'a str) -> Self {
-        self.inner.check_flow_file = path;
-        let json = std::fs::read_to_string(path)
+    pub fn with_base_endpoint_file(mut self, path: String) -> Self {
+        let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
         let base_nodes: HashMap<BlockChainType, UrlType> = serde_json::from_str(&minify(&json))
             .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        self.inner.check_flow_file = path;
         self.inner.base_nodes = base_nodes;
         self
     }
 
-    pub fn with_output_file(mut self, output_file: &'a str) -> Self {
+    pub fn with_output_file(mut self, output_file: String) -> Self {
         self.inner.output_file = output_file;
         self
     }
 
-    pub fn build(self) -> CheckComponent<'a> {
+    pub fn build(self) -> CheckComponent {
         self.inner
     }
 }

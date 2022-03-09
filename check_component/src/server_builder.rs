@@ -1,8 +1,9 @@
-use crate::check_module::check_module::CheckComponent;
+use crate::check_module::check_module::{CheckComponent, ComponentInfo};
 use crate::config::AccessControl;
 use futures::lock::Mutex;
 use log::info;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use slog::Logger;
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -10,14 +11,16 @@ use std::sync::Arc;
 use warp::http::Method;
 use warp::{http::StatusCode, multipart::FormData, Filter, Rejection, Reply};
 
+pub const MAX_JSON_BODY_SIZE: u64 = 1024 * 1024;
+
 #[derive(Default)]
 pub struct ServerBuilder {
     entry_point: String,
     logger: Option<Logger>,
 }
-pub struct CheckComponentServer<'a> {
+pub struct CheckComponentServer {
     entry_point: String,
-    indexer_service: Arc<CheckComponent<'a>>,
+    pub check_component_service: Arc<CheckComponent>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -25,7 +28,7 @@ pub struct DeployParam {
     pub id: String,
 }
 
-impl<'a> CheckComponentServer<'a> {
+impl CheckComponentServer {
     pub fn builder() -> ServerBuilder {
         ServerBuilder::default()
     }
@@ -44,9 +47,9 @@ impl<'a> CheckComponentServer<'a> {
                 Method::OPTIONS,
                 Method::HEAD,
             ]);
-
+        info!("cors: {:?}", cors);
         let router = self
-            .create_route_indexer_cli_deploy(self.indexer_service.clone())
+            .create_get_status(self.check_component_service.clone())
             .with(&cors)
             .recover(handle_rejection);
         let socket_addr: SocketAddr = self.entry_point.parse().unwrap();
@@ -54,16 +57,16 @@ impl<'a> CheckComponentServer<'a> {
         warp::serve(router).run(socket_addr).await;
     }
     /// Indexer deploy from cli api
-    fn create_route_indexer_cli_deploy(
+    fn create_get_status(
         &self,
-        service: Arc<CheckComponent<'a>>,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone + 'a {
+        service: Arc<CheckComponent>,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("get_status")
             .and(warp::post())
-            .and(warp::multipart::form())
-            .and_then(move |form: FormData| {
+            .and(warp::body::content_length_limit(MAX_JSON_BODY_SIZE).and(warp::body::json()))
+            .and_then(move |component_info: ComponentInfo| {
                 let clone_service = service.clone();
-                async move { clone_service.get_components_status(form) }
+                async move { clone_service.get_components_status(component_info).await }
             })
     }
 }
@@ -72,31 +75,11 @@ impl ServerBuilder {
         self.entry_point = String::from(entry_point);
         self
     }
-    pub fn with_logger(mut self, logger: Logger) -> Self {
-        self.logger = Some(logger);
-        self
-    }
 
-    pub fn build(&self) -> CheckComponentServer {
+    pub fn build(&self, check_component: CheckComponent) -> CheckComponentServer {
         CheckComponentServer {
             entry_point: self.entry_point.clone(),
-            indexer_service: Arc::new(CheckComponent {
-                list_node_id_file: "",
-                list_gateway_id_file: "",
-                list_dapi_id_file: "",
-                list_user_file: "",
-                check_flow_file: "",
-                base_endpoint_file: "",
-                output_file: "",
-                list_nodes: vec![],
-                list_gateways: vec![],
-                list_dapis: vec![],
-                list_users: vec![],
-                base_nodes: Default::default(),
-                check_flows: Default::default(),
-                is_loop_check: false,
-                is_write_to_file: false,
-            }),
+            check_component_service: Arc::new(check_component),
         }
     }
 }

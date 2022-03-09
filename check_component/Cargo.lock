@@ -764,6 +764,7 @@ dependencies = [
  "futures",
  "futures-util",
  "handlebars",
+ "lazy_static",
  "log",
  "logger",
  "minifier",

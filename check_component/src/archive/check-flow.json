@@ -1,0 +1,237 @@
+{
+  "checking_chain_type": [
+    {
+      "blockchain": "eth",
+      "component": "node",
+      "check_steps": [
+        {
+          "action": {
+            "action_type": "call",
+            "is_base_node": true,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\",  true],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{"hash":"result/hash","blockNumber":"result/number"}
+          },
+          "return_name": "baseCall",
+          "failed_case":{
+            "critical": true,
+            "message": "cannot get call base_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type": "call",
+            "is_base_node": false,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"{{baseCall_blockNumber}}\",  true],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{ "hash":"result/hash","blockNumber":"result/number"}
+          },
+          "return_name":"checkCall",
+          "failed_case": {
+            "critical": true,
+            "message": "cannot get call check_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type":"compare",
+            "operator_items": {
+              "operator_type": "and",
+              "params": [
+                {
+                  "operator_type": "eq",
+                  "params": ["baseCall_hash","checkCall_hash"]
+                },
+                {
+                  "operator_type": "eq",
+                  "params": ["baseCall_blockNumber","checkCall_blockNumber"]
+                }
+              ]
+            }
+          },
+          "return_name":"compareBaseAndCheckCall",
+          "failed_case": {
+            "critical": true,
+            "message": "check node is difference from base_node"
+          }
+        }
+
+      ]
+    },
+    {
+      "blockchain": "eth",
+      "component": "gateway",
+      "check_steps": [
+        {
+          "action": {
+            "action_type": "call",
+            "is_base_node": true,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\",  true],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{"hash":"result/hash","blockNumber":"result/number"}
+          },
+          "return_name": "baseCall",
+          "failed_case":{
+            "critical": true,
+            "message": "cannot get call base_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type": "call",
+            "is_base_node": false,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"{{baseCall_blockNumber}}\",  true],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{ "hash":"result/hash","blockNumber":"result/number"}
+          },
+          "return_name":"checkCall",
+          "failed_case": {
+            "critical": true,
+            "message": "cannot get call check_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type":"compare",
+            "operator_items": {
+              "operator_type": "and",
+              "params": [
+                {
+                  "operator_type": "eq",
+                  "params": ["baseCall_hash","checkCall_hash"]
+                },
+                {
+                  "operator_type": "eq",
+                  "params": ["baseCall_blockNumber","checkCall_blockNumber"]
+                }
+              ]
+            }
+          },
+          "return_name":"compareBaseAndCheckCall",
+          "failed_case": {
+            "critical": true,
+            "message": "check node is difference from base_node"
+          }
+        }
+
+      ]
+    },
+    {
+      "blockchain": "dot",
+      "component": "node",
+      "check_steps": [
+        {
+          "action": {
+            "action_type": "call",
+            "is_base_node": true,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\"],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{"hash":"result/hash"}
+          },
+          "return_name": "baseCall",
+          "failed_case":{
+            "critical": true,
+            "message": "cannot get call base_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type": "call",
+            "is_base_node": false,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0x8B9314\",  true],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{ "hash":"result/hash"}
+          },
+          "return_name":"checkCall",
+          "failed_case": {
+            "critical": true,
+            "message": "cannot get call check_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type":"compare",
+            "operator_items": {
+              "operator_type": "eq",
+              "params": ["baseCall_hash","checkCall_hash"]
+            }
+          },
+          "return_name":"compareBaseAndCheckCall",
+          "failed_case": {
+            "critical": true,
+            "message": "check node is difference from base_node"
+          }
+        }
+
+      ]
+    },
+    {
+      "blockchain": "dot",
+      "component": "gateway",
+      "check_steps": [
+        {
+          "action": {
+            "action_type": "call",
+            "is_base_node": true,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\"],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{"hash":"result/hash"}
+          },
+          "return_name": "baseCall",
+          "failed_case":{
+            "critical": true,
+            "message": "cannot get call base_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type": "call",
+            "is_base_node": false,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\",  true],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{ "hash":"result/hash"}
+          },
+          "return_name":"checkCall",
+          "failed_case": {
+            "critical": true,
+            "message": "cannot get call check_node_url"
+          }
+        },
+        {
+          "action":{
+            "action_type":"compare",
+            "operator_items": {
+              "operator_type": "eq",
+              "params": ["baseCall_hash","checkCall_hash"]
+
+            }
+          },
+          "return_name":"compareBaseAndCheckCall",
+          "failed_case": {
+            "critical": true,
+            "message": "check node is difference from base_node"
+          }
+        }
+
+      ]
+    }
+  ]
+
+
+}

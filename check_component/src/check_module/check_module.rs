@@ -18,7 +18,8 @@ use std::fmt::format;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ptr::hash;
-use std::thread;
+use std::time::Instant;
+use std::{thread, usize};
 use timer::Timer;
 use tokio::time::error::Elapsed;
 use warp::multipart::FormData;
@@ -32,6 +33,8 @@ type UrlType = String;
 type TaskType = String;
 type StepResult = HashMap<String, String>;
 type ComponentId = String;
+
+const RESPONSE_TIME_KEY: &str = "response_time_ms";
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
@@ -193,22 +196,27 @@ pub struct FailedCase {
 pub struct CheckMkReport {
     status: u8,
     service_name: String,
-    metric: Option<CheckMkMetric>,
+    metric: CheckMkMetric,
     status_detail: String,
+    success: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 struct CheckMkMetric {
-    metric: HashMap<String, Vec<String>>,
+    metric: HashMap<String, Value>,
 }
 
 impl ToString for CheckMkMetric {
     fn to_string(&self) -> String {
-        self.metric
-            .iter()
-            .map(|(key, val)| format!("{}={}", key, val.join(";")))
-            .collect::<Vec<String>>()
-            .join("|")
+        if self.metric.is_empty() {
+            format!("-")
+        } else {
+            self.metric
+                .iter()
+                .map(|(key, val)| format!("{}={}", key, val))
+                .collect::<Vec<String>>()
+                .join("|")
+        }
     }
 }
 
@@ -229,21 +237,31 @@ enum CheckMkStatus {
 
 impl ToString for CheckMkReport {
     fn to_string(&self) -> String {
-        match self.metric.clone() {
-            None => format!(
-                r#"{status} "{service_name}" - {status_detail}"#,
-                status = &self.status,
-                service_name = &self.service_name,
-                status_detail = self.status_detail
-            ),
-            Some(metric) => format!(
-                r#"{status} {service_name} {metric} {status_detail}"#,
-                status = &self.status,
-                service_name = &self.service_name,
-                metric = metric.to_string(),
-                status_detail = self.status_detail
-            ),
-        }
+        format!(
+            r#"{status} {service_name} {metric} {status_detail}"#,
+            status = &self.status,
+            service_name = &self.service_name,
+            metric = self.metric.to_string(),
+            status_detail = self.status_detail
+        )
+    }
+}
+
+impl CheckMkReport {
+    fn to_json(&self) -> String {
+        format!(
+            r#"{{"status":{status},"service_name":{service_name},"metric":{metric},"status_detail":{status_detail}}}"#,
+            status = &self.status,
+            service_name = &self.service_name,
+            metric = self.metric.to_string(),
+            status_detail = self.status_detail
+        )
+    }
+    fn new_failed_report(msg: String) -> Self {
+        let mut resp = CheckMkReport::default();
+        resp.success = false;
+        resp.status_detail = msg.to_string();
+        resp
     }
 }
 
@@ -385,8 +403,7 @@ impl CheckComponent {
             false => Some(&node_url),
         }
         .ok_or(anyhow::Error::msg("Cannot get url"))?;
-        //println!("org:  {}", action.body);
-        //println!("step_result:{:?}", step_result);
+
         // Replace body for transport result of previous step
         let body = Self::replace_string(action.body.clone(), step_result)?;
         //println!("body: {}", body);
@@ -407,18 +424,26 @@ impl CheckComponent {
         pin_mut!(sender);
 
         // Call rpc
+        // Start clock to meansure call time
+        let now = Instant::now();
         let res = tokio::time::timeout(
             std::time::Duration::from_secs(action.time_out as u64),
             &mut sender,
         )
         .await;
+        //End clock
+        let response_time_ms = now.elapsed().as_millis();
+
         let resp = res??.text().await?;
         //let resp = client.send().await?.text().await?;
         let resp: Value = serde_json::from_str(&resp)?;
         //log::debug!("resp: {:?}", resp);
 
-        //get result
+        // get result
         let mut result: HashMap<String, String> = HashMap::new();
+        // Add response_time
+        result.insert(RESPONSE_TIME_KEY.to_string(), response_time_ms.to_string());
+
         for (name, path) in action.return_fields.clone() {
             let mut value = resp.clone();
             let path: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
@@ -457,6 +482,8 @@ impl CheckComponent {
         let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
         let mut message = String::new();
+        let step_number = steps.len();
+        let mut metric: HashMap<String, Value> = HashMap::new();
 
         for step in steps {
             log::debug!("step: {:?}", step);
@@ -486,32 +513,47 @@ impl CheckComponent {
 
             // Handle report
             match report {
-                Ok(report) => match report.success {
-                    true => {
-                        log::debug!(
-                            "Success step: {:?}, report: {:?}",
-                            &step.return_name,
-                            report
-                        );
-                        for (key, value) in &report.result {
-                            step_result
-                                .insert(format!("{}_{}", &report.return_name, key), value.clone());
-                        }
-                    }
-                    false => {
-                        if step.failed_case.critical {
-                            status = CheckMkStatus::Critical;
-                            message.push_str(&format!(
-                                "Stop at step {} due to critical error",
-                                &step.return_name
-                            ));
-                            break;
+                Ok(report) => {
+                    let resp_time =
+                        if let Some(response_time_ms) = report.result.get(RESPONSE_TIME_KEY) {
+                            Some(response_time_ms.parse::<i64>().unwrap_or_default())
                         } else {
-                            status = CheckMkStatus::Warning;
-                            message.push_str(&format!("Failed at step {}.", &step.return_name));
+                            None
+                        };
+                    if let Some(resp_time) = resp_time {
+                        let metric_name = format!("{}_{}", report.return_name, RESPONSE_TIME_KEY);
+                        metric.insert(metric_name, resp_time.into());
+                    }
+
+                    match report.success {
+                        true => {
+                            log::debug!(
+                                "Success step: {:?}, report: {:?}",
+                                &step.return_name,
+                                report
+                            );
+                            for (key, value) in &report.result {
+                                step_result.insert(
+                                    format!("{}_{}", &report.return_name, key),
+                                    value.clone(),
+                                );
+                            }
+                        }
+                        false => {
+                            if step.failed_case.critical {
+                                status = CheckMkStatus::Critical;
+                                message.push_str(&format!(
+                                    "Stop at step {} due to critical error",
+                                    &step.return_name
+                                ));
+                                break;
+                            } else {
+                                status = CheckMkStatus::Warning;
+                                message.push_str(&format!("Failed at step {}.", &step.return_name));
+                            }
                         }
                     }
-                },
+                }
                 Err(e) => {
                     if step.failed_case.critical {
                         status = CheckMkStatus::Critical;
@@ -532,8 +574,9 @@ impl CheckComponent {
             }
         };
         if status == CheckMkStatus::Ok {
-            message.push_str("Succeed ");
+            message.push_str(format!("Succeed {} steps. ", step_number).as_str());
         }
+
         message.push_str(&user_info);
         Ok(CheckMkReport {
             status: status as u8,
@@ -545,8 +588,9 @@ impl CheckComponent {
                 component.id,
                 component.ip
             ),
-            metric: None,
+            metric: CheckMkMetric { metric },
             status_detail: message,
+            success: true,
         })
     }
 
@@ -566,15 +610,17 @@ impl CheckComponent {
             .unwrap_or_default();
         info!("check_steps:{:?}", check_steps);
         if check_steps.is_empty() {
-            return Ok(warp::reply::json(&String::from(format!(
-                "check_steps is empty"
-            ))));
+            return Ok(warp::reply::json(&CheckMkReport::new_failed_report(
+                "check_steps is empty".to_string(),
+            )));
         }
         let res = self.run_check_steps(check_steps, &component_info).await;
         info!("res:{:?}", res);
         match res {
-            Ok(res) => Ok(warp::reply::json(&String::from(format!("{:?}", res)))),
-            Err(err) => Ok(warp::reply::json(&String::from(format!("{:?}", err)))),
+            Ok(res) => Ok(warp::reply::json(&res)),
+            Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
+                format!("{:?}", err),
+            ))),
         }
     }
 

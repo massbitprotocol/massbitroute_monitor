@@ -59,7 +59,7 @@ pub struct OperatorCompare {
     params: Value,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, Hash, PartialEq, Eq)]
 pub struct ComponentInfo {
     pub blockchain: BlockChainType,
     pub network: String,
@@ -160,7 +160,7 @@ enum Component {
     DApi(DApiInfo),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Hash, Eq)]
 pub enum ComponentType {
     Node,
     Gateway,
@@ -194,16 +194,16 @@ pub struct FailedCase {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct CheckMkReport {
-    status: u8,
-    service_name: String,
-    metric: CheckMkMetric,
-    status_detail: String,
-    success: bool,
+    pub status: u8,
+    pub service_name: String,
+    pub metric: CheckMkMetric,
+    pub status_detail: String,
+    pub success: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-struct CheckMkMetric {
-    metric: HashMap<String, Value>,
+pub struct CheckMkMetric {
+    pub metric: HashMap<String, Value>,
 }
 
 impl ToString for CheckMkMetric {
@@ -262,6 +262,9 @@ impl CheckMkReport {
         resp.success = false;
         resp.status_detail = msg.to_string();
         resp
+    }
+    pub fn is_component_status_ok(&self) -> bool {
+        (self.success == true) && (self.status == 0)
     }
 }
 
@@ -478,7 +481,7 @@ impl CheckComponent {
         &self,
         steps: Vec<CheckStep>,
         component: &ComponentInfo,
-    ) -> Result<CheckMkReport, anyhow::Error> {
+    ) -> Result<(ComponentInfo, CheckMkReport), anyhow::Error> {
         let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
         let mut message = String::new();
@@ -543,25 +546,30 @@ impl CheckComponent {
                             if step.failed_case.critical {
                                 status = CheckMkStatus::Critical;
                                 message.push_str(&format!(
-                                    "Stop at step {} due to critical error",
-                                    &step.return_name
+                                    "Failed at step {} due to critical error, message: {}",
+                                    &step.return_name, report.message
                                 ));
                                 break;
                             } else {
                                 status = CheckMkStatus::Warning;
-                                message.push_str(&format!("Failed at step {}.", &step.return_name));
+                                message.push_str(&format!(
+                                    "Failed at step {}, message: {}",
+                                    &step.return_name, report.message
+                                ));
                             }
                         }
                     }
                 }
                 Err(e) => {
+                    message.push_str(&format!(
+                        "Failed at step {}, err: {}.",
+                        &step.return_name, e
+                    ));
                     if step.failed_case.critical {
                         status = CheckMkStatus::Critical;
-                        message.push_str(&format!("Failed at step {}.", &step.return_name));
                         break;
                     } else {
                         status = CheckMkStatus::Warning;
-                        message.push_str(&format!("Failed at step {}.", &step.return_name));
                     }
                 }
             }
@@ -578,20 +586,23 @@ impl CheckComponent {
         }
 
         message.push_str(&user_info);
-        Ok(CheckMkReport {
-            status: status as u8,
-            service_name: format!(
-                "{}-http-{}-{}-{}-{}",
-                component.component_type.to_string(),
-                component.blockchain,
-                component.network,
-                component.id,
-                component.ip
-            ),
-            metric: CheckMkMetric { metric },
-            status_detail: message,
-            success: true,
-        })
+        Ok((
+            component.clone(),
+            CheckMkReport {
+                status: status as u8,
+                service_name: format!(
+                    "{}-http-{}-{}-{}-{}",
+                    component.component_type.to_string(),
+                    component.blockchain,
+                    component.network,
+                    component.id,
+                    component.ip
+                ),
+                metric: CheckMkMetric { metric },
+                status_detail: message,
+                success: true,
+            },
+        ))
     }
 
     pub(crate) async fn get_components_status(
@@ -624,7 +635,9 @@ impl CheckComponent {
         }
     }
 
-    pub async fn check_components(&self) -> Result<Vec<CheckMkReport>, anyhow::Error> {
+    pub async fn check_components(
+        &self,
+    ) -> Result<Vec<(ComponentInfo, CheckMkReport)>, anyhow::Error> {
         log::debug!("Check component");
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
@@ -683,7 +696,7 @@ impl CheckComponent {
         Ok(reports)
     }
 
-    pub async fn run_check(&self) -> Result<(), anyhow::Error> {
+    pub async fn run_check(&self, check_interval_ms: u64) -> Result<(), anyhow::Error> {
         // Begin run check
         log::debug!("run_check");
         // Infinity run check loop
@@ -695,7 +708,7 @@ impl CheckComponent {
                 Ok(reports) => {
                     let report_content: String = reports
                         .iter()
-                        .map(|report| report.to_string())
+                        .map(|(component, report)| report.to_string())
                         .collect::<Vec<String>>()
                         .join("\n");
                     if self.is_write_to_file {
@@ -711,7 +724,7 @@ impl CheckComponent {
                 break;
             }
             // Repeat every CHECK_INTERVAL secs
-            thread::sleep(::std::time::Duration::new(CHECK_INTERVAL, 0));
+            thread::sleep(::std::time::Duration::from_millis(check_interval_ms));
         }
 
         Ok(())

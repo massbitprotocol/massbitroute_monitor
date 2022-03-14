@@ -14,6 +14,7 @@ use std::env;
 lazy_static! {
     pub static ref CHECK_COMPONENT_ENDPOINT: String =
         env::var("CHECK_COMPONENT_ENDPOINT").unwrap_or(String::from("0.0.0.0:3030"));
+    pub static ref CHECK_INTERVAL_MS: u64 = 3000;
 }
 
 #[tokio::main]
@@ -70,7 +71,7 @@ async fn main() {
         let access_control = AccessControl::default();
 
         info!("Run check component");
-        let _ = server.check_component_service.run_check().await;
+        let _ = server.check_component_service.run_check(*CHECK_INTERVAL_MS).await;
 
         info!("Run service");
         server.serve(access_control).await;

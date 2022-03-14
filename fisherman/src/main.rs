@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 use logger::core::init_logger;
-use mbr_check_component::check_module::check_module::CheckComponent;
+use mbr_check_component::check_module::check_module::{CheckComponent, CheckMkReport, ComponentInfo};
 // use regex::Regex;
 use handlebars::Handlebars;
 use lazy_static::lazy_static;
@@ -8,12 +8,65 @@ use log::info;
 use logger;
 use mbr_check_component::config::AccessControl;
 use mbr_check_component::server_builder::ServerBuilder;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::collections::hash_map::Entry;
 use std::env;
+use std::sync::Arc;
+use std::time::Duration;
+use serde::{Deserialize,Serialize};
+
 
 lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
+    pub static ref NUMBER_OF_SAMPLES: u64 = 5;
+    pub static ref SAMPLE_INTERVAL_MS: u64 = 1000;
+    //Fixme: use better solution to get response time
+    pub static ref RESPONSE_TIME_KEY_NAME: String = "checkCall_response_time_ms".to_string();
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct FishermanService {
+    number_of_sample: u64,
+    sample_interval_ms: u64,
+    entry_point: String,
+    check_component_service: Arc<CheckComponent>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ComponentReport {
+    check_number: u64,
+    success_number: u64,
+    response_time_ms: Option<u64>,
+}
+
+impl From<&Vec<CheckMkReport>> for ComponentReport{
+    fn from(reports: &Vec<CheckMkReport>) -> Self {
+        let check_number = *NUMBER_OF_SAMPLES;
+        let mut success_number = 0;
+        let response_times = reports.iter().filter_map(|report| {
+            if report.is_component_status_ok() {
+                success_number += 1;
+            }
+            if let Some(response_time) = report.metric.metric.get(&*RESPONSE_TIME_KEY_NAME) {
+                Some(serde_json::from_value(response_time.clone()).unwrap())
+            }else {
+                None
+            }
+        }).collect::<Vec<u64>>();
+        let number_of_call = response_times.len() as u64;
+        let response_time_ms = match number_of_call==0 {
+            true => {None}
+            false => {Some(response_times.into_iter().sum::<u64>()/number_of_call)}
+        };
+
+        ComponentReport{
+            check_number,
+            success_number,
+            response_time_ms
+        }
+
+    }
 }
 
 #[tokio::main]
@@ -60,14 +113,48 @@ async fn main() {
             .build();
         log::debug!("check_component: {:?}", check_component);
         let socket_addr = FISHERMAN_ENDPOINT.as_str();
-        let server = ServerBuilder::default()
-            .with_entry_point(socket_addr)
-            .build(check_component);
+        let service = FishermanService {
+            number_of_sample: *NUMBER_OF_SAMPLES,
+            sample_interval_ms: *SAMPLE_INTERVAL_MS,
+            entry_point: socket_addr.to_string(),
+            check_component_service: Arc::new(check_component)
+        };
 
 
         let task = tokio::spawn(async move {
             info!("Run check component");
-            let _ = server.check_component_service.run_check().await;
+            let mut average_reports: HashMap<ComponentInfo,ComponentReport> = HashMap::new();
+            let mut collect_reports : HashMap<ComponentInfo,Vec<CheckMkReport>> = HashMap::new();
+            for n in 0..service.number_of_sample {
+                info!("Run {} times",n+1);
+                if let Ok(reports) = service.check_component_service.check_components().await {
+                    for (component,report) in reports {
+                        // with each component collect reports in to vector
+                        match collect_reports.entry(component) {
+                            Entry::Occupied(o) => {
+                                o.into_mut().push(report);
+                            },
+                            Entry::Vacant(v) => {
+                                v.insert(vec![report]);
+                            }
+                        }
+                    }
+                };
+
+                tokio::time::sleep(Duration::from_millis(service.sample_interval_ms));
+
+            }
+
+            info!("collect_reports: {:#?}",collect_reports);
+            for (component,report) in collect_reports.iter(){
+                info!("component:{:?}", component.id);
+                average_reports.insert(component.clone(), ComponentReport::from(report));
+            };
+
+
+
+            info!("average_reports: {:#?}",average_reports);
+
         });
 
         task.await;

@@ -17,6 +17,17 @@ lazy_static! {
     pub static ref CHECK_INTERVAL_MS: u64 = 3000;
 }
 
+// pub fn get_node_url_from_cli() -> String {
+//     let yml = load_yaml!("../../src/examples/cli.yml");
+//     let matches = App::from_yaml(yml).get_matches();
+//
+//     let node_ip = matches.value_of("node-server").unwrap_or("ws://127.0.0.1");
+//     let node_port = matches.value_of("node-port").unwrap_or("9944");
+//     let url = format!("{}:{}", node_ip, node_port);
+//     println!("Interacting with node on {}\n", url);
+//     url
+// }
+
 #[tokio::main]
 async fn main() {
     let res = init_logger(&String::from("CheckComponent"));
@@ -46,6 +57,10 @@ async fn main() {
         let base_endpoint_file = matches
             .value_of("base-endpoint")
             .unwrap_or("src/example/base-endpoint.json");
+        let massbit_chain_endpoint = matches
+            .value_of("massbit-chain-endpoint")
+            .unwrap_or("ws://127.0.0.1:9944");
+        let signer_phrase = matches.value_of("signer-phrase").unwrap_or("Bob");
         let output = matches
             .value_of("output")
             .unwrap_or("src/example/output.json");
@@ -71,7 +86,10 @@ async fn main() {
         let access_control = AccessControl::default();
 
         info!("Run check component");
-        let _ = server.check_component_service.run_check(*CHECK_INTERVAL_MS).await;
+        let _ = server
+            .check_component_service
+            .run_check(*CHECK_INTERVAL_MS)
+            .await;
 
         info!("Run service");
         server.serve(access_control).await;
@@ -126,6 +144,22 @@ fn create_check_component() -> App<'static> {
                 .long("base-endpoint")
                 .value_name("base-endpoint")
                 .help("Input base-endpoint file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("massbit-chain-endpoint")
+                .short('m')
+                .long("massbit-chain-endpoint")
+                .value_name("massbit-chain-endpoint")
+                .help("Input massbit-chain-endpoint")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("signer-phrase")
+                .short('s')
+                .long("signer-phrase")
+                .value_name("signer-phrase")
+                .help("Input signer-phrase")
                 .takes_value(true),
         )
         .arg(

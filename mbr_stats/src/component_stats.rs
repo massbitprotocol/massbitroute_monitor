@@ -24,6 +24,16 @@ use std::fmt::Formatter;
 use std::os::unix::raw::time_t;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// Massbit chain
+use sp_core::sr25519;
+use sp_core::crypto::Pair;
+use sp_keyring::AccountKeyring;
+use std::convert::TryFrom;
+use substrate_api_client::rpc::WsRpcClient;
+use substrate_api_client::{
+    compose_extrinsic, Api, GenericAddress, Metadata, UncheckedExtrinsicV4, XtStatus,
+};
+
 type TimeStamp = i64;
 
 const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
@@ -40,16 +50,17 @@ pub enum ComponentType {
 pub struct ConfigData;
 
 #[derive(Debug, Default)]
-pub struct ComponentStats<'a> {
+pub struct ComponentStats {
     // input file
-    pub config_data_uri: &'a str,
+    pub config_data_uri: String,
     // config data
     pub config_data: Option<ConfigData>,
     // prometheus url
-    pub prometheus_gateway_url: &'a str,
-    pub prometheus_node_url: &'a str,
+    pub prometheus_gateway_url: String,
+    pub prometheus_node_url: String,
     // Massbit verification protocol chain url
-    pub mvp_url: &'a str,
+    pub mvp_url: String,
+    pub signer_phrase: String,
 
     // For collecting data
     pub gateway_adapter: DataCollectionAdapter,
@@ -78,6 +89,45 @@ pub struct ChainAdapter {
     client: Option<JsonRpcClient>,
 }
 
+impl ChainAdapter {
+    pub fn test_sign_extrinsic(&self) {
+        ///////////// test substrate client
+        //let url = get_node_url_from_cli();
+        let node_ip = "wss://dev.verification.massbit.io";
+        let node_port = "";
+        let url = format!("{}:{}", node_ip, node_port);
+
+        // initialize api and set the signer (sender) that is used to sign the extrinsics
+        let from = AccountKeyring::Alice.pair();
+        let client = WsRpcClient::new(&url);
+        let api = Api::new(client).map(|api| api.set_signer(from)).unwrap();
+
+        // set the recipient
+        let to = AccountKeyring::Bob.to_account_id();
+
+        // call Balances::transfer
+        // the names are given as strings
+        #[allow(clippy::redundant_clone)]
+            let xt: UncheckedExtrinsicV4<_> = compose_extrinsic!(
+        api.clone(),
+        "Balances",
+        "transfer",
+        GenericAddress::Id(to),
+        Compact(1000000000000000000_u128)
+    );
+
+        println!("[+] Composed Extrinsic:\n {:?}\n", xt);
+
+        // send and watch extrinsic until InBlock
+        let tx_hash = api
+            .send_extrinsic(xt.hex_encode(), XtStatus::InBlock)
+            .unwrap();
+        println!("[+] Transaction got included. Hash: {:?}", tx_hash);
+        /////////////// end test substrate client
+        loop {}
+    }
+}
+
 impl std::fmt::Debug for ChainAdapter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "MvpAdapter<{:?}>", &self.data)
@@ -104,19 +154,20 @@ pub struct QueryData {
     is_keep: bool,
 }
 
-pub struct StatsBuilder<'a> {
-    inner: ComponentStats<'a>,
+pub struct StatsBuilder {
+    inner: ComponentStats,
 }
 
-impl<'a> Default for StatsBuilder<'a> {
+impl Default for StatsBuilder {
     fn default() -> Self {
         Self {
             inner: ComponentStats {
-                config_data_uri: "",
+                config_data_uri: "".to_string(),
                 config_data: None,
-                prometheus_gateway_url: "",
-                prometheus_node_url: "",
-                mvp_url: "",
+                prometheus_gateway_url: "".to_string(),
+                prometheus_node_url: "".to_string(),
+                mvp_url: "".to_string(),
+                signer_phrase: "".to_string(),
                 gateway_adapter: Default::default(),
                 node_adapter: Default::default(),
                 chain_adapter: Default::default(),
@@ -125,8 +176,8 @@ impl<'a> Default for StatsBuilder<'a> {
     }
 }
 
-impl<'a> ComponentStats<'a> {
-    pub fn builder() -> StatsBuilder<'a> {
+impl ComponentStats {
+    pub fn builder() -> StatsBuilder {
         StatsBuilder::default()
     }
 
@@ -195,6 +246,9 @@ impl<'a> ComponentStats<'a> {
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
+        println!("test_sign_extrinsic...");
+        self.chain_adapter.test_sign_extrinsic();
+
         // subscribe finalized header
         let client = self
             .chain_adapter
@@ -267,8 +321,8 @@ impl<'a> ComponentStats<'a> {
         Ok(())
     }
 }
-impl<'a> StatsBuilder<'a> {
-    pub async fn with_config_uri(mut self, path: &'a str) -> StatsBuilder<'a> {
+impl StatsBuilder {
+    pub async fn with_config_uri(mut self, path: String) -> StatsBuilder {
         self.inner.config_data_uri = path;
 
         let config_data: Option<ConfigData> = self.get_config_data().await;
@@ -288,7 +342,7 @@ impl<'a> StatsBuilder<'a> {
         client
     }
 
-    pub async fn with_prometheus_gateway_url(mut self, path: &'a str) -> StatsBuilder<'a> {
+    pub async fn with_prometheus_gateway_url(mut self, path: String) -> StatsBuilder {
         self.inner.prometheus_gateway_url = path;
 
         self.inner.gateway_adapter = DataCollectionAdapter {
@@ -301,7 +355,7 @@ impl<'a> StatsBuilder<'a> {
         self
     }
 
-    pub async fn with_prometheus_node_url(mut self, path: &'a str) -> StatsBuilder<'a> {
+    pub async fn with_prometheus_node_url(mut self, path: String) -> StatsBuilder {
         self.inner.prometheus_node_url = path;
 
         self.inner.node_adapter = DataCollectionAdapter {
@@ -313,15 +367,19 @@ impl<'a> StatsBuilder<'a> {
         self
     }
 
-    pub async fn with_mvp_url(mut self, path: &'a str) -> StatsBuilder<'a> {
-        self.inner.mvp_url = path;
+    pub async fn with_mvp_url(mut self, path: String) -> StatsBuilder {
+        self.inner.mvp_url = path.clone();
         let client = WsClientBuilder::default().build(&path).await;
         println!("chain client: {:?}", client);
         self.inner.chain_adapter.client = client.ok();
         self
     }
+    pub fn with_signer_phrase(mut self, signer_phrase: String) -> Self {
+        self.inner.signer_phrase = signer_phrase;
 
-    pub fn build(self) -> ComponentStats<'a> {
+        self
+    }
+    pub fn build(self) -> ComponentStats {
         self.inner
     }
 }

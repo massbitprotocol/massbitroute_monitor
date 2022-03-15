@@ -151,13 +151,13 @@ pub struct CheckStep {
     failed_case: FailedCase,
 }
 
-struct GatewayInfo;
-struct DApiInfo;
+// struct GatewayInfo;
+// struct DApiInfo;
 
 enum Component {
     Node(ComponentInfo),
-    Gateway(GatewayInfo),
-    DApi(DApiInfo),
+    Gateway(ComponentInfo),
+    DApi(ComponentInfo),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Hash, Eq)]
@@ -939,7 +939,6 @@ impl GeneratorBuilder {
         self.inner.base_nodes = base_nodes;
         self
     }
-
     pub fn with_output_file(mut self, output_file: String) -> Self {
         self.inner.output_file = output_file;
         self

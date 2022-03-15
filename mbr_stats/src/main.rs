@@ -9,6 +9,8 @@ async fn main() {
     println!("Start mbr stats");
     let res = init_logger(&String::from("ComponentStats"));
 
+
+
     let matches = Command::new("mbr-check-component")
         .version("0.1")
         .about("mbr-check-component")
@@ -27,13 +29,13 @@ async fn main() {
             .unwrap_or("wss://rpc.polkadot.io");
 
         let component_stats = ComponentStats::builder()
-            .with_config_uri(config_data)
+            .with_config_uri(config_data.to_string())
             .await
-            .with_prometheus_gateway_url(prometheus_gateway_url)
+            .with_prometheus_gateway_url(prometheus_gateway_url.to_string())
             .await
-            .with_prometheus_node_url(prometheus_node_url)
+            .with_prometheus_node_url(prometheus_node_url.to_string())
             .await
-            .with_mvp_url(mvp_url)
+            .with_mvp_url(mvp_url.to_string())
             .await
             .build();
         log::debug!("check_component: {:?}", component_stats);

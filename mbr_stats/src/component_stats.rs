@@ -1,10 +1,9 @@
 use anyhow::{anyhow, Error};
-use chrono::Duration;
 use clap::StructOpt;
 use futures::pin_mut;
 use futures_util::future::{err, join_all};
 use minifier::json::minify;
-use reqwest::{Body, Response};
+use reqwest::{Body, Response, Url};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -22,19 +21,20 @@ use serde_json::{to_string, Number, Value};
 use std::convert::TryInto;
 use std::fmt::Formatter;
 use std::os::unix::raw::time_t;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-// Massbit chain
-use sp_core::sr25519;
-use sp_core::crypto::Pair;
+use sp_core::Bytes;
 use sp_keyring::AccountKeyring;
-use std::convert::TryFrom;
+use substrate_api_client::Api;
 use substrate_api_client::rpc::WsRpcClient;
-use substrate_api_client::{
-    compose_extrinsic, Api, GenericAddress, Metadata, UncheckedExtrinsicV4, XtStatus,
-};
+use tokio::sync::RwLock;
+use tokio::task;
+use tokio::time::{sleep,Duration};
+use crate::chain_adapter::{ChainAdapter, Project, Projects};
+
 
 type TimeStamp = i64;
+type ProjectId = Bytes;
 
 const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
 const DATA_NAME: &str = "nginx_vts_filter_requests_total";
@@ -63,17 +63,19 @@ pub struct ComponentStats {
     pub signer_phrase: String,
 
     // For collecting data
-    pub gateway_adapter: DataCollectionAdapter,
-    pub node_adapter: DataCollectionAdapter,
-    // For collecting data
+    pub gateway_adapter: Arc<DataCollectionAdapter>,
+    pub node_adapter: Arc<DataCollectionAdapter>,
+    // Projects data
+    pub projects: Arc<RwLock<Projects>>,
 
     // For submit data
-    pub chain_adapter: ChainAdapter,
+    pub chain_adapter: Arc<ChainAdapter>,
 }
+
+
 
 #[derive(Clone, Default)]
 pub struct DataCollectionAdapter {
-    //data: HashMap<String, QueryData>,
     client: Option<PrometheusClient>,
 }
 
@@ -83,64 +85,7 @@ impl std::fmt::Debug for DataCollectionAdapter {
     }
 }
 
-#[derive(Default)]
-pub struct ChainAdapter {
-    data: HashMap<String, SubmitData>,
-    client: Option<JsonRpcClient>,
-}
 
-impl ChainAdapter {
-    pub fn test_sign_extrinsic(&self) {
-        ///////////// test substrate client
-        //let url = get_node_url_from_cli();
-        let node_ip = "wss://dev.verification.massbit.io";
-        let node_port = "";
-        let url = format!("{}:{}", node_ip, node_port);
-
-        // initialize api and set the signer (sender) that is used to sign the extrinsics
-        let from = AccountKeyring::Alice.pair();
-        let client = WsRpcClient::new(&url);
-        let api = Api::new(client).map(|api| api.set_signer(from)).unwrap();
-
-        // set the recipient
-        let to = AccountKeyring::Bob.to_account_id();
-
-        // call Balances::transfer
-        // the names are given as strings
-        #[allow(clippy::redundant_clone)]
-            let xt: UncheckedExtrinsicV4<_> = compose_extrinsic!(
-        api.clone(),
-        "Balances",
-        "transfer",
-        GenericAddress::Id(to),
-        Compact(1000000000000000000_u128)
-    );
-
-        println!("[+] Composed Extrinsic:\n {:?}\n", xt);
-
-        // send and watch extrinsic until InBlock
-        let tx_hash = api
-            .send_extrinsic(xt.hex_encode(), XtStatus::InBlock)
-            .unwrap();
-        println!("[+] Transaction got included. Hash: {:?}", tx_hash);
-        /////////////// end test substrate client
-        loop {}
-    }
-}
-
-impl std::fmt::Debug for ChainAdapter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MvpAdapter<{:?}>", &self.data)
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct SubmitData {
-    consumer_id: String,
-    requests_count: isize,
-    from_block_number: isize,
-    to_block_number: isize,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct QueryData {
@@ -170,6 +115,7 @@ impl Default for StatsBuilder {
                 signer_phrase: "".to_string(),
                 gateway_adapter: Default::default(),
                 node_adapter: Default::default(),
+                projects: Default::default(),
                 chain_adapter: Default::default(),
             },
         }
@@ -245,14 +191,31 @@ impl ComponentStats {
         Ok(res)
     }
 
-    pub async fn run(&self) -> anyhow::Result<()> {
-        println!("test_sign_extrinsic...");
-        self.chain_adapter.test_sign_extrinsic();
+    pub async fn run(&mut self) -> anyhow::Result<()> {
+        // println!("test_sign_extrinsic...");
+        // self.chain_adapter.test_sign_extrinsic();
+
+        let projects = self.projects.clone();
+        let chain_adapter = self.chain_adapter.clone();
+        task::spawn(async move {
+            chain_adapter.subscribe_event_update_quota(projects).await;
+        });
+
+        let projects = self.projects.clone();
+        loop {
+            sleep(Duration::from_millis(2000)).await;
+            {
+                let projects_lock = projects.read().await;
+                println!("Current Projects: {:?}",projects_lock);
+            }
+        }
+
+        println!("finish subscribe_event");
 
         // subscribe finalized header
         let client = self
             .chain_adapter
-            .client
+            .json_rpc_client
             .as_ref()
             .ok_or(anyhow::Error::msg("None chain client"))?;
         let mut subscribe_finalized_heads = client
@@ -345,33 +308,43 @@ impl StatsBuilder {
     pub async fn with_prometheus_gateway_url(mut self, path: String) -> StatsBuilder {
         self.inner.prometheus_gateway_url = path;
 
-        self.inner.gateway_adapter = DataCollectionAdapter {
+        self.inner.gateway_adapter = Arc::new(DataCollectionAdapter {
             //data: Default::default(),
             client: self
                 .get_prometheus_client(&self.inner.prometheus_gateway_url.to_string())
                 .await
                 .ok(),
-        };
+        });
         self
     }
 
     pub async fn with_prometheus_node_url(mut self, path: String) -> StatsBuilder {
         self.inner.prometheus_node_url = path;
 
-        self.inner.node_adapter = DataCollectionAdapter {
+        self.inner.node_adapter = Arc::new(DataCollectionAdapter {
             client: self
                 .get_prometheus_client(&self.inner.prometheus_node_url.to_string())
                 .await
                 .ok(),
-        };
+        });
         self
     }
 
     pub async fn with_mvp_url(mut self, path: String) -> StatsBuilder {
         self.inner.mvp_url = path.clone();
+        // RPSee client for subscribe new block
         let client = WsClientBuilder::default().build(&path).await;
         println!("chain client: {:?}", client);
-        self.inner.chain_adapter.client = client.ok();
+
+        // substrate_api_client for send extrinsic and subscribe event
+        let from = AccountKeyring::Bob.pair();
+        let ws_client = WsRpcClient::new(&self.inner.mvp_url);
+        let chain_adapter = ChainAdapter{
+            json_rpc_client: client.ok(),
+            ws_rpc_client: Some(ws_client.clone()),
+            api: Api::new(ws_client.clone()).map(|api| api.set_signer(from)).ok()
+        };
+        self.inner.chain_adapter = Arc::new(chain_adapter);
         self
     }
     pub fn with_signer_phrase(mut self, signer_phrase: String) -> Self {

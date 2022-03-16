@@ -4,6 +4,8 @@ use logger::core::init_logger;
 use mbr_stats::component_stats::ComponentStats;
 use std::collections::BTreeMap;
 
+
+
 #[tokio::main]
 async fn main() {
     println!("Start mbr stats");
@@ -26,9 +28,9 @@ async fn main() {
             .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_node");
         let mvp_url = matches
             .value_of("mvp-url")
-            .unwrap_or("wss://rpc.polkadot.io");
+            .unwrap_or("wss://dev.verification.massbit.io");
 
-        let component_stats = ComponentStats::builder()
+        let mut component_stats = ComponentStats::builder()
             .with_config_uri(config_data.to_string())
             .await
             .with_prometheus_gateway_url(prometheus_gateway_url.to_string())

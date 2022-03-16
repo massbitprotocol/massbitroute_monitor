@@ -1700,6 +1700,7 @@ dependencies = [
  "log",
  "logger",
  "minifier",
+ "parity-scale-codec",
  "prometheus-http-query",
  "reqwest",
  "serde",

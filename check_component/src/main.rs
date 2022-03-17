@@ -60,6 +60,7 @@ async fn main() {
         let massbit_chain_endpoint = matches
             .value_of("massbit-chain-endpoint")
             .unwrap_or("ws://127.0.0.1:9944");
+        let domain = matches.value_of("domain").unwrap_or("massbitroute.dev");
         let signer_phrase = matches.value_of("signer-phrase").unwrap_or("Bob");
         let output = matches
             .value_of("output")
@@ -75,6 +76,7 @@ async fn main() {
             .await
             .with_check_flow_file(check_flow_file.to_string())
             .with_base_endpoint_file(base_endpoint_file.to_string())
+            .with_domain(domain.to_string())
             .with_output_file(output.to_string())
             .build();
         log::debug!("check_component: {:?}", check_component);
@@ -85,13 +87,13 @@ async fn main() {
 
         let access_control = AccessControl::default();
 
-        info!("Run check component");
-        let _ = server
-            .check_component_service
-            .run_check(*CHECK_INTERVAL_MS)
-            .await;
+        // info!("Run check component");
+        // let _ = server
+        //     .check_component_service
+        //     .run_check(*CHECK_INTERVAL_MS)
+        //     .await;
 
-        info!("Run service");
+        info!("Run service ");
         server.serve(access_control).await;
     }
 }
@@ -168,6 +170,13 @@ fn create_check_component() -> App<'static> {
                 .long("output")
                 .value_name("output")
                 .help("Output file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("domain")
+                .long("domain")
+                .value_name("domain")
+                .help("domain name")
                 .takes_value(true),
         )
 }

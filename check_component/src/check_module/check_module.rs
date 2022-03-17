@@ -7,7 +7,6 @@ use minifier::json::minify;
 use reqwest::{Body, Response};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 
-use crate::check_module::check_module::ComponentType::Node;
 use handlebars::{Handlebars, RenderError};
 use log::{debug, error, info, log_enabled, Level};
 use serde_json::{to_string, Number, Value};
@@ -25,8 +24,6 @@ use tokio::time::error::Elapsed;
 use warp::multipart::FormData;
 use warp::reject::custom;
 use warp::{Rejection, Reply};
-
-// use futures_util::future::try_future::TryFutureExt;
 
 type BlockChainType = String;
 type UrlType = String;
@@ -83,8 +80,24 @@ pub struct UserInfo {
 }
 
 impl ComponentInfo {
-    fn get_node_url(&self) -> UrlType {
-        format!("http://{}.node.mbr.massbitroute.com", self.id)
+    // fn get_node_url(&self) -> UrlType {
+    //     format!("http://{}.node.mbr.massbitroute.com", self.id)
+    // }
+
+    fn get_url(&self) -> UrlType {
+        format!("https://{}", self.ip)
+    }
+
+    fn get_host_header(&self, domain: &String) -> String {
+        match self.component_type {
+            ComponentType::Node => {
+                format!("{}.node.mbr.{}", self.id, domain)
+            }
+            ComponentType::Gateway => {
+                format!("{}.gw.mbr.{}", self.id, domain)
+            }
+            ComponentType::DApi => String::default(),
+        }
     }
 
     fn get_component_same_chain(
@@ -102,21 +115,23 @@ impl ComponentInfo {
         result
     }
 
-    fn get_gateway_url(&self, fix_dapi: &ComponentInfo) -> UrlType {
-        // http://34.88.83.191/cb8a7cef-0ebd-4ce7-a39f-6c0d4ddd5f3a
-        format!("http://{ip}/{dapi_id}", ip = self.ip, dapi_id = fix_dapi.id)
-    }
+    // fn get_gateway_url(&self, fix_dapi: &ComponentInfo) -> UrlType {
+    //     // http://34.88.83.191/cb8a7cef-0ebd-4ce7-a39f-6c0d4ddd5f3a
+    //     format!("http://{ip}/{dapi_id}", ip = self.ip, dapi_id = fix_dapi.id)
+    // }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct CheckComponent {
-    // input file
+    // input
     pub list_node_id_file: String,
     pub list_gateway_id_file: String,
     pub list_dapi_id_file: String,
     pub list_user_file: String,
     pub check_flow_file: String,
     pub base_endpoint_file: String,
+    // MBR Domain
+    pub domain: String,
     // The output file
     pub output_file: String,
     // inner data
@@ -386,44 +401,29 @@ impl CheckComponent {
         return_name: &String,
         step_result: &StepResult,
     ) -> Result<ActionResponse, anyhow::Error> {
-        // Get url
-        //log::debug!("self.base_nodes: {:?}", self.base_nodes);
-
         // prepare rpc call
-        let ref_dapi = node.get_component_same_chain(&self.list_dapis).unwrap();
-        let node_url = match node.component_type {
-            ComponentType::Node => node.get_node_url(),
-            ComponentType::Gateway => {
-                let url = node.get_gateway_url(&ref_dapi);
-                //println!("gateway url: {}", url);
-                url
-            }
-            ComponentType::DApi => String::default(),
-        };
+        //let ref_dapi = node.get_component_same_chain(&self.list_dapis).unwrap();
+        let node_url = node.get_url();
 
         let url = match action.is_base_node {
             true => self.base_nodes.get(node.blockchain.as_str()),
             false => Some(&node_url),
         }
         .ok_or(anyhow::Error::msg("Cannot get url"))?;
-
+        let mut client_builder = reqwest::ClientBuilder::new();
+        let client = client_builder.danger_accept_invalid_certs(true).build()?;
         // Replace body for transport result of previous step
         let body = Self::replace_string(action.body.clone(), step_result)?;
-        //println!("body: {}", body);
 
-        let mut client = reqwest::Client::new()
+        let mut request_builder = client
             .post(url)
-            .header("content-type", "application/json");
-        client = match node.component_type {
-            ComponentType::Node => client.header("X-Api-Key", node.token.as_str()).body(body),
-            ComponentType::Gateway => client
-                .header("Host", ref_dapi.endpoint.unwrap_or_default().as_str())
-                .body(body),
-            ComponentType::DApi => client,
-        };
-        log::debug!("client: {:?}", client);
+            .header("content-type", "application/json")
+            .header("x-api-key", node.token.as_str())
+            .header("host", node.get_host_header(&self.domain))
+            .body(body);
+        log::debug!("request_builder: {:?}", request_builder);
 
-        let sender = client.send();
+        let sender = request_builder.send();
         pin_mut!(sender);
 
         // Call rpc
@@ -438,12 +438,13 @@ impl CheckComponent {
         let response_time_ms = now.elapsed().as_millis();
 
         let resp = res??.text().await?;
-        //let resp = client.send().await?.text().await?;
+
         let resp: Value = serde_json::from_str(&resp)?;
-        //log::debug!("resp: {:?}", resp);
+        log::debug!("response call: {:?}", resp);
 
         // get result
         let mut result: HashMap<String, String> = HashMap::new();
+
         // Add response_time
         result.insert(RESPONSE_TIME_KEY.to_string(), response_time_ms.to_string());
 
@@ -628,7 +629,7 @@ impl CheckComponent {
         let res = self.run_check_steps(check_steps, &component_info).await;
         info!("res:{:?}", res);
         match res {
-            Ok(res) => Ok(warp::reply::json(&res)),
+            Ok(res) => Ok(warp::reply::json(&res.1)),
             Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
                 format!("{:?}", err),
             ))),
@@ -745,6 +746,7 @@ impl Default for GeneratorBuilder {
                 list_user_file: "".to_string(),
                 check_flow_file: "".to_string(),
                 base_endpoint_file: "".to_string(),
+                domain: "".to_string(),
                 output_file: "".to_string(),
                 list_nodes: vec![],
                 list_gateways: vec![],
@@ -766,7 +768,7 @@ impl GeneratorBuilder {
         let list_nodes: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::Node)
             .await
-            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+            .unwrap_or_default();
         self.inner.list_nodes = list_nodes;
         self
     }
@@ -776,7 +778,7 @@ impl GeneratorBuilder {
         let list_gateways: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::Gateway)
             .await
-            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+            .unwrap_or_default();
         self.inner.list_gateways = list_gateways;
         self
     }
@@ -786,17 +788,14 @@ impl GeneratorBuilder {
         let list_dapis: Vec<ComponentInfo> = self
             .get_list_component(ComponentType::DApi)
             .await
-            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+            .unwrap_or_default();
         self.inner.list_dapis = list_dapis;
         self
     }
     pub async fn with_list_user_file(mut self, path: String) -> GeneratorBuilder {
         self.inner.list_user_file = path.clone();
 
-        let list_users: Vec<UserInfo> = self
-            .get_list_user()
-            .await
-            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        let list_users: Vec<UserInfo> = self.get_list_user().await.unwrap_or_default();
         log::debug!("list users: {:?}", &list_users);
         self.inner.list_users = list_users;
         self
@@ -923,18 +922,20 @@ impl GeneratorBuilder {
     pub fn with_check_flow_file(mut self, path: String) -> Self {
         let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
-        let test_flow: CheckFlows = serde_json::from_str(&minify(&json))
-            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        let test_flow: CheckFlows = serde_json::from_str(&minify(&json)).unwrap_or_default();
         self.inner.check_flow_file = path;
         self.inner.check_flows = test_flow;
         self
     }
-
+    pub fn with_domain(mut self, path: String) -> Self {
+        self.inner.domain = path;
+        self
+    }
     pub fn with_base_endpoint_file(mut self, path: String) -> Self {
         let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
-        let base_nodes: HashMap<BlockChainType, UrlType> = serde_json::from_str(&minify(&json))
-            .unwrap_or_else(|err| panic!("Cannot parse `{}` as JSON: {}", path, err));
+        let base_nodes: HashMap<BlockChainType, UrlType> =
+            serde_json::from_str(&minify(&json)).unwrap_or_default();
         self.inner.check_flow_file = path;
         self.inner.base_nodes = base_nodes;
         self

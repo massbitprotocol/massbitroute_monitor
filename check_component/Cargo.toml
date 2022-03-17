@@ -16,7 +16,7 @@ anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 minifier = "0.0.42"
 clap = "3.0"
-reqwest =  { version = "0.11" , features = ["multipart"] }
+reqwest =  { version = "0.11" , features = ["multipart","native-tls"] }
 tokio = { version = "1.16" , features = ["full"] }
 futures-util = "0.3"
 timer = "0.2"

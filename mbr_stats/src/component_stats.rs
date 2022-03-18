@@ -127,6 +127,11 @@ impl ComponentStats {
         StatsBuilder::default()
     }
 
+    pub fn update_projects(&mut self) -> Result<(),anyhow::Error>{
+        // Todo: add code to update project from portal
+        Ok(())
+    }
+
     async fn get_request_number(
         &self,
         filter: &str,
@@ -191,28 +196,7 @@ impl ComponentStats {
         Ok(res)
     }
 
-    pub async fn run(&mut self) -> anyhow::Result<()> {
-        // println!("test_sign_extrinsic...");
-        // self.chain_adapter.test_sign_extrinsic();
-
-        let projects = self.projects.clone();
-        let chain_adapter = self.chain_adapter.clone();
-        task::spawn(async move {
-            chain_adapter.subscribe_event_update_quota(projects).await;
-        });
-
-        let projects = self.projects.clone();
-        loop {
-            sleep(Duration::from_millis(2000)).await;
-            {
-                let projects_lock = projects.read().await;
-                println!("Current Projects: {:?}",projects_lock);
-            }
-        }
-
-        println!("finish subscribe_event");
-
-        // subscribe finalized header
+    async fn subscribe_finalized_heads(&self) -> Result<Subscription<Value>,anyhow::Error> {
         let client = self
             .chain_adapter
             .json_rpc_client
@@ -226,14 +210,17 @@ impl ComponentStats {
             )
             .await;
         println!("subscribe_finalized_heads: {:?}", subscribe_finalized_heads);
-        let mut subscribe_finalized_heads = subscribe_finalized_heads?;
+        Ok(subscribe_finalized_heads?)
+    }
+
+    async fn loop_get_request_number(&self, mut subscribe: Subscription<Value>) -> Result<(),anyhow::Error>{
         let mut i = 0;
         // wait for new block
         let mut last_count_block: isize = -1;
         let mut last_count_block_timestamp: TimeStamp = -1;
 
         loop {
-            let res = subscribe_finalized_heads.next().await;
+            let res = subscribe.next().await;
             if let Some(Ok(res)) = res {
                 println!("received {:?}", res);
                 if let Some(block_number) = res.get("number") {
@@ -280,6 +267,25 @@ impl ComponentStats {
                 }
             }
         }
+    }
+
+    pub async fn run(&mut self) -> anyhow::Result<()> {
+        // println!("test_sign_extrinsic...");
+        // self.chain_adapter.test_sign_extrinsic();
+
+        let projects = self.projects.clone();
+        let chain_adapter = self.chain_adapter.clone();
+
+
+        task::spawn(async move {
+            println!("Subscribe_event");
+            chain_adapter.subscribe_event_update_quota(projects).await;
+        });
+
+
+        // subscribe finalized header
+        let mut subscribe_finalized_heads = self.subscribe_finalized_heads().await?;
+        self.loop_get_request_number(subscribe_finalized_heads).await?;
 
         Ok(())
     }

@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::fmt::Formatter;
 // Massbit chain
 use sp_core::{Bytes, sr25519};
@@ -18,19 +19,32 @@ use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 use jsonrpsee::core::client::{
     Client as JsonRpcClient, ClientT, Subscription, SubscriptionClientT,
 };
+//use sp_core::LogLevel::Debug;
 use tokio::sync::RwLock;
+use std::fmt::{self, Debug, Display};
+use minifier::js::Keyword::Default;
 
 type ProjectId = Bytes;
-type Quota = u64;
+type ProjectIdString = String;
+type Quota = String;
 
 #[derive(Default,Debug)]
-pub struct Projects(pub HashMap<ProjectId,Project>);
+pub struct Projects(pub HashMap<ProjectIdString,Project>);
 
 #[derive(Default,Debug)]
 pub struct Project{
-    project_hash: Hash,
+    blockchain: String,
+    network: String,
     quota: Quota,
 }
+
+// #[derive(Default,Debug)]
+// pub struct Dapi{
+//     id: String,
+//     status: u8,
+// }
+
+
 
 #[derive(Default)]
 pub struct ChainAdapter {
@@ -38,6 +52,56 @@ pub struct ChainAdapter {
     pub(crate) ws_rpc_client: Option<WsRpcClient>,
     pub(crate) api: Option<Api<Pair, WsRpcClient>>
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct SubmitData {
+    consumer_id: String,
+    requests_count: isize,
+    from_block_number: isize,
+    to_block_number: isize,
+}
+
+
+#[derive(Decode)]
+struct TransferEventArgs {
+    from: AccountId,
+    to: AccountId,
+    value: u128,
+}
+
+#[derive(Decode,Debug)]
+struct ProjectRegisteredEventArgs {
+    project_id: Bytes,
+    account_id: AccountId,
+    blockchain: PalletDapiBlockChain,
+    quota: u64
+}
+
+impl ProjectRegisteredEventArgs {
+    fn project_id_to_string(&self) -> String{
+        String::from_utf8_lossy(&*self.project_id).to_string()
+    }
+}
+
+#[derive(Decode,Debug)]
+enum PalletDapiBlockChain{
+    Ethereum,
+    Polkadot,
+}
+impl fmt::Display for PalletDapiBlockChain {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PalletDapiBlockChain::Ethereum => {
+                write!(f, "eth")
+            }
+            PalletDapiBlockChain::Polkadot => {
+                write!(f, "dot")
+            }
+        }
+
+    }
+}
+
 
 impl ChainAdapter {
     pub fn test_sign_extrinsic(&self) {
@@ -66,6 +130,7 @@ impl ChainAdapter {
         /////////////// end test substrate client
         loop {}
     }
+
     pub async fn subscribe_event_update_quota(&self, projects: Arc<RwLock<Projects>>) {
         let (events_in, events_out) = channel();
         let api = self.api.as_ref().unwrap();
@@ -77,10 +142,19 @@ impl ChainAdapter {
             println!("Got event: {:?}", event);
             {
                 let mut projects_lock = projects.write().await;
-                projects_lock.0.insert(event.project_id,Project{
-                    quota: event.quota,
-                    project_hash: event.project_hash,
-                });
+                match projects_lock.0.entry(event.project_id_to_string()) {
+                    Entry::Occupied(o) => {
+                        let project = o.into_mut();
+                        project.quota = event.quota.to_string();
+                    },
+                    Entry::Vacant(v) => {
+                        v.insert(Project {
+                            blockchain: event.blockchain.to_string(),
+                            network: "".to_string(),
+                            quota: event.quota.to_string(),
+                        });
+                    }
+                };
             }
             //println!("projects: {:?}", projects);
         }
@@ -93,36 +167,4 @@ impl std::fmt::Debug for ChainAdapter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "MvpAdapter")
     }
-}
-
-
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct SubmitData {
-    consumer_id: String,
-    requests_count: isize,
-    from_block_number: isize,
-    to_block_number: isize,
-}
-
-
-#[derive(Decode)]
-struct TransferEventArgs {
-    from: AccountId,
-    to: AccountId,
-    value: u128,
-}
-
-#[derive(Decode,Debug)]
-struct ProjectRegisteredEventArgs {
-    project_id: Bytes,
-    project_hash: Hash,
-    account_id: AccountId,
-    blockchain: PalletDapiBlockChain,
-    quota: u64
-}
-
-#[derive(Decode,Debug)]
-enum PalletDapiBlockChain{
-    Ethereum,
-    Polkadot,
 }

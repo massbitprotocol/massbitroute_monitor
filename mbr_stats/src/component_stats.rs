@@ -23,10 +23,13 @@ use std::fmt::Formatter;
 use std::os::unix::raw::time_t;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use sp_core::Bytes;
+use codec::Encode;
+use sp_core::{Bytes, Pair as _};
+use sp_core::sr25519::Pair;
 use sp_keyring::AccountKeyring;
 use substrate_api_client::Api;
 use substrate_api_client::rpc::WsRpcClient;
+use tokio::io::AsyncReadExt;
 use tokio::sync::RwLock;
 use tokio::task;
 use tokio::time::{sleep,Duration};
@@ -38,6 +41,8 @@ type ProjectId = Bytes;
 
 const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
 const DATA_NAME: &str = "nginx_vts_filter_requests_total";
+const PROJECT_FILTER: &str = ".*::proj::api_method";
+
 
 #[derive(Debug)]
 pub enum ComponentType {
@@ -55,17 +60,19 @@ pub struct ComponentStats {
     pub config_data_uri: String,
     // config data
     pub config_data: Option<ConfigData>,
-    // prometheus url
+    // Url
     pub prometheus_gateway_url: String,
     pub prometheus_node_url: String,
     // Massbit verification protocol chain url
     pub mvp_url: String,
     pub signer_phrase: String,
 
+
     // For collecting data
     pub gateway_adapter: Arc<DataCollectionAdapter>,
     pub node_adapter: Arc<DataCollectionAdapter>,
     // Projects data
+    pub list_project_url: String,
     pub projects: Arc<RwLock<Projects>>,
 
     // For submit data
@@ -115,6 +122,7 @@ impl Default for StatsBuilder {
                 signer_phrase: "".to_string(),
                 gateway_adapter: Default::default(),
                 node_adapter: Default::default(),
+                list_project_url: "".to_string(),
                 projects: Default::default(),
                 chain_adapter: Default::default(),
             },
@@ -127,22 +135,29 @@ impl ComponentStats {
         StatsBuilder::default()
     }
 
-    pub fn update_projects(&mut self) -> Result<(),anyhow::Error>{
-        // Todo: add code to update project from portal
+    pub async fn get_projects_quota_list(projects: Arc<RwLock<Projects>>, list_project_url:String) -> Result<(),anyhow::Error>{
+        let mut res = reqwest::get(list_project_url).await?.text().await?;
+        let projects_new: Projects = serde_json::from_str(res.as_str())?;
+        {
+            let mut lock = projects.write().await;
+            lock.0 = projects_new.0;
+            println!("projects: {:?}", lock.0);
+        }
+
         Ok(())
     }
 
     async fn get_request_number(
         &self,
-        filter: &str,
-        value: &str,
+        filter_name: &str,
+        filter_value: &str,
         data_name: &str,
         time: TimeStamp,
     ) -> anyhow::Result<HashMap<String, usize>> {
         let res: HashMap<String, usize> = HashMap::new();
         let q: InstantVector = Selector::new()
             .metric(data_name)
-            .regex_match(filter, value)
+            .regex_match(filter_name, filter_value)
             .with("code", "2xx")
             .try_into()?;
         let q = sum(q, Some(Aggregate::By(&["filter"])));
@@ -244,21 +259,23 @@ impl ComponentStats {
                             let current_count_block_timestamp =
                                 (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
                                     as TimeStamp;
-                            // Get number of request in between 2 time
-                            // Collect data
-                            if let Ok(res) = self
-                                .get_request_number_in_duration(
-                                    last_count_block_timestamp,
-                                    current_count_block_timestamp,
-                                    DATA_NAME
-                                )
-                                .await
-                            {
-                                println!(
-                                    "Number of requests from {} to {}: {:#?}",
-                                    last_count_block_timestamp, current_count_block_timestamp, res
-                                );
+
+                            // Get request number
+                            match self.get_request_number("filter", PROJECT_FILTER, DATA_NAME,current_count_block_timestamp).await{
+                                Ok(projects_request) => {
+                                    println!("projects_request: {:?}",projects_request);
+                                    let project_quota = self.projects.clone();
+                                    self.chain_adapter.submit_projects_usage(project_quota, projects_request).await;
+                                },
+
+                                Err(e) => println!("get_request_number error: {}",e)
                             }
+
+
+
+
+
+
 
                             last_count_block = current_count_block;
                             last_count_block_timestamp = current_count_block_timestamp;
@@ -275,17 +292,27 @@ impl ComponentStats {
 
         let projects = self.projects.clone();
         let chain_adapter = self.chain_adapter.clone();
+        let list_project_url = self.list_project_url.clone();
 
-
+        // Update quota list
         task::spawn(async move {
+            let res = Self::get_projects_quota_list(projects.clone(),list_project_url).await;
+            println!("Get projects quota res: {:?}",res);
             println!("Subscribe_event");
             chain_adapter.subscribe_event_update_quota(projects).await;
         });
 
-
         // subscribe finalized header
         let mut subscribe_finalized_heads = self.subscribe_finalized_heads().await?;
+
+        // Get request number over time to submit to chain
         self.loop_get_request_number(subscribe_finalized_heads).await?;
+
+        // let project_id = "a9c95892-e4d2-4632-acf3-f0e82b92b856".encode();
+        // self.chain_adapter.submit_project_usage(project_id.into(),123u128);
+        // loop {
+        //
+        // }
 
         Ok(())
     }
@@ -343,19 +370,25 @@ impl StatsBuilder {
         println!("chain client: {:?}", client);
 
         // substrate_api_client for send extrinsic and subscribe event
-        let from = AccountKeyring::Bob.pair();
+        //let (signer,seed) = Pair::from_phrase(self.inner.signer_phrase.as_str(),None).expect("Wrong signer-phrase");
+        // Fixme: find Ferdie Pair from phrase
+        let signer = AccountKeyring::Ferdie.pair();
+
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
         let chain_adapter = ChainAdapter{
             json_rpc_client: client.ok(),
             ws_rpc_client: Some(ws_client.clone()),
-            api: Api::new(ws_client.clone()).map(|api| api.set_signer(from)).ok()
+            api: Api::new(ws_client.clone()).map(|api| api.set_signer(signer)).ok()
         };
         self.inner.chain_adapter = Arc::new(chain_adapter);
         self
     }
+    pub fn with_list_project_url(mut self, path: String) -> StatsBuilder {
+        self.inner.list_project_url = path;
+        self
+    }
     pub fn with_signer_phrase(mut self, signer_phrase: String) -> Self {
         self.inner.signer_phrase = signer_phrase;
-
         self
     }
     pub fn build(self) -> ComponentStats {

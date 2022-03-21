@@ -29,6 +29,12 @@ async fn main() {
         let mvp_url = matches
             .value_of("mvp-url")
             .unwrap_or("wss://dev.verification.massbit.io");
+        let list_project_url = matches
+            .value_of("list-project-url")
+            .unwrap_or("https://portal.massbitroute.dev/mbr/d-apis/project/list/verify");
+        let signer_phrase = matches
+            .value_of("signer-phrase")
+            .unwrap_or("bottom drive obey lake curtain smoke basket hold race lonely fit walk"); //Alice
 
         let mut component_stats = ComponentStats::builder()
             .with_config_uri(config_data.to_string())
@@ -37,8 +43,10 @@ async fn main() {
             .await
             .with_prometheus_node_url(prometheus_node_url.to_string())
             .await
+            .with_signer_phrase(signer_phrase.to_string())
             .with_mvp_url(mvp_url.to_string())
             .await
+            .with_list_project_url(list_project_url.to_string())
             .build();
         log::debug!("check_component: {:?}", component_stats);
         let _ = component_stats.run().await;
@@ -70,6 +78,20 @@ fn create_component_stats() -> Command<'static> {
                 .long("mvp-url")
                 .value_name("mvp-url")
                 .help("Input mvp-url")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("list-project-url")
+                .long("list-project-url")
+                .value_name("list-project-url")
+                .help("Input list-project-url")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("signer-phrase")
+                .long("signer-phrase")
+                .value_name("signer-phrase")
+                .help("Input signer-phrase")
                 .takes_value(true),
         )
         .arg(

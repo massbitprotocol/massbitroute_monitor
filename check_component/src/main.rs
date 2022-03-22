@@ -66,9 +66,9 @@ async fn main() {
             .value_of("output")
             .unwrap_or("src/example/output.json");
         let check_component = CheckComponent::builder()
-            .with_list_node_id_file(list_node_id_file.to_string())
+            .with_list_node_id_file(list_node_id_file.to_string(), None)
             .await
-            .with_list_gateway_id_file(list_gateway_id_file.to_string())
+            .with_list_gateway_id_file(list_gateway_id_file.to_string(), None)
             .await
             .with_list_dapi_id_file(list_dapi_id_file.to_string())
             .await

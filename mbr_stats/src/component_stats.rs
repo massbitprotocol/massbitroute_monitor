@@ -175,6 +175,7 @@ impl ComponentStats {
                 .filter_map(|iv| {
                     iv.metric().get("filter").and_then(|filter| {
                         let value = iv.sample().value() as usize;
+                        // Fixme: get project ID in the filter string
                         Some((filter.to_string(), value))
                     })
                 })

@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 use std::fmt::{self, Debug, Display};
 use minifier::js::Keyword::Default;
 
-const MVP_EXTRINSIC_DAPI: &str = "Dapi";
+pub const MVP_EXTRINSIC_DAPI: &str = "Dapi";
 const MVP_EXTRINSIC_SUBMIT_PROJECT_USAGE: &str = "submit_project_usage";
 const MVP_EVENT_PROJECT_REGISTERED: &str = "ProjectRegistered";
 
@@ -53,9 +53,9 @@ pub struct Project{
 
 #[derive(Default)]
 pub struct ChainAdapter {
-    pub(crate) json_rpc_client: Option<JsonRpcClient>,
-    pub(crate) ws_rpc_client: Option<WsRpcClient>,
-    pub(crate) api: Option<Api<Pair, WsRpcClient>>
+    pub json_rpc_client: Option<JsonRpcClient>,
+    pub ws_rpc_client: Option<WsRpcClient>,
+    pub api: Option<Api<Pair, WsRpcClient>>
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -117,13 +117,14 @@ impl ChainAdapter {
     pub fn submit_project_usage(&self,project_id: &String, usage:u128) -> Result<(),anyhow::Error>{
         // set the recipient
         let api = self.api.as_ref().unwrap().clone();
+        let id:[u8;36] = project_id.as_bytes().try_into()?;
         // the names are given as strings
         #[allow(clippy::redundant_clone)]
         let xt: UncheckedExtrinsicV4<_> = compose_extrinsic!(
             api,
             MVP_EXTRINSIC_DAPI,
             MVP_EXTRINSIC_SUBMIT_PROJECT_USAGE,
-            project_id.as_bytes(),
+            id,
             usage
         );
 

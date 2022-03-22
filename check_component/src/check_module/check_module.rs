@@ -61,14 +61,19 @@ pub struct ComponentInfo {
     pub blockchain: BlockChainType,
     pub network: String,
     pub id: ComponentId,
+    #[serde(rename = "userId")]
     pub user_id: String,
     pub ip: String,
     pub zone: String,
+    #[serde(rename = "countryCode")]
     pub country_code: String,
+    #[serde(skip_serializing, default)]
     pub token: String,
+    #[serde(skip_serializing, default)]
     pub component_type: ComponentType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub endpoint: Option<String>,
+    pub status: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -292,12 +297,42 @@ impl CheckComponent {
         self.list_users.iter().find(|user| &user.id == user_id)
     }
 
+    pub async fn reload_components_list(
+        &mut self,
+        status: Option<String>,
+    ) -> Result<(), anyhow::Error> {
+        let url = &self.list_node_id_file;
+        log::debug!("url:{}", url);
+        let res_data = reqwest::get(url).await?.text().await?;
+        info!("res_data: {:?}", res_data);
+        self.list_nodes = serde_json::from_str(res_data.as_str()).unwrap();
+
+        let url = &self.list_gateway_id_file;
+        log::debug!("url:{}", url);
+        let res_data = reqwest::get(url).await?.text().await?;
+        info!("res_data: {:?}", res_data);
+        self.list_gateways = serde_json::from_str(res_data.as_str()).unwrap();
+
+        //Filter components
+        if let Some(status) = status {
+            self.list_nodes
+                .retain(|component| *component.status == status);
+            self.list_gateways
+                .retain(|component| *component.status == status);
+        }
+
+        Ok(())
+    }
+
     pub fn get_check_steps(
         &self,
         blockchain: &String,
         component_type: &String,
         task: &TaskType,
     ) -> Result<Vec<CheckStep>, anyhow::Error> {
+        // log::info!("blockchain:{:?}", blockchain);
+        // log::info!("component_type:{:?}", component_type);
+        // log::info!("self.check_flows:{:?}", self.check_flows);
         match self.check_flows.get(task.as_str()) {
             Some(check_flows) => {
                 for check_flow in check_flows {
@@ -639,7 +674,7 @@ impl CheckComponent {
     pub async fn check_components(
         &self,
     ) -> Result<Vec<(ComponentInfo, CheckMkReport)>, anyhow::Error> {
-        log::debug!("Check component");
+        log::info!("Check components");
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
         //header 'x-api-key: vnihqf14qk5km71aatvfr7c3djiej9l6mppd5k20uhs62p0b1cm79bfkmcubal9ug44e8cu2c74m29jpusokv6ft6r01o5bnv5v4gb8='
@@ -658,7 +693,7 @@ impl CheckComponent {
             match steps {
                 Ok(steps) => {
                     //log::debug!("steps:{:#?}", steps);
-                    log::debug!("Do the check steps");
+                    //log::info!("Do the check steps");
                     tasks.push(self.run_check_steps(steps, node));
                 }
                 Err(err) => {
@@ -679,7 +714,7 @@ impl CheckComponent {
             match steps {
                 Ok(steps) => {
                     //log::debug!("steps:{:#?}", steps);
-                    log::debug!("Do the check steps");
+                    //log::info!("Do the check steps");
                     tasks.push(self.run_check_steps(steps, gateway));
                 }
                 Err(err) => {
@@ -702,8 +737,9 @@ impl CheckComponent {
         log::debug!("run_check");
         // Infinity run check loop
         loop {
+            log::info!("check_components");
             let reports = self.check_components().await;
-
+            log::info!("reports:{:?}", reports);
             // Write reports to file
             match reports {
                 Ok(reports) => {
@@ -762,34 +798,45 @@ impl Default for GeneratorBuilder {
 }
 
 impl GeneratorBuilder {
-    pub async fn with_list_node_id_file(mut self, path: String) -> GeneratorBuilder {
+    pub async fn with_list_node_id_file(
+        mut self,
+        path: String,
+        status: Option<String>,
+    ) -> GeneratorBuilder {
         self.inner.list_node_id_file = path.clone();
 
         let list_nodes: Vec<ComponentInfo> = self
-            .get_list_component(ComponentType::Node)
+            .get_list_component(ComponentType::Node, status)
             .await
             .unwrap_or_default();
+        info!("list_nodes:{:?}", list_nodes);
         self.inner.list_nodes = list_nodes;
         self
     }
-    pub async fn with_list_gateway_id_file(mut self, path: String) -> GeneratorBuilder {
+
+    pub async fn with_list_gateway_id_file(
+        mut self,
+        path: String,
+        status: Option<String>,
+    ) -> GeneratorBuilder {
         self.inner.list_gateway_id_file = path.clone();
 
         let list_gateways: Vec<ComponentInfo> = self
-            .get_list_component(ComponentType::Gateway)
+            .get_list_component(ComponentType::Gateway, status)
             .await
             .unwrap_or_default();
+        info!("list_gateways:{:?}", list_gateways);
         self.inner.list_gateways = list_gateways;
         self
     }
     pub async fn with_list_dapi_id_file(mut self, path: String) -> GeneratorBuilder {
         self.inner.list_dapi_id_file = path.clone();
 
-        let list_dapis: Vec<ComponentInfo> = self
-            .get_list_component(ComponentType::DApi)
-            .await
-            .unwrap_or_default();
-        self.inner.list_dapis = list_dapis;
+        // let list_dapis: Vec<ComponentInfo> = self
+        //     .get_list_component(ComponentType::DApi)
+        //     .await
+        //     .unwrap_or_default();
+        // self.inner.list_dapis = list_dapis;
         self
     }
     pub async fn with_list_user_file(mut self, path: String) -> GeneratorBuilder {
@@ -846,27 +893,28 @@ impl GeneratorBuilder {
     async fn get_list_component(
         &self,
         component_type: ComponentType,
+        status: Option<String>,
     ) -> Result<Vec<ComponentInfo>, anyhow::Error> {
-        let mut nodes: Vec<ComponentInfo> = Vec::new();
+        let mut components: Vec<ComponentInfo> = Vec::new();
         log::debug!("----------Create list of nodes info details----------");
         let list_id_file = match component_type {
             ComponentType::Node => &self.inner.list_node_id_file,
             ComponentType::Gateway => &self.inner.list_gateway_id_file,
             ComponentType::DApi => &self.inner.list_dapi_id_file,
         };
-        let lines: Vec<String> = match list_id_file.starts_with("http") {
+        let mut lines: Vec<String> = Vec::new();
+        match list_id_file.starts_with("http") {
             true => {
                 let url = list_id_file;
                 log::debug!("url:{}", url);
-                let node_data = reqwest::get(url).await?.text().await?;
-                log::debug!("node_data: {}", node_data);
-                let lines: Vec<String> = node_data.split("\n").map(|s| s.to_string()).collect();
-                lines
+                let res_data = reqwest::get(url).await?.text().await?;
+                info!("res_data: {:?}", res_data);
+                components = serde_json::from_str(res_data.as_str()).unwrap();
             }
             false => {
                 let file = File::open(list_id_file)?;
                 let reader = BufReader::new(file);
-                reader.lines().into_iter().filter_map(|s| s.ok()).collect()
+                lines = reader.lines().into_iter().filter_map(|s| s.ok()).collect()
             }
         };
         for line in lines {
@@ -888,6 +936,7 @@ impl GeneratorBuilder {
                         token: data[7].clone(),
                         component_type: component_type.clone(),
                         endpoint: Default::default(),
+                        status: "".to_string(),
                     },
                     //77762f16-4344-4c58-9851-9e2e4488a2c0 87f54452-18e7-4582-b699-110e061a6248 ftm mainnet cd0pfbm2tjq3.ftm-mainnet.massbitroute.com 77762f16-4344-4c58-9851-9e2e4488a2c0
                     ComponentType::DApi => ComponentInfo {
@@ -901,14 +950,20 @@ impl GeneratorBuilder {
                         token: Default::default(),
                         component_type: component_type.clone(),
                         endpoint: Some(data[4].clone()),
+                        status: "".to_string(),
                     },
                 };
 
-                nodes.push(node);
+                components.push(node);
             }
         }
 
-        return Ok(nodes);
+        //Filter components
+        if let Some(status) = status {
+            components.retain(|component| *component.status == status);
+        }
+
+        return Ok(components);
     }
 
     // pub fn get_token(node_data: String) -> Result<String,anyhow::Error> {
@@ -922,6 +977,7 @@ impl GeneratorBuilder {
     pub fn with_check_flow_file(mut self, path: String) -> Self {
         let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
+        log::info!("json: {:#?}", json);
         let test_flow: CheckFlows = serde_json::from_str(&minify(&json)).unwrap_or_default();
         self.inner.check_flow_file = path;
         self.inner.check_flows = test_flow;

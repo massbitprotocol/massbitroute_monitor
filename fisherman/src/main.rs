@@ -1,6 +1,8 @@
-use clap::{App, Arg};
+use clap::{App, Arg, Command};
 use logger::core::init_logger;
-use mbr_check_component::check_module::check_module::{CheckComponent, CheckMkReport, ComponentInfo};
+use mbr_check_component::check_module::check_module::{
+    CheckComponent, CheckMkReport, ComponentInfo,
+};
 // use regex::Regex;
 use handlebars::Handlebars;
 use lazy_static::lazy_static;
@@ -8,73 +10,20 @@ use log::info;
 use logger;
 use mbr_check_component::config::AccessControl;
 use mbr_check_component::server_builder::ServerBuilder;
-use std::collections::{BTreeMap, HashMap};
+use mbr_fisherman::fisherman_service::FishermanService;
+use mbr_fisherman::{FISHERMAN_ENDPOINT, NUMBER_OF_SAMPLES, SAMPLE_INTERVAL_MS};
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
-use std::env;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::time::Duration;
-use serde::{Deserialize,Serialize};
-
-
-lazy_static! {
-    pub static ref FISHERMAN_ENDPOINT: String =
-        env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
-    pub static ref NUMBER_OF_SAMPLES: u64 = 5;
-    pub static ref SAMPLE_INTERVAL_MS: u64 = 1000;
-    //Fixme: use better solution to get response time
-    pub static ref RESPONSE_TIME_KEY_NAME: String = "checkCall_response_time_ms".to_string();
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct FishermanService {
-    number_of_sample: u64,
-    sample_interval_ms: u64,
-    entry_point: String,
-    check_component_service: Arc<CheckComponent>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct ComponentReport {
-    check_number: u64,
-    success_number: u64,
-    response_time_ms: Option<u64>,
-}
-
-impl From<&Vec<CheckMkReport>> for ComponentReport{
-    fn from(reports: &Vec<CheckMkReport>) -> Self {
-        let check_number = *NUMBER_OF_SAMPLES;
-        let mut success_number = 0;
-        let response_times = reports.iter().filter_map(|report| {
-            if report.is_component_status_ok() {
-                success_number += 1;
-            }
-            if let Some(response_time) = report.metric.metric.get(&*RESPONSE_TIME_KEY_NAME) {
-                Some(serde_json::from_value(response_time.clone()).unwrap())
-            }else {
-                None
-            }
-        }).collect::<Vec<u64>>();
-        let number_of_call = response_times.len() as u64;
-        let response_time_ms = match number_of_call==0 {
-            true => {None}
-            false => {Some(response_times.into_iter().sum::<u64>()/number_of_call)}
-        };
-
-        ComponentReport{
-            check_number,
-            success_number,
-            response_time_ms
-        }
-
-    }
-}
 
 #[tokio::main]
 async fn main() {
     let res = init_logger(&String::from("Fisherman"));
     //println!("Log output: {}", res); // Print log output type
 
-    let matches = App::new("mbr-fisherman")
+    let matches = Command::new("mbr-fisherman")
         .version("0.1")
         .about("mbr-fisherman")
         .subcommand(create_run_fisherman())
@@ -98,11 +47,17 @@ async fn main() {
         let base_endpoint_file = matches
             .value_of("base-endpoint")
             .unwrap_or("src/example/base-endpoint.json");
+        let mvp_url = matches
+            .value_of("mvp-url")
+            .unwrap_or("wss://dev.verification.massbit.io");
+        let signer_phrase = matches
+            .value_of("signer-phrase")
+            .unwrap_or("bottom drive obey lake curtain smoke basket hold race lonely fit walk"); //Alice
 
         let check_component = CheckComponent::builder()
-            .with_list_node_id_file(list_node_id_file.to_string())
+            .with_list_node_id_file(list_node_id_file.to_string(), Some("staked".to_string()))
             .await
-            .with_list_gateway_id_file(list_gateway_id_file.to_string())
+            .with_list_gateway_id_file(list_gateway_id_file.to_string(), Some("staked".to_string()))
             .await
             .with_list_dapi_id_file(list_dapi_id_file.to_string())
             .await
@@ -113,58 +68,35 @@ async fn main() {
             .build();
         log::debug!("check_component: {:?}", check_component);
         let socket_addr = FISHERMAN_ENDPOINT.as_str();
-        let service = FishermanService {
-            number_of_sample: *NUMBER_OF_SAMPLES,
-            sample_interval_ms: *SAMPLE_INTERVAL_MS,
-            entry_point: socket_addr.to_string(),
-            check_component_service: Arc::new(check_component)
-        };
+        // let fisherman_service = FishermanService {
+        //     number_of_sample: *NUMBER_OF_SAMPLES,
+        //     sample_interval_ms: *SAMPLE_INTERVAL_MS,
+        //     entry_point: socket_addr.to_string(),
+        //     check_component_service: Arc::new(check_component),
+        //     mvp_url: "".to_string(),
+        //     signer_phrase: "".to_string(),
+        //     chain_adapter: Arc::new(Default::default())
+        // };
 
+        let fisherman_service = FishermanService::builder()
+            .with_number_of_sample(NUMBER_OF_SAMPLES)
+            .with_sample_interval_ms(SAMPLE_INTERVAL_MS)
+            .with_entry_point(socket_addr.to_string())
+            .with_check_component_service(check_component)
+            .with_signer_phrase(signer_phrase.to_string())
+            .with_mvp_url(mvp_url.to_string())
+            .await
+            .build();
 
-        let task = tokio::spawn(async move {
-            info!("Run check component");
-            let mut average_reports: HashMap<ComponentInfo,ComponentReport> = HashMap::new();
-            let mut collect_reports : HashMap<ComponentInfo,Vec<CheckMkReport>> = HashMap::new();
-            for n in 0..service.number_of_sample {
-                info!("Run {} times",n+1);
-                if let Ok(reports) = service.check_component_service.check_components().await {
-                    for (component,report) in reports {
-                        // with each component collect reports in to vector
-                        match collect_reports.entry(component) {
-                            Entry::Occupied(o) => {
-                                o.into_mut().push(report);
-                            },
-                            Entry::Vacant(v) => {
-                                v.insert(vec![report]);
-                            }
-                        }
-                    }
-                };
+        fisherman_service.loop_check_component().await;
 
-                tokio::time::sleep(Duration::from_millis(service.sample_interval_ms));
-
-            }
-
-            info!("collect_reports: {:#?}",collect_reports);
-            for (component,report) in collect_reports.iter(){
-                info!("component:{:?}", component.id);
-                average_reports.insert(component.clone(), ComponentReport::from(report));
-            };
-
-
-
-            info!("average_reports: {:#?}",average_reports);
-
-        });
-
-        task.await;
         // info!("Run service");
         // let access_control = AccessControl::default();
         // server.serve(access_control).await;
     }
 }
-fn create_run_fisherman() -> App<'static> {
-    App::new("run-fisherman")
+fn create_run_fisherman() -> Command<'static> {
+    Command::new("run-fisherman")
         .about("check node kind is correct")
         .arg(
             Arg::new("list-node-id-file")
@@ -214,5 +146,19 @@ fn create_run_fisherman() -> App<'static> {
                 .help("Input base-endpoint file")
                 .takes_value(true),
         )
-
+        .arg(
+            Arg::new("signer-phrase")
+                .long("signer-phrase")
+                .value_name("signer-phrase")
+                .help("Input signer-phrase")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("mvp-url")
+                .short('m')
+                .long("mvp-url")
+                .value_name("mvp-url")
+                .help("Input mvp-url")
+                .takes_value(true),
+        )
 }

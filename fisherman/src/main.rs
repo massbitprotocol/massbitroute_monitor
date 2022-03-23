@@ -53,6 +53,7 @@ async fn main() {
         let signer_phrase = matches
             .value_of("signer-phrase")
             .unwrap_or("bottom drive obey lake curtain smoke basket hold race lonely fit walk"); //Alice
+        let domain = matches.value_of("domain").unwrap_or("massbitroute.dev");
 
         let check_component = CheckComponent::builder()
             .with_list_node_id_file(list_node_id_file.to_string(), Some("staked".to_string()))
@@ -63,6 +64,7 @@ async fn main() {
             .await
             .with_list_user_file(list_user_file.to_string())
             .await
+            .with_domain(domain.to_string())
             .with_check_flow_file(check_flow_file.to_string())
             .with_base_endpoint_file(base_endpoint_file.to_string())
             .build();
@@ -159,6 +161,13 @@ fn create_run_fisherman() -> Command<'static> {
                 .long("mvp-url")
                 .value_name("mvp-url")
                 .help("Input mvp-url")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("domain")
+                .long("domain")
+                .value_name("domain")
+                .help("domain name")
                 .takes_value(true),
         )
 }

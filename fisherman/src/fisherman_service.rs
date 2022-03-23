@@ -1,23 +1,28 @@
 use crate::{
-    DELAY_BETWEEN_CHECK_LOOP_MS, MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT, NUMBER_OF_SAMPLES,
-    RESPONSE_TIME_KEY_NAME, RESPONSE_TIME_THRESHOLD, SUCCESS_PERCENT_THRESHOLD,
+    DELAY_BETWEEN_CHECK_LOOP_MS, GATEWAY_RESPONSE_FAILED_NUMBER, GATEWAY_RESPONSE_TIME_THRESHOLD,
+    MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT, NODE_RESPONSE_FAILED_NUMBER,
+    NODE_RESPONSE_TIME_THRESHOLD, NUMBER_OF_SAMPLES, REPORTS_HISTORY_QUEUE_LENGTH_MAX,
+    RESPONSE_TIME_KEY_NAME, SUCCESS_PERCENT_THRESHOLD,
 };
 use anyhow::Error;
 use log::info;
+use mbr_check_component::check_module::check_module::ComponentType::Gateway;
 use mbr_check_component::check_module::check_module::{
     CheckComponent, CheckMkReport, ComponentInfo, ComponentType,
 };
 use mbr_stats::chain_adapter::ChainAdapter;
 use mbr_stats::chain_adapter::MVP_EXTRINSIC_DAPI;
+use minifier::js::Keyword::Default;
 use sp_keyring::AccountKeyring;
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Pair;
 use substrate_api_client::{compose_extrinsic, Api, UncheckedExtrinsicV4, XtStatus};
+use warp::get;
 use warp::test::request;
 
 pub trait SubmitProviderReport {
@@ -143,11 +148,38 @@ impl FishermanService {
         FishermanBuilder::default()
     }
 
+    fn is_history_continuous_fail_reach_limit(
+        reports_history: &VecDeque<HashMap<ComponentInfo, ComponentReport>>,
+        component: &ComponentInfo,
+    ) -> bool {
+        let mut count = 0;
+        for reports in reports_history.iter() {
+            if let Some(report) = reports.get(component) {
+                if !report.is_healthy(&component.component_type) {
+                    count += 1;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        println!("Number continuous-fails of id {}: {}", component.id, count);
+        match component.component_type {
+            ComponentType::Node => count > NODE_RESPONSE_FAILED_NUMBER,
+            ComponentType::Gateway => count > GATEWAY_RESPONSE_FAILED_NUMBER,
+            ComponentType::DApi => false,
+        }
+    }
+
     pub async fn loop_check_component(mut self) {
         let number_of_sample = self.number_of_sample;
         info!("number_of_sample:{}", number_of_sample);
         let sample_interval_ms = self.sample_interval_ms;
         info!("sample_interval_ms:{}", sample_interval_ms);
+        let mut reports_history: VecDeque<HashMap<ComponentInfo, ComponentReport>> =
+            VecDeque::new();
+
         loop {
             info!("Run check component");
             let mut average_reports: HashMap<ComponentInfo, ComponentReport> = HashMap::new();
@@ -173,6 +205,7 @@ impl FishermanService {
             }
 
             info!("collect_reports: {:?}", collect_reports);
+            // Calculate average report
             for (component, report) in collect_reports.iter() {
                 info!("component:{:?}", component.id);
                 average_reports.insert(component.clone(), ComponentReport::from(report));
@@ -180,11 +213,19 @@ impl FishermanService {
 
             info!("average_reports: {:#?}", average_reports);
             // Check and send report
-            for (component_info, report) in average_reports {
-                if !report.is_healthy() && component_info.status == "staked" {
+            for (component_info, report) in average_reports.iter() {
+                // Check for healthy and submit report
+                if !report.is_healthy(&component_info.component_type)
+                    && component_info.status == "staked"
+                    && Self::is_history_continuous_fail_reach_limit(
+                        &reports_history,
+                        &component_info,
+                    )
+                {
                     info!("Submit report: {:?}", component_info);
                     let provider_id: [u8; 36] = component_info.id.as_bytes().try_into().unwrap();
                     info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
+                    // Submit report
                     self.chain_adapter
                         .submit_provider_report(
                             provider_id,
@@ -215,6 +256,12 @@ impl FishermanService {
                         });
                 }
             }
+            // Store to history
+            reports_history.push_back(average_reports);
+            while reports_history.len() > REPORTS_HISTORY_QUEUE_LENGTH_MAX {
+                reports_history.pop_front();
+            }
+
             tokio::time::sleep(Duration::from_millis(DELAY_BETWEEN_CHECK_LOOP_MS)).await;
             self.check_component_service
                 .reload_components_list(Some("staked".to_string()))
@@ -239,13 +286,18 @@ pub struct ComponentReport {
 }
 
 impl ComponentReport {
-    pub fn is_healthy(&self) -> bool {
+    pub fn is_healthy(&self, component_type: &ComponentType) -> bool {
+        let response_threshold = match component_type {
+            ComponentType::Node => NODE_RESPONSE_TIME_THRESHOLD,
+            ComponentType::Gateway => GATEWAY_RESPONSE_TIME_THRESHOLD,
+            _ => u32::default(),
+        };
         // If there is not enough info return false
         if self.success_number == 0 || self.response_time_ms == None {
             return false;
         }
         (self.get_success_percent() >= SUCCESS_PERCENT_THRESHOLD)
-            && (self.response_time_ms.unwrap() <= RESPONSE_TIME_THRESHOLD)
+            && (self.response_time_ms.unwrap() <= response_threshold)
     }
     pub fn get_success_percent(&self) -> u32 {
         if self.request_number > 0 {

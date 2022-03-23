@@ -67,7 +67,7 @@ pub struct ComponentInfo {
     pub zone: String,
     #[serde(rename = "countryCode")]
     pub country_code: String,
-    #[serde(skip_serializing, default)]
+    #[serde(rename = "appKey")]
     pub token: String,
     #[serde(skip_serializing, default)]
     pub component_type: ComponentType,
@@ -305,13 +305,21 @@ impl CheckComponent {
         log::debug!("url:{}", url);
         let res_data = reqwest::get(url).await?.text().await?;
         info!("res_data: {:?}", res_data);
-        self.list_nodes = serde_json::from_str(res_data.as_str()).unwrap();
+        let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str())?;
+        for component in components.iter_mut() {
+            component.component_type = ComponentType::Node;
+        }
+        self.list_nodes = components;
 
         let url = &self.list_gateway_id_file;
         log::debug!("url:{}", url);
         let res_data = reqwest::get(url).await?.text().await?;
         info!("res_data: {:?}", res_data);
-        self.list_gateways = serde_json::from_str(res_data.as_str()).unwrap();
+        let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str()).unwrap();
+        for component in components.iter_mut() {
+            component.component_type = ComponentType::Gateway;
+        }
+        self.list_gateways = components;
 
         //Filter components
         if let Some(status) = status {
@@ -456,7 +464,7 @@ impl CheckComponent {
             .header("x-api-key", node.token.as_str())
             .header("host", node.get_host_header(&self.domain))
             .body(body);
-        log::debug!("request_builder: {:?}", request_builder);
+        log::info!("request_builder: {:?}", request_builder);
 
         let sender = request_builder.send();
         pin_mut!(sender);
@@ -475,7 +483,7 @@ impl CheckComponent {
         let resp = res??.text().await?;
 
         let resp: Value = serde_json::from_str(&resp)?;
-        log::debug!("response call: {:?}", resp);
+        //log::info!("response call: {:?}", resp);
 
         // get result
         let mut result: HashMap<String, String> = HashMap::new();
@@ -914,7 +922,7 @@ impl GeneratorBuilder {
             false => {
                 let file = File::open(list_id_file)?;
                 let reader = BufReader::new(file);
-                lines = reader.lines().into_iter().filter_map(|s| s.ok()).collect()
+                lines = reader.lines().into_iter().filter_map(|s| s.ok()).collect();
             }
         };
         for line in lines {
@@ -961,6 +969,10 @@ impl GeneratorBuilder {
         //Filter components
         if let Some(status) = status {
             components.retain(|component| *component.status == status);
+        }
+        // Set component type
+        for component in components.iter_mut() {
+            component.component_type = component_type.clone();
         }
 
         return Ok(components);

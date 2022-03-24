@@ -8,7 +8,7 @@ lazy_static! {
 }
 //Fixme: use better solution to get response time
 pub const RESPONSE_TIME_KEY_NAME: &str = "checkCall_response_time_ms";
-pub const NUMBER_OF_SAMPLES: u64 = 4;
+pub const NUMBER_OF_SAMPLES: u64 = 10;
 pub const SAMPLE_INTERVAL_MS: u64 = 200;
 pub const DELAY_BETWEEN_CHECK_LOOP_MS: u64 = 1000;
 // Good health response

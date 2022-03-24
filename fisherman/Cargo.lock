@@ -1764,7 +1764,7 @@ dependencies = [
  "log",
  "logger",
  "mbr-check-component",
- "mbr_stats",
+ "mbr-stats",
  "minifier",
  "reqwest",
  "serde",
@@ -1778,7 +1778,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mbr_stats"
+name = "mbr-stats"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+cargo build --release
 echo "Update bin file"
 rsync -avz ../target/release/mbr-fisherman mbr-verify:/opt/fisherman/mbr-fisherman
 rsync -avz ../../check_component/target/release/check-flow.json mbr-verify:/opt/fisherman/check-flow.json

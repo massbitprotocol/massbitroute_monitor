@@ -1,5 +1,5 @@
 #!/bin/bash
-
+cargo build --release
 echo "Update bin file"
 rsync -avz ../target/release/mbr-stats mbr-verify:/opt/stats/mbr-stats
 

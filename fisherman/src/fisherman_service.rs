@@ -167,8 +167,8 @@ impl FishermanService {
         }
         println!("Number continuous-fails of id {}: {}", component.id, count);
         match component.component_type {
-            ComponentType::Node => count > NODE_RESPONSE_FAILED_NUMBER,
-            ComponentType::Gateway => count > GATEWAY_RESPONSE_FAILED_NUMBER,
+            ComponentType::Node => count >= NODE_RESPONSE_FAILED_NUMBER,
+            ComponentType::Gateway => count >= GATEWAY_RESPONSE_FAILED_NUMBER,
             ComponentType::DApi => false,
         }
     }

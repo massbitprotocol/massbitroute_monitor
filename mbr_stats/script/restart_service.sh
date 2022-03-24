@@ -1,1 +1,1 @@
-sudo systemctl restart stats
+sudo supervisorctl restart stats

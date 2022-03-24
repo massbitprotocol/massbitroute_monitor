@@ -44,7 +44,7 @@ const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
 const DATA_NAME: &str = "nginx_vts_filter_requests_total";
 const PROJECT_FILTER: &str = ".*::proj::api_method";
 const PROJECT_FILTER_PROJECT_ID_REGEX: &str = r"[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}";
-
+const UPDATE_PROJECT_QUOTA_INTERVAL: u64 = 10; //sec
 
 
 #[derive(Debug)]
@@ -148,7 +148,7 @@ impl ComponentStats {
         {
             let mut lock = projects.write().await;
             lock.0 = projects_new.0;
-            info!("projects quota list: {:?}", lock.0);
+            info!("projects quota update by portal: {:?}", lock.0);
         }
 
         Ok(())
@@ -307,10 +307,19 @@ impl ComponentStats {
 
         // Update quota list
         task::spawn(async move {
-            let res = Self::get_projects_quota_list(projects.clone(),&list_project_url, "staked").await;
-            info!("Get projects quota res: {:?}",projects);
+            loop {
+                let res = Self::get_projects_quota_list(projects.clone(),&list_project_url, "staked").await;
+                if res.is_err(){
+                    info!("Get projects quota error: {:?}",res);
+                }
+                sleep(Duration::from_secs(UPDATE_PROJECT_QUOTA_INTERVAL)).await;
+            }
+        });
+        let projects = self.projects.clone();
+        // Update quota list
+        task::spawn(async move {
             info!("Subscribe_event");
-            chain_adapter.subscribe_event_update_quota(projects).await;
+            chain_adapter.subscribe_event_update_quota(projects.clone()).await;
         });
 
         // subscribe finalized header

@@ -162,7 +162,7 @@ impl ChainAdapter {
                         });
                     }
                 };
-                info!("projects: {:?}", projects_lock);
+                info!("projects quota update by event: {:?}", projects_lock);
             }
 
         }

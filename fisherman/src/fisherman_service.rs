@@ -17,6 +17,7 @@ use sp_keyring::AccountKeyring;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
+use std::fmt::{write, Display, Formatter};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use substrate_api_client::rpc::WsRpcClient;
@@ -211,7 +212,18 @@ impl FishermanService {
                 average_reports.insert(component.clone(), ComponentReport::from(report));
             }
 
-            info!("average_reports: {:#?}", average_reports);
+            // Display report for debug
+            for (component, report) in average_reports.iter() {
+                info!("id: {}, type: {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
+                    component.id,
+                    component.component_type,
+                    report.request_number,
+                    report.success_number,
+                    report.response_time_ms,
+                    report.is_healthy(&component.component_type)
+                );
+            }
+
             // Check and send report
             for (component_info, report) in average_reports.iter() {
                 // Check for healthy and submit report

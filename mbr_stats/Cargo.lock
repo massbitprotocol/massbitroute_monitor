@@ -1687,7 +1687,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mbr_stats"
+name = "mbr-stats"
 version = "0.1.0"
 dependencies = [
  "anyhow",

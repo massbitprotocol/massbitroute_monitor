@@ -148,7 +148,7 @@ impl ComponentStats {
         {
             let mut lock = projects.write().await;
             lock.0 = projects_new.0;
-            println!("projects quota list: {:?}", lock.0);
+            info!("projects quota list: {:?}", lock.0);
         }
 
         Ok(())
@@ -157,7 +157,7 @@ impl ComponentStats {
     fn capture_project_id(filter: &str) -> Option<String> {
         let re = Regex::new(PROJECT_FILTER_PROJECT_ID_REGEX).unwrap();
         let project_id = re.captures(filter).and_then(|id| id.get(0).and_then(|id| Some(id.as_str().to_string())));
-        //println!("filter: {}, project_id:{:?}",filter, project_id);
+        //info!("filter: {}, project_id:{:?}",filter, project_id);
         project_id
     }
 
@@ -192,7 +192,7 @@ impl ComponentStats {
                         // Fixme: get project ID in the filter string
                         let project = ComponentStats::capture_project_id(filter.as_str())
                             .and_then(|project_id| Some((project_id.to_string(), value)));
-                        println!("project: {:?}",project);
+                        info!("project: {:?}",project);
                         project
                     })
                 })
@@ -200,7 +200,7 @@ impl ComponentStats {
         } else {
             Err(anyhow::Error::msg("Cannot parse response"))
         };
-        //println!("Hashmap res: {:#?}", res);
+        //info!("Hashmap res: {:#?}", res);
         res
 
     }
@@ -242,7 +242,7 @@ impl ComponentStats {
                 "chain_unsubscribeFinalizedHeads",
             )
             .await;
-        println!("subscribe_finalized_heads: {:?}", subscribe_finalized_heads);
+        info!("subscribe_finalized_heads: {:?}", subscribe_finalized_heads);
         Ok(subscribe_finalized_heads?)
     }
 
@@ -255,13 +255,13 @@ impl ComponentStats {
         loop {
             let res = subscribe.next().await;
             if let Some(Ok(res)) = res {
-                println!("received {:?}", res);
+                info!("received {:?}", res);
                 if let Some(block_number) = res.get("number") {
                     let block_number = isize::from_str_radix(
                         block_number.as_str().unwrap().trim_start_matches("0x"),
                         16,
                     )?;
-                    println!("block_number {:?}", block_number);
+                    info!("block_number {:?}", block_number);
                     if last_count_block == -1 {
                         last_count_block = block_number;
                         // Fixme: need decode block for getting timestamp. For now use system time.
@@ -281,12 +281,12 @@ impl ComponentStats {
                             // Get request number
                             match self.get_request_number("filter", PROJECT_FILTER, DATA_NAME,current_count_block_timestamp).await{
                                 Ok(projects_request) => {
-                                    //println!("projects_request: {:?}",projects_request);
+                                    //info!("projects_request: {:?}",projects_request);
                                     let project_quota = self.projects.clone();
                                     self.chain_adapter.submit_projects_usage(project_quota, projects_request).await;
                                 },
 
-                                Err(e) => println!("get_request_number error: {}",e)
+                                Err(e) => info!("get_request_number error: {}",e)
                             }
                             last_count_block = current_count_block;
                             last_count_block_timestamp = current_count_block_timestamp;
@@ -298,7 +298,7 @@ impl ComponentStats {
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        // println!("test_sign_extrinsic...");
+        // info!("test_sign_extrinsic...");
         // self.chain_adapter.test_sign_extrinsic();
 
         let projects = self.projects.clone();
@@ -308,8 +308,8 @@ impl ComponentStats {
         // Update quota list
         task::spawn(async move {
             let res = Self::get_projects_quota_list(projects.clone(),&list_project_url, "staked").await;
-            println!("Get projects quota res: {:?}",projects);
-            println!("Subscribe_event");
+            info!("Get projects quota res: {:?}",projects);
+            info!("Subscribe_event");
             chain_adapter.subscribe_event_update_quota(projects).await;
         });
 
@@ -377,7 +377,7 @@ impl StatsBuilder {
         self.inner.mvp_url = path.clone();
         // RPSee client for subscribe new block
         let client = WsClientBuilder::default().build(&path).await;
-        println!("chain client: {:?}", client);
+        info!("chain client: {:?}", client);
 
         // substrate_api_client for send extrinsic and subscribe event
         //let (signer,seed) = Pair::from_phrase(self.inner.signer_phrase.as_str(),None).expect("Wrong signer-phrase");

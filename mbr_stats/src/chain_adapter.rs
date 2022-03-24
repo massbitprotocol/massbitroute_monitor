@@ -22,6 +22,7 @@ use jsonrpsee::core::client::{
 //use sp_core::LogLevel::Debug;
 use tokio::sync::RwLock;
 use std::fmt::{self, Debug, Display};
+use log::info;
 use minifier::js::Keyword::Default;
 
 pub const MVP_EXTRINSIC_DAPI: &str = "Dapi";
@@ -103,13 +104,13 @@ impl ChainAdapter {
             usage
         );
 
-        println!("[+] Composed Extrinsic:\n {:?}\n", xt);
+        info!("[+] Composed Extrinsic:\n {:?}\n", xt);
 
         // send and watch extrinsic until InBlock
         let tx_hash = self.api.as_ref().unwrap()
             .send_extrinsic(xt.hex_encode(), XtStatus::InBlock)
             .unwrap();
-        println!("[+] Transaction got included. Hash: {:?}", tx_hash);
+        info!("[+] Transaction got included. Hash: {:?}", tx_hash);
         Ok(())
     }
     pub async fn submit_projects_usage(&self,projects_quota: Arc<RwLock<Projects>>, projects_request: HashMap<String,usize>) -> Result<(),anyhow::Error>{
@@ -122,14 +123,14 @@ impl ChainAdapter {
             if let Some(project_quota)=projects_quota_clone.get(&project_id){
                 let quota = project_quota.quota.parse::<usize>()?;
                 if  quota < request_number {
-                    println!("Project {} has requests number: {} larger than Quota: {}, ",project_id,request_number,quota);
+                    info!("Project {} has requests number: {} larger than Quota: {}, ",project_id,request_number,quota);
                     if let Err(e) = self.submit_project_usage(&project_id, request_number as u128){
-                        println!("submit_project_usage error:{:?}",e);
+                        info!("submit_project_usage error:{:?}",e);
                     };
                 }
             }
             else {
-                println!("Warning: Project {} has requests number: {} but do not has quota info!",project_id,request_number);
+                info!("Warning: Project {} has requests number: {} but do not has quota info!",project_id,request_number);
             }
         }
         Ok(())
@@ -143,7 +144,7 @@ impl ChainAdapter {
             let event: ProjectRegisteredEventArgs = api
                 .wait_for_event(MVP_EXTRINSIC_DAPI, MVP_EVENT_PROJECT_REGISTERED, None, &events_out)
                 .unwrap();
-            println!("Got event: {:?}", event);
+            info!("Got event: {:?}", event);
             {
                 let mut projects_lock = projects.write().await;
                 match projects_lock.0.entry(event.project_id_to_string()) {
@@ -161,7 +162,7 @@ impl ChainAdapter {
                         });
                     }
                 };
-                println!("projects: {:?}", projects_lock);
+                info!("projects: {:?}", projects_lock);
             }
 
         }

@@ -1,1 +1,1 @@
-sudo systemctl restart fisherman
+sudo supervisorctl restart fisherman

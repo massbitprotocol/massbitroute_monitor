@@ -5,7 +5,7 @@ use crate::{
     RESPONSE_TIME_KEY_NAME, SUCCESS_PERCENT_THRESHOLD,
 };
 use anyhow::Error;
-use log::info;
+use log::{debug, info};
 use mbr_check_component::check_module::check_module::ComponentType::Gateway;
 use mbr_check_component::check_module::check_module::{
     CheckComponent, CheckMkReport, ComponentInfo, ComponentType,
@@ -188,7 +188,7 @@ impl FishermanService {
             for n in 0..number_of_sample {
                 info!("Run {} times", n + 1);
                 if let Ok(reports) = self.check_component_service.check_components().await {
-                    info!("reports:{:?}", reports);
+                    debug!("reports:{:?}", reports);
                     for (component, report) in reports {
                         // with each component collect reports in to vector
                         match collect_reports.entry(component) {
@@ -205,7 +205,7 @@ impl FishermanService {
                 tokio::time::sleep(Duration::from_millis(sample_interval_ms)).await;
             }
 
-            info!("collect_reports: {:?}", collect_reports);
+            debug!("collect_reports: {:?}", collect_reports);
             // Calculate average report
             for (component, report) in collect_reports.iter() {
                 info!("component:{:?}", component.id);

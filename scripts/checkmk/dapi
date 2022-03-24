@@ -1,0 +1,219 @@
+#!/bin/bash
+check_http="/opt/omd/versions/2.0.0p18.cre/lib/nagios/plugins/check_http"
+mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component
+
+if [ ! -f "/usr/bin/parallel" ];then
+    apt install -y parallel
+fi
+
+_check_component() {
+	type=component
+	output=/tmp/check_mk_$type
+	cache=$1
+	if [ -z "$cache" ]; then cache=0; fi
+	if [ $cache -eq 0 ]; then
+		if [ -f "$output" ]; then
+			cat $output
+		fi
+		return
+	fi
+
+	cd $(dirname $mbr_check_component)
+	RUST_LOG=debug RUST_LOG_TYPE=file ./mbr-check-component check-kind -n https://dapi.massbit.io/deploy/info/node/listid -g https://dapi.massbit.io/deploy/info/gateway/listid -d https://dapi.massbit.io/deploy/info/dapi/listid -u https://dapi.massbit.io/deploy/info/user/listid -b base-endpoint.json -o output.json -c check-flow.json >${output}.1
+
+	mv ${output}.1 $output
+	cat $output
+}
+_dapi() {
+	type=dapi
+	output=/tmp/check_mk_$type
+	cache=$1
+	if [ -z "$cache" ]; then cache=0; fi
+	if [ $cache -eq 0 ]; then
+		if [ -f "$output" ]; then
+			cat $output
+		fi
+		return
+	fi
+
+	tmp=$(mktemp)
+	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	if [ $? -eq 0 ]; then
+		cat $tmp | while read id user_id block net hostname token status _remain; do
+			if [ $status -ne 1 ]; then continue; fi
+
+			_checkname=http_$type-$block-${net}_${id}
+			$check_http -H $hostname -u /$token -T application/json --method=POST --post='{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false]}' -t 10 -p 443 --ssl | tail -1 |
+				awk -F'|' -v checkname=$_checkname '{st=0;perf="-";if(index($1,"CRITICAL") != 0){st=2} else if(index($1,"WARNING") != 0){st=1} else {gsub(/ /,"|",$2);perf=$2;};print st,checkname,perf,$1}' >>${output}.1
+
+		done
+
+		rm ${tmp}*
+		mv ${output}.1 $output
+		cat $output
+	fi
+
+}
+
+_check_http(){
+    type=$1
+    output=$2
+    
+    shift 2
+    
+    echo $@ |  while read id user_id block net ip continent country token status approved _remain; do
+			if [ $status -ne 1 ]; then continue; fi
+			if [ $approved -ne 1 ]; then continue; fi
+			hostname=${id}.${type}.mbr.massbitroute.com
+			_checkname=http_${type}-$block-${net}_$id
+			$check_http -k "x-api-key: $token" -H $hostname -I $ip -u / -T application/json --method=POST --post='{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false]}' -t 10 -p 443 --ssl | tail -1 |
+				awk -F'|' -v checkname=$_checkname '{st=0;perf="-";if(index($1,"CRITICAL") != 0){st=2} else if(index($1,"WARNING") != 0){st=1} else {gsub(/ /,"|",$2);perf=$2;};print st,checkname,perf,$1}' >> $output
+
+    done
+}
+
+_gateway_v1() {
+    	type=gateway
+	output=/tmp/check_mk_$type
+
+	cache=$1
+	if [ -z "$cache" ]; then cache=0; fi
+	if [ $cache -eq 0 ]; then
+		if [ -f "$output" ]; then
+			cat $output
+		fi
+		return
+	fi
+
+	tmp=$(mktemp)
+	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	if [ $? -eq 0 ]; then
+
+	    cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
+		echo $0 _check_http gw ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved 
+	    done | parallel -j$(nproc)
+
+		rm $tmp
+		mv ${output}.1 $output
+		cat $output
+	fi
+    }
+_gateway() {
+	type=gateway
+	output=/tmp/check_mk_$type
+
+	cache=$1
+	if [ -z "$cache" ]; then cache=0; fi
+	if [ $cache -eq 0 ]; then
+		if [ -f "$output" ]; then
+			cat $output
+		fi
+		return
+	fi
+
+	tmp=$(mktemp)
+	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	if [ $? -eq 0 ]; then
+
+		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
+			if [ $status -ne 1 ]; then continue; fi
+			if [ $approved -ne 1 ]; then continue; fi
+			hostname=$id.gw.mbr.massbitroute.com
+			_checkname=http_${type}-$block-${net}_$id
+			$check_http -k "x-api-key: $token" -H $hostname -I $ip -u / -T application/json --method=POST --post='{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false]}' -t 10 -p 443 --ssl | tail -1 |
+				awk -F'|' -v checkname=$_checkname '{st=0;perf="-";if(index($1,"CRITICAL") != 0){st=2} else if(index($1,"WARNING") != 0){st=1} else {gsub(/ /,"|",$2);perf=$2;};print st,checkname,perf,$1}' >>${output}.1
+
+		done
+
+		rm $tmp
+		mv ${output}.1 $output
+		cat $output
+	fi
+}
+
+
+_node_v1() {
+	type=node
+	output=/tmp/check_mk_$type
+
+	cache=$1
+	if [ -z "$cache" ]; then cache=0; fi
+	if [ $cache -eq 0 ]; then
+		if [ -f "$output" ]; then
+			cat $output
+		fi
+		return
+	fi
+
+	tmp=$(mktemp)
+	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	if [ $? -eq 0 ]; then
+
+		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
+	        
+echo $0 _check_http node ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
+		done | parallel -j$(nproc)
+		
+		rm $tmp
+		mv ${output}.1 $output
+		cat $output
+	fi
+}
+
+_node() {
+	type=node
+	output=/tmp/check_mk_$type
+
+	cache=$1
+	if [ -z "$cache" ]; then cache=0; fi
+	if [ $cache -eq 0 ]; then
+		if [ -f "$output" ]; then
+			cat $output
+		fi
+		return
+	fi
+
+	tmp=$(mktemp)
+	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	if [ $? -eq 0 ]; then
+
+		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
+			if [ $status -ne 1 ]; then continue; fi
+			if [ $approved -ne 1 ]; then continue; fi
+			hostname=$id.node.mbr.massbitroute.com
+			_checkname=http_${type}-$block-${net}_$id
+			$check_http -k "x-api-key: $token" -H $hostname -I $ip -u / -T application/json --method=POST --post='{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false]}' -t 10 -p 443 --ssl | tail -1 |
+				awk -F'|' -v checkname=$_checkname '{st=0;perf="-";if(index($1,"CRITICAL") != 0){st=2} else if(index($1,"WARNING") != 0){st=1} else {gsub(/ /,"|",$2);perf=$2;};print st,checkname,perf,$1}' >>${output}.1
+
+		done
+
+		rm $tmp
+		mv ${output}.1 $output
+		cat $output
+	fi
+}
+_collect() {
+	lock=/tmp/check_mk_lock
+	if [ -f "$lock" ]; then return; fi
+	touch $lock
+	# _dapi 1
+	_node_v1 1
+	_gateway_v1 1
+
+	#	_check_component 1
+	rm $lock
+}
+loop() {
+	while true; do
+		$0 $@
+		sleep 3
+	done
+}
+if [ $# -eq 0 ]; then
+	# _dapi 0
+	_node_v1 0
+	_gateway_v1 0
+#	_check_component 0
+else
+	$@
+fi

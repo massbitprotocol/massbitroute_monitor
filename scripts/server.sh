@@ -31,7 +31,7 @@ _add() {
 
 }
 _kill() {
-	kill $(ps -ef | grep -v grep | grep -i server.py | awk '{print $2}')
+	pkill -f server.py
 }
 if [ $# -eq 0 ]; then
 	$pip --upgrade pip

@@ -6,6 +6,7 @@ SITE_ROOT=$(realpath $(dirname $(realpath $0))/..)
 
 export HOME=/tmp
 cd $SITE_ROOT
+. $SITE_ROOT/.env
 #source $SITE_ROOT/.env
 git="git -C $SITE_ROOT"
 type="monitor"
@@ -14,45 +15,299 @@ mbr_cli="$dir/mbr"
 script_run="$dir/scripts/run"
 cmd="$dir/cmd_server"
 nginx="$cmd nginx"
+service_dir=/massbit/massbitroute/app/src/sites/services
+
+sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
+arg="request_format=python&output_format=json"
+host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
+
+_load_env() {
+	ROOT_DIR=$SITE_ROOT
+	if [ -f "$ROOT_DIR/.env" ]; then
+		source $ROOT_DIR/.env
+		_file=$ROOT_DIR/.env
+		if [ -z "$MBR_ENV" ]; then
+			if [ -f "$ROOT_DIR/vars/ENV" ]; then
+				export MBR_ENV=$(cat "$ROOT_DIR/vars/ENV")
+			fi
+		fi
+
+		if [ -n "$MBR_ENV" ]; then
+			_file=$ROOT_DIR/.env.$MBR_ENV
+		fi
+		source $_file
+		mkdir -p $ROOT_DIR/src
+		cat $_file | grep -v "^#" | awk -F'=' 'BEGIN{cfg="return {\n"}{sub(/^export\s*/,"",$1);cfg=cfg"[\""$1"\"]""=\""$2"\",\n"}END{print cfg"}"}' >$ROOT_DIR/src/env.lua
+	fi
+	env
+}
+
+_cron() {
+	#    * * * * * $SITE_ROOT/scripts/checkmk/dapi _collect
+	cat >/tmp/cron <<EOF
+EOF
+	crontab /tmp/cron
+}
 _git_config() {
 	$git config --global user.name "Vu Tran"
 	$git config --global user.email "baysao@gmail.com"
 }
 _reload() {
-
-	bash $dir/etc/mkagent/agents/server.sh _kill
-	bash $dir/etc/mkagent/agents/push.sh _kill
+	_cron
+	bash $SITE_ROOT/scripts/server.sh _kill
+	bash $SITE_ROOT/etc/mkagent/agents/push.sh _kill
 	$cmd _update
 	$cmd update
 }
 
+_install() {
+	mkdir -p $service_dir
+	user=$GIT_USER
+	pass=$GIT_PASSWORD
+
+	service=gbc
+	git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git /massbit/massbitroute/app/$service
+	git -C /massbit/massbitroute/app/$service remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
+
+	service=asdf
+	git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git /massbit/massbitroute/app/gbc/bin/.asdf
+
+	git -C /massbit/massbitroute/app/gbc/bin/.asdf remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
+
+	service=ssl
+	git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git /etc/letsencrypt
+	git -C /etc/letsencrypt remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
+
+	service=mkagent
+	git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git $SITE_ROOT/etc/$service
+
+	git -C $SITE_ROOT/etc/$service remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
+
+	service=$type
+	user=$GIT_USER_MONITOR
+	pass=$GIT_PASSWORD_MONITOR
+	git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git $service_dir/$service
+	git -C $service_dir/$service remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
+
+	ln -sf /massbit/massbitroute/app/gbc /massbit/massbitroute/app/src/gbc
+	ln -sf /massbit/massbitroute/app/gbc/bin/openresty /usr/local/openresty
+	apt-get update
+	apt-get install -y git apache2-utils supervisor jq python-is-python2 libssl-dev
+	cp supervisor.conf /etc/supervisor/conf.d/${type}.conf
+	systemctl enable supervisor
+	systemctl start supervisor
+	supervisorctl update
+
+}
+_del_monitor_host() {
+	hostname=$1
+	# sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
+	# arg="request_format=python&output_format=json"
+	# host="https://monitor.mbr.massbitroute.com/mbr/check_mk/webapi.py?$sec&$arg"
+
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	action="delete_host"
+	host_info='request={"hostname":"'$hostname'"}'
+	curl -sSfL "$host&action=$action" -d $host_info | jq
+
+	# action="activate_changes"
+	# host_info='request={"sites":["mbr"]}'
+	# curl -sSfL "$host&action=$action" -d $host_info | jq
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+
+}
+_monitor_activate() {
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	# sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
+	# arg="request_format=python&output_format=json"
+	# host="https://monitor.mbr.massbitroute.com/mbr/check_mk/webapi.py?$sec&$arg"
+
+	action="activate_changes"
+	host_info='request={"sites":["mbr"]}'
+	curl -sSfL "$host&action=$action" -d $host_info | jq
+
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+}
+
+_add_monitor_host() {
+	echo $@
+	hostname=$1
+	ip=$2
+	group=$3
+	disc=$4
+	if [ -z "$disc" ]; then disc=0; fi
+
+	if [ ! -f "/tmp/$hostname" ]; then
+		action="add_host"
+		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
+		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		if [ $st -ne 0 ]; then
+			sleep 1
+			st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		fi
+
+		touch /tmp/$hostname
+	fi
+
+	if [ $disc -eq 1 ]; then
+		action="discover_services"
+		host_info='request={"hostname":"'$hostname'"}'
+		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		if [ $st -ne 0 ]; then
+			sleep 1
+			st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		fi
+
+	fi
+
+}
+_redis_monitor() {
+	/opt/omd/versions/2.0.0p18.cre/bin/redis-cli -s /omd/sites/mbr/tmp/run/redis $@
+}
+_add_core_monitors() {
+	_add_monitor_host mbr-stat-eu-1 34.88.224.156 mbr-stat
+	_add_monitor_host mbr-stat-eu-2 34.88.146.128 mbr-stat
+
+	_add_monitor_host mbr-portal-as-1 34.126.181.168 mbr-portal
+	_add_monitor_host mbr-portal-as-2 34.126.176.201 mbr-portal
+
+	_add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
+	_add_monitor_host mbr-monitor-eu-2 34.88.133.22 mbr-monitor
+
+	_add_monitor_host mbr-git-eu-1 34.88.161.189 mbr-git
+	_add_monitor_host mbr-git-eu-2 34.88.202.210 mbr-git
+
+	_add_monitor_host mbr-api-eu-1 34.88.231.165 mbr-api
+	_add_monitor_host mbr-api-as-1 34.87.189.191 mbr-api
+}
+_refresh_monitors() {
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	su - mbr -c 'cmk -v -I;cmk -R'
+	# su - mbr -c 'cmk -v -II mbr-monitor-eu-1;cmk -v -I;cmk -R'
+
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+}
+
+_remove_hosts() {
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	tmp1=$(mktemp)
+	tmp2=$(mktemp)
+	type=gateway
+	curl -sk https://dapi.massbit.io/deploy/info/$type/listid | awk -v type=$type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
+	comm -23 $tmp2 $tmp1 | while read h; do
+		_del_monitor_host $h
+	done
+	type=node
+	curl -sk https://dapi.massbit.io/deploy/info/$type/listid | awk -v type=$type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
+	comm -23 $tmp2 $tmp1 | while read h; do
+		_del_monitor_host $h
+	done
+	# type=dapi
+	# curl -sk https://dapi.massbit.io/deploy/info/$type/listid | awk -v type=$type '{print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	# su - mbr -c 'lq "GET services\nColumns: description\nFilter: host_name = mbr-monitor-eu-1"' | awk '/^dapi-/' | sort >$tmp2
+	# comm -23 $tmp2 $tmp1 | while read h; do
+	# 	$0 _del_monitor_host $h
+	# done
+	rm $tmp1 $tmp2
+	_monitor_activate
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+}
+_add_monitors() {
+	_add_core_monitors
+	token_file=$SITE_ROOT/scripts/tokens.txt
+	if [ ! -f "$token_file" ]; then touch $token_file; fi
+
+	token_core_file=$SITE_ROOT/scripts/tokens_core.txt
+	cp $token_core_file ${token_file}.tmp
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	tmp=$(mktemp)
+	token_gw=$(mktemp)
+	token_node=$(mktemp)
+	mk_reload=0
+
+	curl -sSfL https://dapi.massbit.io/deploy/info/gateway/listid -o ${tmp} >/dev/null
+	if [ $? -eq 0 ]; then
+		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
+			if [ -z "$id" ]; then continue; fi
+			if [ $status -ne 1 ]; then continue; fi
+			if [ $approved -ne 1 ]; then continue; fi
+			_hostname=gateway-$block-$net-$id
+			_add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1
+			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
+			echo $_access_token $_hostname >>${token_file}.tmp
+			mk_reload=1
+			sleep 1
+		done
+
+	fi
+	rm ${tmp}*
+
+	tmp=$(mktemp)
+	curl -sSfL https://dapi.massbit.io/deploy/info/node/listid -o ${tmp} >/dev/null
+	if [ $? -eq 0 ]; then
+
+		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
+			if [ -z "$id" ]; then continue; fi
+			if [ $status -ne 1 ]; then continue; fi
+			if [ $approved -ne 1 ]; then continue; fi
+			_hostname=node-$block-$net-$id
+			_add_monitor_host $_hostname $ip mbr-node-$block-$net 1
+			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
+			echo $_access_token $_hostname >>${token_file}.tmp
+			mk_reload=1
+			sleep 1
+		done
+
+	fi
+
+	diff -s ${token_file}.tmp $token_file >/dev/null
+	if [ $? -ne 0 ]; then
+		mv ${token_file}.tmp $token_file
+		bash $SITE_ROOT/scripts/server.sh _kill
+	fi
+
+	rm ${tmp}*
+
+	_monitor_activate
+
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+}
+_del_monitors() {
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	tmp=$(mktemp)
+	curl -sSfL https://dapi.massbit.io/deploy/info/gateway/listid -o $tmp >/dev/null
+	if [ $? -eq 0 ]; then
+		cat $tmp | while read id user_id block net ip; do
+			_del_monitor_host gateway-$block-$net-$id
+		done
+
+	fi
+	curl -sSfL https://dapi.massbit.io/deploy/info/node/listid -o $tmp >/dev/null
+	if [ $? -eq 0 ]; then
+		cat $tmp | while read id user_id block net ip; do
+			_del_monitor_host node-$block-$net-$id
+		done
+
+	fi
+	rm $tmp
+	#_monitor_activate
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+}
 loop() {
 	while true; do
 		$0 $@
-		sleep 10
+		sleep 3
 	done
 }
 _monitor() {
-	su - mbr -c 'cmk -I'
 	is_reload=0
-	# echo mbr-monitor >vars/TYPE
-	# rm vars/TYPE
-
-	# if [ ! -d "$SITE_ROOT/vars" ]; then mkdir -p $SITE_ROOT/vars; fi
-	# echo mbr-monitor >$SITE_ROOT/vars/TYPE
-	if [ ! -d "$SITE_ROOT/etc/mkagent/.git" ]; then
-		mkdir -p $SITE_ROOT/etc/mkagent
-		git clone http://mbr_gateway:6a796299bb72357770735a79019612af228586e7@git.massbitroute.com/massbitroute/mkagent.git $SITE_ROOT/etc/mkagent
-		is_reload=1
-	fi
-
-	if [ -f "/massbit/massbitroute/app/src/sites/services/monitor/etc/main.mk" ]; then
-		ln -sf /massbit/massbitroute/app/src/sites/services/monitor/etc/main.mk /opt/omd/sites/mbr/etc/check_mk/main.mk
-	fi
 
 	for d in \
 		/massbit/massbitroute/app/gbc \
-		$SITE_ROOT $SITE_ROOT/etc/mkagent \
+		$SITE_ROOT \
+		$SITE_ROOT/etc/mkagent \
 		/etc/letsencrypt; do
 		git -C $d pull | grep -i "updating"
 		if [ $? -eq 0 ]; then
@@ -63,6 +318,12 @@ _monitor() {
 	if [ $is_reload -ne 0 ]; then
 		$0 _reload
 	fi
+	# $0 _remove_hosts
+	$0 _add_monitors
+	# $0 _add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
+	# $0 _monitor_activate
+	# $0 _refresh_monitors
+	# $cmd start all
 }
 
 _run() {

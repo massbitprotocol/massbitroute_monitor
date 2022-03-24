@@ -8,38 +8,33 @@ local _config = {
     },
     templates = {},
     apps = {},
+    supervisor1 = [[
+
+[program:monitor_refresh]
+command=/bin/bash _SITE_ROOT_/scripts/run loop _refresh_monitors
+autorestart=true
+redirect_stderr=true
+stdout_logfile=_SITE_ROOT_/logs/monitor_refresh.log
+]],
     supervisor = [[
-[program:stat_monitor_client]
-command=/bin/bash _SITE_ROOT_/etc/mkagent/agents/push.sh
+[program:check_mk_dapi_collect]
+command=/bin/bash _SITE_ROOT_/scripts/checkmk/dapi loop _collect
 autorestart=true
 redirect_stderr=true
-stdout_logfile=_SITE_ROOT_/logs/stat_monitor_client.log
+stdout_logfile=_SITE_ROOT_/logs/check_mk_dapi_collect.log
 
-[program:stat_monitor]
-command=/bin/bash _SITE_ROOT_/etc/mkagent/agents/server.sh
+[program:monitor_client]
+command=/bin/bash _SITE_ROOT_/etc/mkagent/agents/push.sh _SITE_ROOT_
 autorestart=true
 redirect_stderr=true
-stdout_logfile=_SITE_ROOT_/logs/stat_monitor.log
+stdout_logfile=_SITE_ROOT_/logs/monitor_client.log
 
-; Prometheus for Community Gateway
-[program:stat_prometheus_gw]
-command=/bin/bash _SITE_ROOT_/scripts/run loop _service_prometheus_gw _SITE_ROOT_ v1
+[program:monitor_server]
+command=/bin/bash _SITE_ROOT_/scripts/server.sh
 autorestart=true
 redirect_stderr=true
-stdout_logfile=_SITE_ROOT_/logs/stat_prometheus_gw.log
+stdout_logfile=_SITE_ROOT_/logs/monitor_server.log
 
-; Prometheus for Community Node
-[program:stat_prometheus_node]
-command=/bin/bash _SITE_ROOT_/scripts/run loop _service_prometheus_node _SITE_ROOT_ v1
-autorestart=true
-redirect_stderr=true
-stdout_logfile=_SITE_ROOT_/logs/stat_prometheus_node.log
-
-[program:stat_grafana]
-command=/bin/bash _SITE_ROOT_/scripts/run loop _service_grafana _SITE_ROOT_ v1
-autorestart=true
-redirect_stderr=true
-stdout_logfile=_SITE_ROOT_/logs/stat_grafana.log
     ]]
 }
 return _config

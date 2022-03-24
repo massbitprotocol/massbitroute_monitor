@@ -1,0 +1,27 @@
+[package]
+name = "mbr-check-component"
+version = "0.1.0"
+edition = "2018"
+authors = ["Massbit <contact@massbit.io>"]
+description = "Check component kind and status"
+homepage = "https://www.massbit.io/"
+repository = "https://github.com/massbitprotocol/massbitroute_monitor"
+readme = "README.md"
+keywords = ["checking", "massbit-route","massbit"]
+license = "MIT"
+
+[dependencies]
+serde_json = "1.0"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+minifier = "0.0.42"
+clap = "3.0"
+reqwest =  { version = "0.11" , features = ["multipart"] }
+tokio = { version = "1.16" , features = ["full"] }
+futures-util = "0.3"
+timer = "0.2"
+chrono = "0.4"
+futures = "0.3"
+log = { version = "0.4", features = ["std"] }
+logger = { path = "../logger" }
+handlebars = "4.2"

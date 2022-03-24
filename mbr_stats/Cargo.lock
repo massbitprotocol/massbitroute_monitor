@@ -1702,6 +1702,7 @@ dependencies = [
  "minifier",
  "parity-scale-codec",
  "prometheus-http-query",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

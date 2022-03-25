@@ -24,6 +24,7 @@ use std::os::unix::raw::time_t;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use codec::Encode;
+use regex::Regex;
 use sp_core::{Bytes, Pair as _};
 use sp_core::sr25519::Pair;
 use sp_keyring::AccountKeyring;
@@ -42,6 +43,8 @@ type ProjectId = Bytes;
 const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
 const DATA_NAME: &str = "nginx_vts_filter_requests_total";
 const PROJECT_FILTER: &str = ".*::proj::api_method";
+const PROJECT_FILTER_PROJECT_ID_REGEX: &str = r"[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}";
+
 
 
 #[derive(Debug)]
@@ -135,16 +138,27 @@ impl ComponentStats {
         StatsBuilder::default()
     }
 
-    pub async fn get_projects_quota_list(projects: Arc<RwLock<Projects>>, list_project_url:String) -> Result<(),anyhow::Error>{
+    pub async fn get_projects_quota_list(projects: Arc<RwLock<Projects>>, list_project_url:&String, status: &str) -> Result<(),anyhow::Error>{
         let mut res = reqwest::get(list_project_url).await?.text().await?;
-        let projects_new: Projects = serde_json::from_str(res.as_str())?;
+        let mut projects_new: Projects = serde_json::from_str(res.as_str())?;
+        // Filter by status
+        projects_new.0.retain(|id,project| {
+            project.status == *status
+        });
         {
             let mut lock = projects.write().await;
             lock.0 = projects_new.0;
-            println!("projects: {:?}", lock.0);
+            println!("projects quota list: {:?}", lock.0);
         }
 
         Ok(())
+    }
+
+    fn capture_project_id(filter: &str) -> Option<String> {
+        let re = Regex::new(PROJECT_FILTER_PROJECT_ID_REGEX).unwrap();
+        let project_id = re.captures(filter).and_then(|id| id.get(0).and_then(|id| Some(id.as_str().to_string())));
+        //println!("filter: {}, project_id:{:?}",filter, project_id);
+        project_id
     }
 
     async fn get_request_number(
@@ -176,7 +190,10 @@ impl ComponentStats {
                     iv.metric().get("filter").and_then(|filter| {
                         let value = iv.sample().value() as usize;
                         // Fixme: get project ID in the filter string
-                        Some((filter.to_string(), value))
+                        let project = ComponentStats::capture_project_id(filter.as_str())
+                            .and_then(|project_id| Some((project_id.to_string(), value)));
+                        println!("project: {:?}",project);
+                        project
                     })
                 })
                 .collect::<HashMap<String, usize>>())
@@ -264,20 +281,13 @@ impl ComponentStats {
                             // Get request number
                             match self.get_request_number("filter", PROJECT_FILTER, DATA_NAME,current_count_block_timestamp).await{
                                 Ok(projects_request) => {
-                                    println!("projects_request: {:?}",projects_request);
+                                    //println!("projects_request: {:?}",projects_request);
                                     let project_quota = self.projects.clone();
                                     self.chain_adapter.submit_projects_usage(project_quota, projects_request).await;
                                 },
 
                                 Err(e) => println!("get_request_number error: {}",e)
                             }
-
-
-
-
-
-
-
                             last_count_block = current_count_block;
                             last_count_block_timestamp = current_count_block_timestamp;
                         }
@@ -297,8 +307,8 @@ impl ComponentStats {
 
         // Update quota list
         task::spawn(async move {
-            let res = Self::get_projects_quota_list(projects.clone(),list_project_url).await;
-            println!("Get projects quota res: {:?}",res);
+            let res = Self::get_projects_quota_list(projects.clone(),&list_project_url, "staked").await;
+            println!("Get projects quota res: {:?}",projects);
             println!("Subscribe_event");
             chain_adapter.subscribe_event_update_quota(projects).await;
         });
@@ -335,7 +345,6 @@ impl StatsBuilder {
         use std::convert::TryFrom;
         let client = PrometheusClient::try_from(url.as_str())
             .map_err(|err| anyhow::Error::msg(format!("{:?}", err)));
-
         client
     }
 

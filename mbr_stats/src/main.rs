@@ -4,14 +4,10 @@ use logger::core::init_logger;
 use mbr_stats::component_stats::ComponentStats;
 use std::collections::BTreeMap;
 
-
-
 #[tokio::main]
 async fn main() {
     println!("Start mbr stats");
     let res = init_logger(&String::from("ComponentStats"));
-
-
 
     let matches = Command::new("mbr-check-component")
         .version("0.1")

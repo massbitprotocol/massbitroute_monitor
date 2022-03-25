@@ -464,7 +464,7 @@ impl CheckComponent {
             .header("x-api-key", node.token.as_str())
             .header("host", node.get_host_header(&self.domain))
             .body(body);
-        log::info!("request_builder: {:?}", request_builder);
+        log::debug!("request_builder: {:?}", request_builder);
 
         let sender = request_builder.send();
         pin_mut!(sender);

@@ -41,14 +41,8 @@ pub struct Project{
     blockchain: String,
     network: String,
     quota: Quota,
+    pub status: String,
 }
-
-// #[derive(Default,Debug)]
-// pub struct Dapi{
-//     id: String,
-//     status: u8,
-// }
-
 
 
 #[derive(Default)]
@@ -92,25 +86,6 @@ impl ProjectRegisteredEventArgs {
         (chain_id[0].to_string(),chain_id[1].to_string())
     }
 }
-
-// #[derive(Decode,Debug)]
-// enum PalletDapiBlockChain{
-//     Ethereum,
-//     Polkadot,
-// }
-// impl fmt::Display for PalletDapiBlockChain {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         match self {
-//             PalletDapiBlockChain::Ethereum => {
-//                 write!(f, "eth")
-//             }
-//             PalletDapiBlockChain::Polkadot => {
-//                 write!(f, "dot")
-//             }
-//         }
-//
-//     }
-// }
 
 
 impl ChainAdapter {
@@ -182,6 +157,7 @@ impl ChainAdapter {
                             blockchain,
                             network,
                             quota: event.quota.to_string(),
+                            status: "staked".to_string()
                         });
                     }
                 };

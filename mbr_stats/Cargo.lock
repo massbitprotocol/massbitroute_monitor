@@ -1687,7 +1687,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mbr_stats"
+name = "mbr-stats"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1702,6 +1702,7 @@ dependencies = [
  "minifier",
  "parity-scale-codec",
  "prometheus-http-query",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

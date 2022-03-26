@@ -1,27 +1,14 @@
-use clap::{App, Arg, Command};
-use logger::core::init_logger;
-use mbr_check_component::check_module::check_module::{
-    CheckComponent, CheckMkReport, ComponentInfo,
-};
-// use regex::Regex;
-use handlebars::Handlebars;
-use lazy_static::lazy_static;
-use log::info;
+use clap::{Arg, Command};
 use logger;
-use mbr_check_component::config::AccessControl;
-use mbr_check_component::server_builder::ServerBuilder;
+use logger::core::init_logger;
+use mbr_check_component::check_module::check_module::CheckComponent;
 use mbr_fisherman::fisherman_service::FishermanService;
 use mbr_fisherman::{FISHERMAN_ENDPOINT, NUMBER_OF_SAMPLES, SAMPLE_INTERVAL_MS};
-use serde::{Deserialize, Serialize};
-use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
-use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
     let res = init_logger(&String::from("Fisherman"));
-    //println!("Log output: {}", res); // Print log output type
+    println!("Log output: {}", res); // Print log output type
 
     let matches = Command::new("mbr-fisherman")
         .version("0.1")

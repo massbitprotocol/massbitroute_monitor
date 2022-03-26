@@ -40,7 +40,7 @@ use crate::chain_adapter::{ChainAdapter, Project, Projects};
 type TimeStamp = i64;
 type ProjectId = Bytes;
 
-const NUMBER_BLOCK_FOR_COUNTING: isize = 3;
+const NUMBER_BLOCK_FOR_COUNTING: isize = 2;
 const DATA_NAME: &str = "nginx_vts_filter_requests_total";
 const PROJECT_FILTER: &str = ".*::proj::api_method";
 const PROJECT_FILTER_PROJECT_ID_REGEX: &str = r"[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}";
@@ -281,7 +281,7 @@ impl ComponentStats {
                             // Get request number
                             match self.get_request_number("filter", PROJECT_FILTER, DATA_NAME,current_count_block_timestamp).await{
                                 Ok(projects_request) => {
-                                    //info!("projects_request: {:?}",projects_request);
+                                    info!("projects_request: {:?}",projects_request);
                                     let project_quota = self.projects.clone();
                                     self.chain_adapter.submit_projects_usage(project_quota, projects_request).await;
                                 },
@@ -327,12 +327,6 @@ impl ComponentStats {
 
         // Get request number over time to submit to chain
         self.loop_get_request_number(subscribe_finalized_heads).await?;
-
-        // let project_id = "a9c95892-e4d2-4632-acf3-f0e82b92b856".encode();
-        // self.chain_adapter.submit_project_usage(project_id.into(),123u128);
-        // loop {
-        //
-        // }
 
         Ok(())
     }

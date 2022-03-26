@@ -915,7 +915,7 @@ impl GeneratorBuilder {
                 debug!("url:{}", url);
                 let res_data = reqwest::get(url).await?.text().await?;
                 debug!("res_data: {:?}", res_data);
-                components = serde_json::from_str(res_data.as_str()).unwrap();
+                components = serde_json::from_str(res_data.as_str())?;
             }
             false => {
                 let file = File::open(list_id_file)?;

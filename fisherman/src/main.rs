@@ -90,6 +90,7 @@ async fn main() {
             .await
             .build();
 
+        // Check component
         fisherman_service.loop_check_component().await;
 
         // info!("Run service");

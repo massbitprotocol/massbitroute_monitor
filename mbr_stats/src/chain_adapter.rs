@@ -108,8 +108,7 @@ impl ChainAdapter {
 
         // send and watch extrinsic until InBlock
         let tx_hash = self.api.as_ref().unwrap()
-            .send_extrinsic(xt.hex_encode(), XtStatus::InBlock)
-            .unwrap();
+            .send_extrinsic(xt.hex_encode(), XtStatus::InBlock)?;
         info!("[+] Transaction got included. Hash: {:?}", tx_hash);
         Ok(())
     }
@@ -122,12 +121,10 @@ impl ChainAdapter {
         for (project_id,request_number) in projects_request {
             if let Some(project_quota)=projects_quota_clone.get(&project_id){
                 let quota = project_quota.quota.parse::<usize>()?;
-                if  quota < request_number {
-                    info!("Project {} has requests number: {} larger than Quota: {}, ",project_id,request_number,quota);
-                    if let Err(e) = self.submit_project_usage(&project_id, request_number as u128){
-                        info!("submit_project_usage error:{:?}",e);
-                    };
-                }
+                info!("Project {} has requests number: {} Quota: {}, ",project_id,request_number,quota);
+                if let Err(e) = self.submit_project_usage(&project_id, request_number as u128){
+                    info!("submit_project_usage error:{:?}",e);
+                };
             }
             else {
                 info!("Warning: Project {} has requests number: {} but do not has quota info!",project_id,request_number);

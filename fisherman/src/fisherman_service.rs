@@ -58,7 +58,7 @@ impl SubmitProviderReport for ChainAdapter {
             response_time
         );
 
-        println!("[+] Composed Extrinsic:\n {:?}\n", xt);
+        info!("[+] Composed Extrinsic:\n {:?}\n", xt);
 
         // send and watch extrinsic until InBlock
         let tx_hash = self
@@ -66,8 +66,8 @@ impl SubmitProviderReport for ChainAdapter {
             .as_ref()
             .unwrap()
             .send_extrinsic(xt.hex_encode(), XtStatus::InBlock)
-            .unwrap();
-        println!("[+] Transaction got included. Hash: {:?}", tx_hash);
+            .unwrap_or_default();
+        info!("[+] Transaction got included. Hash: {:?}", tx_hash);
         Ok(())
     }
 }

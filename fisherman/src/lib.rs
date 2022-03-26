@@ -8,7 +8,7 @@ lazy_static! {
 }
 //Fixme: use better solution to get response time
 pub const RESPONSE_TIME_KEY_NAME: &str = "checkCall_response_time_ms";
-pub const NUMBER_OF_SAMPLES: u64 = 5;
+pub const NUMBER_OF_SAMPLES: u64 = 3;
 pub const SAMPLE_INTERVAL_MS: u64 = 200;
 pub const DELAY_BETWEEN_CHECK_LOOP_MS: u64 = 1000;
 // Good health response
@@ -21,4 +21,4 @@ const NODE_RESPONSE_FAILED_NUMBER: i32 = 0;
 const GATEWAY_RESPONSE_FAILED_NUMBER: i32 = 1;
 
 const MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT: &str = "submit_provider_report";
-const REPORTS_HISTORY_QUEUE_LENGTH_MAX: usize = 10;
+const REPORTS_HISTORY_QUEUE_LENGTH_MAX: usize = 1;

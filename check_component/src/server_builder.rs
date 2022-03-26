@@ -1,22 +1,20 @@
 use crate::check_module::check_module::{CheckComponent, ComponentInfo};
 use crate::config::AccessControl;
-use futures::lock::Mutex;
+
 use log::info;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use slog::Logger;
+
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use warp::http::Method;
-use warp::{http::StatusCode, multipart::FormData, Filter, Rejection, Reply};
+use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 pub const MAX_JSON_BODY_SIZE: u64 = 1024 * 1024;
 
 #[derive(Default)]
 pub struct ServerBuilder {
     entry_point: String,
-    logger: Option<Logger>,
 }
 pub struct CheckComponentServer {
     entry_point: String,
@@ -33,7 +31,7 @@ impl CheckComponentServer {
         ServerBuilder::default()
     }
     pub async fn serve(&self, access_control: AccessControl) {
-        let mut allow_headers: Vec<String> = access_control.get_access_control_allow_headers();
+        let allow_headers: Vec<String> = access_control.get_access_control_allow_headers();
         info!("allow_headers: {:?}", allow_headers);
         let cors = warp::cors()
             .allow_any_origin()

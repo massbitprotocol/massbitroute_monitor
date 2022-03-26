@@ -1,28 +1,21 @@
-use anyhow::{anyhow, Error};
-use chrono::Duration;
-use clap::StructOpt;
 use futures::pin_mut;
-use futures_util::future::{err, join_all};
+use futures_util::future::join_all;
 use minifier::json::minify;
-use reqwest::{Body, Response};
-use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 
-use handlebars::{Handlebars, RenderError};
-use log::{debug, error, info, log_enabled, Level};
-use serde_json::{to_string, Number, Value};
-use std::any::Any;
+use serde::{Deserialize, Serialize};
+
+use handlebars::Handlebars;
+use log::{debug, info};
+use serde_json::Value;
+
 use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fmt::format;
+
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::ptr::hash;
+
 use std::time::Instant;
 use std::{thread, usize};
-use timer::Timer;
-use tokio::time::error::Elapsed;
-use warp::multipart::FormData;
-use warp::reject::custom;
+
 use warp::{Rejection, Reply};
 
 type BlockChainType = String;
@@ -105,20 +98,20 @@ impl ComponentInfo {
         }
     }
 
-    fn get_component_same_chain(
-        &self,
-        list_components: &Vec<ComponentInfo>,
-    ) -> Option<ComponentInfo> {
-        let mut result = None;
-
-        for component in list_components {
-            if (component.blockchain == self.blockchain) && (component.network == self.network) {
-                result = Some(component.clone());
-                break;
-            }
-        }
-        result
-    }
+    // fn get_component_same_chain(
+    //     &self,
+    //     list_components: &Vec<ComponentInfo>,
+    // ) -> Option<ComponentInfo> {
+    //     let mut result = None;
+    //
+    //     for component in list_components {
+    //         if (component.blockchain == self.blockchain) && (component.network == self.network) {
+    //             result = Some(component.clone());
+    //             break;
+    //         }
+    //     }
+    //     result
+    // }
 
     // fn get_gateway_url(&self, fix_dapi: &ComponentInfo) -> UrlType {
     //     // http://34.88.83.191/cb8a7cef-0ebd-4ce7-a39f-6c0d4ddd5f3a
@@ -174,12 +167,6 @@ pub struct CheckStep {
 // struct GatewayInfo;
 // struct DApiInfo;
 
-enum Component {
-    Node(ComponentInfo),
-    Gateway(ComponentInfo),
-    DApi(ComponentInfo),
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Hash, Eq)]
 pub enum ComponentType {
     Node,
@@ -201,8 +188,6 @@ impl std::default::Default for ComponentType {
         ComponentType::Node
     }
 }
-
-const CHECK_INTERVAL: u64 = 2; // sec unit
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct FailedCase {
@@ -268,15 +253,15 @@ impl ToString for CheckMkReport {
 }
 
 impl CheckMkReport {
-    fn to_json(&self) -> String {
-        format!(
-            r#"{{"status":{status},"service_name":{service_name},"metric":{metric},"status_detail":{status_detail}}}"#,
-            status = &self.status,
-            service_name = &self.service_name,
-            metric = self.metric.to_string(),
-            status_detail = self.status_detail
-        )
-    }
+    // fn to_json(&self) -> String {
+    //     format!(
+    //         r#"{{"status":{status},"service_name":{service_name},"metric":{metric},"status_detail":{status_detail}}}"#,
+    //         status = &self.status,
+    //         service_name = &self.service_name,
+    //         metric = self.metric.to_string(),
+    //         status_detail = self.status_detail
+    //     )
+    // }
     fn new_failed_report(msg: String) -> Self {
         let mut resp = CheckMkReport::default();
         resp.success = false;
@@ -403,7 +388,7 @@ impl CheckComponent {
     fn compare_action(
         &self,
         action: &ActionCompare,
-        node: &ComponentInfo,
+        _node: &ComponentInfo,
         return_name: &String,
         step_result: &StepResult,
     ) -> Result<ActionResponse, anyhow::Error> {
@@ -427,7 +412,7 @@ impl CheckComponent {
     }
 
     fn replace_string(org: String, step_result: &StepResult) -> Result<String, anyhow::Error> {
-        let mut handlebars = Handlebars::new();
+        let handlebars = Handlebars::new();
         handlebars
             .render_template(org.as_str(), step_result)
             .map_err(|err| {
@@ -452,12 +437,12 @@ impl CheckComponent {
             false => Some(&node_url),
         }
         .ok_or(anyhow::Error::msg("Cannot get url"))?;
-        let mut client_builder = reqwest::ClientBuilder::new();
+        let client_builder = reqwest::ClientBuilder::new();
         let client = client_builder.danger_accept_invalid_certs(true).build()?;
         // Replace body for transport result of previous step
         let body = Self::replace_string(action.body.clone(), step_result)?;
 
-        let mut request_builder = client
+        let request_builder = client
             .post(url)
             .header("content-type", "application/json")
             .header("x-api-key", node.token.as_str())
@@ -684,8 +669,6 @@ impl CheckComponent {
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
         //header 'x-api-key: vnihqf14qk5km71aatvfr7c3djiej9l6mppd5k20uhs62p0b1cm79bfkmcubal9ug44e8cu2c74m29jpusokv6ft6r01o5bnv5v4gb8='
-        let mut reports: Vec<CheckMkReport> = Vec::new();
-
         // Check node
         let nodes = &self.list_nodes;
         let mut tasks = Vec::new();
@@ -702,7 +685,7 @@ impl CheckComponent {
                     //info!("Do the check steps");
                     tasks.push(self.run_check_steps(steps, node));
                 }
-                Err(err) => {
+                Err(_err) => {
                     debug!("There are no check steps");
                 }
             };
@@ -723,7 +706,7 @@ impl CheckComponent {
                     //info!("Do the check steps");
                     tasks.push(self.run_check_steps(steps, gateway));
                 }
-                Err(err) => {
+                Err(_err) => {
                     debug!("There are no check steps");
                 }
             };
@@ -751,7 +734,7 @@ impl CheckComponent {
                 Ok(reports) => {
                     let report_content: String = reports
                         .iter()
-                        .map(|(component, report)| report.to_string())
+                        .map(|(_component, report)| report.to_string())
                         .collect::<Vec<String>>()
                         .join("\n");
                     if self.is_write_to_file {
@@ -761,7 +744,7 @@ impl CheckComponent {
                         println!("{}", report_content);
                     }
                 }
-                Err(err) => (),
+                Err(_err) => (),
             }
             if !self.is_loop_check {
                 break;

@@ -2,13 +2,13 @@ use clap::{App, Arg};
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
 // use regex::Regex;
-use handlebars::Handlebars;
+
 use lazy_static::lazy_static;
 use log::info;
 use logger;
 use mbr_check_component::config::AccessControl;
 use mbr_check_component::server_builder::ServerBuilder;
-use std::collections::BTreeMap;
+
 use std::env;
 
 lazy_static! {
@@ -30,7 +30,7 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() {
-    let res = init_logger(&String::from("CheckComponent"));
+    let _res = init_logger(&String::from("CheckComponent"));
     //println!("Log output: {}", res); // Print log output type
 
     let matches = App::new("mbr-check-component")
@@ -57,11 +57,11 @@ async fn main() {
         let base_endpoint_file = matches
             .value_of("base-endpoint")
             .unwrap_or("src/example/base-endpoint.json");
-        let massbit_chain_endpoint = matches
+        let _massbit_chain_endpoint = matches
             .value_of("massbit-chain-endpoint")
             .unwrap_or("ws://127.0.0.1:9944");
         let domain = matches.value_of("domain").unwrap_or("massbitroute.dev");
-        let signer_phrase = matches.value_of("signer-phrase").unwrap_or("Bob");
+        let _signer_phrase = matches.value_of("signer-phrase").unwrap_or("Bob");
         let output = matches
             .value_of("output")
             .unwrap_or("src/example/output.json");

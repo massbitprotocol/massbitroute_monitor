@@ -6,25 +6,20 @@ use crate::{
 };
 use anyhow::Error;
 use log::{debug, info};
-use mbr_check_component::check_module::check_module::ComponentType::Gateway;
 use mbr_check_component::check_module::check_module::{
     CheckComponent, CheckMkReport, ComponentInfo, ComponentType,
 };
 use mbr_stats::chain_adapter::ChainAdapter;
 use mbr_stats::chain_adapter::MVP_EXTRINSIC_DAPI;
-use minifier::js::Keyword::Default;
 use sp_keyring::AccountKeyring;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
-use std::convert::{TryFrom, TryInto};
-use std::fmt::{write, Display, Formatter};
+use std::convert::TryInto;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Pair;
 use substrate_api_client::{compose_extrinsic, Api, UncheckedExtrinsicV4, XtStatus};
-use warp::get;
-use warp::test::request;
 
 pub trait SubmitProviderReport {
     fn submit_provider_report(
@@ -238,7 +233,8 @@ impl FishermanService {
                     let provider_id: [u8; 36] = component_info.id.as_bytes().try_into().unwrap();
                     info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
                     // Submit report
-                    self.chain_adapter
+                    if let Err(e) = self
+                        .chain_adapter
                         .submit_provider_report(
                             provider_id,
                             report.request_number,
@@ -265,7 +261,10 @@ impl FishermanService {
                                 self.check_component_service.list_gateways
                             );
                             Ok(())
-                        });
+                        })
+                    {
+                        info!("submit_provider_report error:{:?}", e);
+                    }
                 }
             }
             // Store to history
@@ -275,9 +274,13 @@ impl FishermanService {
             }
 
             tokio::time::sleep(Duration::from_millis(DELAY_BETWEEN_CHECK_LOOP_MS)).await;
-            self.check_component_service
+            if let Err(e) = self
+                .check_component_service
                 .reload_components_list(Some("staked".to_string()))
-                .await;
+                .await
+            {
+                info!("reload_components_list error: {:?}", e);
+            };
             info!(
                 "Reload list node: {:?}",
                 self.check_component_service.list_nodes

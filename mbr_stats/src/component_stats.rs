@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Error};
 use clap::StructOpt;
 use futures::pin_mut;
 use futures_util::future::{err, join_all};
@@ -7,6 +6,8 @@ use reqwest::{Body, Response, Url};
 use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::chain_adapter::{ChainAdapter, Project, Projects};
+use codec::Encode;
 use jsonrpsee::core::client::{
     Client as JsonRpcClient, ClientT, Subscription, SubscriptionClientT,
 };
@@ -17,35 +18,30 @@ use log::{debug, error, info, log_enabled, Level};
 use prometheus_http_query::aggregations::{count_values, sum, topk};
 use prometheus_http_query::functions::round;
 use prometheus_http_query::{Aggregate, Client as PrometheusClient, InstantVector, Selector};
+use regex::Regex;
 use serde_json::{to_string, Number, Value};
+use sp_core::sr25519::Pair;
+use sp_core::{Bytes, Pair as _};
+use sp_keyring::AccountKeyring;
 use std::convert::TryInto;
 use std::fmt::Formatter;
-use std::os::unix::raw::time_t;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use codec::Encode;
-use regex::Regex;
-use sp_core::{Bytes, Pair as _};
-use sp_core::sr25519::Pair;
-use sp_keyring::AccountKeyring;
-use substrate_api_client::Api;
 use substrate_api_client::rpc::WsRpcClient;
+use substrate_api_client::Api;
 use tokio::io::AsyncReadExt;
 use tokio::sync::RwLock;
 use tokio::task;
-use tokio::time::{sleep,Duration};
-use crate::chain_adapter::{ChainAdapter, Project, Projects};
-
+use tokio::time::{sleep, Duration};
 
 type TimeStamp = i64;
-type ProjectId = Bytes;
 
 const NUMBER_BLOCK_FOR_COUNTING: isize = 2;
 const DATA_NAME: &str = "nginx_vts_filter_requests_total";
 const PROJECT_FILTER: &str = ".*::proj::api_method";
-const PROJECT_FILTER_PROJECT_ID_REGEX: &str = r"[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}";
+const PROJECT_FILTER_PROJECT_ID_REGEX: &str =
+    r"[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}";
 const UPDATE_PROJECT_QUOTA_INTERVAL: u64 = 10; //sec
-
 
 #[derive(Debug)]
 pub enum ComponentType {
@@ -70,7 +66,6 @@ pub struct ComponentStats {
     pub mvp_url: String,
     pub signer_phrase: String,
 
-
     // For collecting data
     pub gateway_adapter: Arc<DataCollectionAdapter>,
     pub node_adapter: Arc<DataCollectionAdapter>,
@@ -82,8 +77,6 @@ pub struct ComponentStats {
     pub chain_adapter: Arc<ChainAdapter>,
 }
 
-
-
 #[derive(Clone, Default)]
 pub struct DataCollectionAdapter {
     client: Option<PrometheusClient>,
@@ -94,8 +87,6 @@ impl std::fmt::Debug for DataCollectionAdapter {
         write!(f, "DataCollectionAdapter<>")
     }
 }
-
-
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct QueryData {
@@ -138,13 +129,17 @@ impl ComponentStats {
         StatsBuilder::default()
     }
 
-    pub async fn get_projects_quota_list(projects: Arc<RwLock<Projects>>, list_project_url:&String, status: &str) -> Result<(),anyhow::Error>{
-        let mut res = reqwest::get(list_project_url).await?.text().await?;
+    pub async fn get_projects_quota_list(
+        projects: Arc<RwLock<Projects>>,
+        list_project_url: &String,
+        status: &str,
+    ) -> Result<(), anyhow::Error> {
+        let res = reqwest::get(list_project_url).await?.text().await?;
         let mut projects_new: Projects = serde_json::from_str(res.as_str())?;
         // Filter by status
-        projects_new.0.retain(|id,project| {
-            project.status == *status
-        });
+        projects_new
+            .0
+            .retain(|_id, project| project.status == *status);
         {
             let mut lock = projects.write().await;
             lock.0 = projects_new.0;
@@ -156,7 +151,9 @@ impl ComponentStats {
 
     fn capture_project_id(filter: &str) -> Option<String> {
         let re = Regex::new(PROJECT_FILTER_PROJECT_ID_REGEX).unwrap();
-        let project_id = re.captures(filter).and_then(|id| id.get(0).and_then(|id| Some(id.as_str().to_string())));
+        let project_id = re
+            .captures(filter)
+            .and_then(|id| id.get(0).and_then(|id| Some(id.as_str().to_string())));
         //info!("filter: {}, project_id:{:?}",filter, project_id);
         project_id
     }
@@ -168,7 +165,6 @@ impl ComponentStats {
         data_name: &str,
         time: TimeStamp,
     ) -> anyhow::Result<HashMap<String, usize>> {
-        let res: HashMap<String, usize> = HashMap::new();
         let q: InstantVector = Selector::new()
             .metric(data_name)
             .regex_match(filter_name, filter_value)
@@ -192,7 +188,7 @@ impl ComponentStats {
                         // Fixme: get project ID in the filter string
                         let project = ComponentStats::capture_project_id(filter.as_str())
                             .and_then(|project_id| Some((project_id.to_string(), value)));
-                        info!("project: {:?}",project);
+                        info!("project: {:?}", project);
                         project
                     })
                 })
@@ -202,40 +198,15 @@ impl ComponentStats {
         };
         //info!("Hashmap res: {:#?}", res);
         res
-
     }
 
-    async fn get_request_number_in_duration(
-        &self,
-        start_time: TimeStamp,
-        end_time: TimeStamp,
-        data_name: &str,
-    ) -> anyhow::Result<HashMap<String,usize>> {
-        let dapi_id: &str = ".*gw::api_method.*|.*node::api_method.*|.*dapi::api_method.*";
-        let start_req_number = self
-            .get_request_number("filter", dapi_id, data_name,start_time)
-            .await?;
-        let end_req_number = self.get_request_number("filter", dapi_id, data_name,end_time).await?;
-        let res = start_req_number.iter().filter_map(|(name,start_value)|{
-            if let Some(end_value) = end_req_number.get(name) {
-                Some((name.to_string(),end_value-start_value))
-            }
-            else {
-                None
-            }
-        }).collect::<HashMap<String,usize>>();
-
-
-        Ok(res)
-    }
-
-    async fn subscribe_finalized_heads(&self) -> Result<Subscription<Value>,anyhow::Error> {
+    async fn subscribe_finalized_heads(&self) -> Result<Subscription<Value>, anyhow::Error> {
         let client = self
             .chain_adapter
             .json_rpc_client
             .as_ref()
             .ok_or(anyhow::Error::msg("None chain client"))?;
-        let mut subscribe_finalized_heads = client
+        let subscribe_finalized_heads = client
             .subscribe::<Value>(
                 "chain_subscribeFinalizedHeads",
                 rpc_params![],
@@ -246,11 +217,12 @@ impl ComponentStats {
         Ok(subscribe_finalized_heads?)
     }
 
-    async fn loop_get_request_number(&self, mut subscribe: Subscription<Value>) -> Result<(),anyhow::Error>{
-        let mut i = 0;
+    async fn loop_get_request_number(
+        &self,
+        mut subscribe: Subscription<Value>,
+    ) -> Result<(), anyhow::Error> {
         // wait for new block
         let mut last_count_block: isize = -1;
-        let mut last_count_block_timestamp: TimeStamp = -1;
 
         loop {
             let res = subscribe.next().await;
@@ -264,10 +236,6 @@ impl ComponentStats {
                     info!("block_number {:?}", block_number);
                     if last_count_block == -1 {
                         last_count_block = block_number;
-                        // Fixme: need decode block for getting timestamp. For now use system time.
-                        last_count_block_timestamp =
-                            (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
-                                as TimeStamp;
                         continue;
                     } else {
                         if block_number - last_count_block >= NUMBER_BLOCK_FOR_COUNTING {
@@ -279,17 +247,30 @@ impl ComponentStats {
                                     as TimeStamp;
 
                             // Get request number
-                            match self.get_request_number("filter", PROJECT_FILTER, DATA_NAME,current_count_block_timestamp).await{
+                            match self
+                                .get_request_number(
+                                    "filter",
+                                    PROJECT_FILTER,
+                                    DATA_NAME,
+                                    current_count_block_timestamp,
+                                )
+                                .await
+                            {
                                 Ok(projects_request) => {
-                                    info!("projects_request: {:?}",projects_request);
+                                    info!("projects_request: {:?}", projects_request);
                                     let project_quota = self.projects.clone();
-                                    self.chain_adapter.submit_projects_usage(project_quota, projects_request).await;
-                                },
+                                    if let Err(e) = self
+                                        .chain_adapter
+                                        .submit_projects_usage(project_quota, projects_request)
+                                        .await
+                                    {
+                                        info!("Submit projects usage error: {:?}", e)
+                                    }
+                                }
 
-                                Err(e) => info!("get_request_number error: {}",e)
+                                Err(e) => info!("get_request_number error: {}", e),
                             }
                             last_count_block = current_count_block;
-                            last_count_block_timestamp = current_count_block_timestamp;
                         }
                     }
                 }
@@ -308,9 +289,11 @@ impl ComponentStats {
         // Update quota list
         task::spawn(async move {
             loop {
-                let res = Self::get_projects_quota_list(projects.clone(),&list_project_url, "staked").await;
-                if res.is_err(){
-                    info!("Get projects quota error: {:?}",res);
+                let res =
+                    Self::get_projects_quota_list(projects.clone(), &list_project_url, "staked")
+                        .await;
+                if res.is_err() {
+                    info!("Get projects quota error: {:?}", res);
                 }
                 sleep(Duration::from_secs(UPDATE_PROJECT_QUOTA_INTERVAL)).await;
             }
@@ -319,14 +302,17 @@ impl ComponentStats {
         // Update quota list
         task::spawn(async move {
             info!("Subscribe_event");
-            chain_adapter.subscribe_event_update_quota(projects.clone()).await;
+            chain_adapter
+                .subscribe_event_update_quota(projects.clone())
+                .await;
         });
 
         // subscribe finalized header
-        let mut subscribe_finalized_heads = self.subscribe_finalized_heads().await?;
+        let subscribe_finalized_heads = self.subscribe_finalized_heads().await?;
 
         // Get request number over time to submit to chain
-        self.loop_get_request_number(subscribe_finalized_heads).await?;
+        self.loop_get_request_number(subscribe_finalized_heads)
+            .await?;
 
         Ok(())
     }
@@ -388,10 +374,12 @@ impl StatsBuilder {
         let signer = AccountKeyring::Ferdie.pair();
 
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
-        let chain_adapter = ChainAdapter{
+        let chain_adapter = ChainAdapter {
             json_rpc_client: client.ok(),
             ws_rpc_client: Some(ws_client.clone()),
-            api: Api::new(ws_client.clone()).map(|api| api.set_signer(signer)).ok()
+            api: Api::new(ws_client.clone())
+                .map(|api| api.set_signer(signer))
+                .ok(),
         };
         self.inner.chain_adapter = Arc::new(chain_adapter);
         self

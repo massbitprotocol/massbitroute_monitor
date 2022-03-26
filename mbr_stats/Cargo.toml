@@ -26,6 +26,5 @@ jsonrpsee = {version = "0.9.0", features = ["full"]}
 substrate-api-client = { git = "https://github.com/scs/substrate-api-client.git" }
 sp-core = { version = "6.0.0", default-features = false, features = ["full_crypto"], git = "https://github.com/paritytech/substrate.git", branch = "master" }
 sp-keyring = { version = "6.0.0", git = "https://github.com/paritytech/substrate.git", branch = "master" }
-#system = { version = "4.0.0-dev", optional = true, git = "https://github.com/paritytech/substrate.git", branch = "master", package = "frame-system" }
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = ['derive'] }
 regex = "1.5"

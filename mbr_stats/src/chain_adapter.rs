@@ -3,9 +3,9 @@ use std::fmt::Formatter;
 // Massbit chain
 use codec::Decode;
 use jsonrpsee::core::client::{
-    Client as JsonRpcClient, ClientT, Subscription, SubscriptionClientT,
+    Client as JsonRpcClient,
 };
-use jsonrpsee::tracing::Event;
+
 use log::info;
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::Pair as _;

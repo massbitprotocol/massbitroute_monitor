@@ -1,27 +1,22 @@
-use clap::StructOpt;
-use futures::pin_mut;
-use futures_util::future::{err, join_all};
-use minifier::json::minify;
-use reqwest::{Body, Response, Url};
-use serde::{forward_to_deserialize_any_helper, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::chain_adapter::{ChainAdapter, Project, Projects};
-use codec::Encode;
+use crate::chain_adapter::{ChainAdapter, Projects};
+
 use jsonrpsee::core::client::{
-    Client as JsonRpcClient, ClientT, Subscription, SubscriptionClientT,
+    Subscription, SubscriptionClientT,
 };
-use jsonrpsee::types::ParamsSer;
+
 use jsonrpsee::ws_client::WsClientBuilder;
-use jsonrpsee::{rpc_params, tracing};
-use log::{debug, error, info, log_enabled, Level};
-use prometheus_http_query::aggregations::{count_values, sum, topk};
-use prometheus_http_query::functions::round;
+use jsonrpsee::{rpc_params};
+use log::{info};
+use prometheus_http_query::aggregations::{sum};
+
 use prometheus_http_query::{Aggregate, Client as PrometheusClient, InstantVector, Selector};
 use regex::Regex;
-use serde_json::{to_string, Number, Value};
-use sp_core::sr25519::Pair;
-use sp_core::{Bytes, Pair as _};
+use serde_json::{Value};
+
+
 use sp_keyring::AccountKeyring;
 use std::convert::TryInto;
 use std::fmt::Formatter;
@@ -29,7 +24,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Api;
-use tokio::io::AsyncReadExt;
+
 use tokio::sync::RwLock;
 use tokio::task;
 use tokio::time::{sleep, Duration};
@@ -331,7 +326,6 @@ impl StatsBuilder {
         None
     }
     async fn get_prometheus_client(&self, url: &String) -> anyhow::Result<PrometheusClient> {
-        use std::convert::TryFrom;
         let client = PrometheusClient::try_from(url.as_str())
             .map_err(|err| anyhow::Error::msg(format!("{:?}", err)));
         client

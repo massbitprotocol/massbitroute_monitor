@@ -134,9 +134,9 @@
             "is_base_node": true,
             "request_type":"POST",
             "header":{"content-type":"application/json"},
-            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\",  false],\"id\": 1}",
+            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\"],\"id\": 1}",
             "time_out":5,
-            "return_fields":{"hash":"result/hash"}
+            "return_fields":{"hash":"result"}
           },
           "return_name": "baseCall",
           "failed_case":{
@@ -150,9 +150,9 @@
             "is_base_node": false,
             "request_type":"POST",
             "header":{"content-type":"application/json"},
-            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"0x8B9314\",  false],\"id\": 1}",
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\"],\"id\": 1}",
             "time_out":5,
-            "return_fields":{ "hash":"result/hash"}
+            "return_fields":{ "hash":"result"}
           },
           "return_name":"checkCall",
           "failed_case": {
@@ -187,9 +187,9 @@
             "is_base_node": true,
             "request_type":"POST",
             "header":{"content-type":"application/json"},
-            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\",  false],\"id\": 1}",
+            "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\"],\"id\": 1}",
             "time_out":5,
-            "return_fields":{"hash":"result/hash"}
+            "return_fields":{"hash":"result"}
           },
           "return_name": "baseCall",
           "failed_case":{
@@ -203,9 +203,9 @@
             "is_base_node": false,
             "request_type":"POST",
             "header":{"content-type":"application/json"},
-            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\",  false],\"id\": 1}",
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlockHash\", \"params\": [\"0x8B9314\"],\"id\": 1}",
             "time_out":5,
-            "return_fields":{ "hash":"result/hash"}
+            "return_fields":{ "hash":"result"}
           },
           "return_name":"checkCall",
           "failed_case": {

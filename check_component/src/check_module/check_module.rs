@@ -54,18 +54,19 @@ pub struct ComponentInfo {
     pub blockchain: BlockChainType,
     pub network: String,
     pub id: ComponentId,
-    #[serde(rename = "userId")]
+    #[serde(rename = "userId", default)]
     pub user_id: String,
     pub ip: String,
     pub zone: String,
-    #[serde(rename = "countryCode")]
+    #[serde(rename = "countryCode", default)]
     pub country_code: String,
-    #[serde(rename = "appKey")]
+    #[serde(rename = "appKey", default)]
     pub token: String,
-    #[serde(skip_serializing, default)]
+    #[serde(rename = "componentType", default)]
     pub component_type: ComponentType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub endpoint: Option<String>,
+    #[serde(default)]
     pub status: String,
 }
 
@@ -289,8 +290,9 @@ impl CheckComponent {
         let url = &self.list_node_id_file;
         debug!("url:{}", url);
         let res_data = reqwest::get(url).await?.text().await?;
-        debug!("res_data: {:?}", res_data);
+        debug!("res_data Node: {:?}", res_data);
         let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str())?;
+        println!("components Node: {:?}", components);
         for component in components.iter_mut() {
             component.component_type = ComponentType::Node;
         }
@@ -299,8 +301,9 @@ impl CheckComponent {
         let url = &self.list_gateway_id_file;
         debug!("url:{}", url);
         let res_data = reqwest::get(url).await?.text().await?;
-        debug!("res_data: {:?}", res_data);
+        debug!("res_data Gateway: {:?}", res_data);
         let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str()).unwrap();
+        println!("components Gateway: {:?}", components);
         for component in components.iter_mut() {
             component.component_type = ComponentType::Gateway;
         }
@@ -442,12 +445,19 @@ impl CheckComponent {
         // Replace body for transport result of previous step
         let body = Self::replace_string(action.body.clone(), step_result)?;
 
-        let request_builder = client
-            .post(url)
-            .header("content-type", "application/json")
-            .header("x-api-key", node.token.as_str())
-            .header("host", node.get_host_header(&self.domain))
-            .body(body);
+        let request_builder = match action.is_base_node {
+            true => client
+                .post(url)
+                .header("content-type", "application/json")
+                .body(body),
+            false => client
+                .post(url)
+                .header("content-type", "application/json")
+                .header("x-api-key", node.token.as_str())
+                .header("host", node.get_host_header(&self.domain))
+                .body(body),
+        };
+
         debug!("request_builder: {:?}", request_builder);
 
         let sender = request_builder.send();
@@ -467,7 +477,7 @@ impl CheckComponent {
         let resp = res??.text().await?;
 
         let resp: Value = serde_json::from_str(&resp)?;
-        //info!("response call: {:?}", resp);
+        debug!("response call: {:?}", resp);
 
         // get result
         let mut result: HashMap<String, String> = HashMap::new();

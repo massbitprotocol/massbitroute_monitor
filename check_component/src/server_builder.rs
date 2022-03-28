@@ -1,13 +1,15 @@
 use crate::check_module::check_module::{CheckComponent, ComponentInfo};
 use crate::config::AccessControl;
 
-use log::info;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
+use serde_json::Value;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use warp::http::Method;
+use warp::http::{HeaderMap, Method};
+
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 pub const MAX_JSON_BODY_SIZE: u64 = 1024 * 1024;
@@ -60,12 +62,32 @@ impl CheckComponentServer {
         service: Arc<CheckComponent>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("get_status")
+            .and(CheckComponentServer::log_headers())
             .and(warp::post())
             .and(warp::body::content_length_limit(MAX_JSON_BODY_SIZE).and(warp::body::json()))
-            .and_then(move |component_info: ComponentInfo| {
+            .and_then(move |body: Value| {
+                info!("#### Received request body ####");
+                info!("{}", body);
+                let component_info: ComponentInfo = serde_json::from_value(body).unwrap();
                 let clone_service = service.clone();
                 async move { clone_service.get_components_status(component_info).await }
             })
+    }
+
+    fn log_headers() -> impl Filter<Extract = (), Error = Infallible> + Copy {
+        warp::header::headers_cloned()
+            .map(|headers: HeaderMap| {
+                debug!("#### Received request header ####");
+                for (k, v) in headers.iter() {
+                    // Error from `to_str` should be handled properly
+                    debug!(
+                        "{}: {}",
+                        k,
+                        v.to_str().expect("Failed to print header value")
+                    )
+                }
+            })
+            .untuple_one()
     }
 }
 impl ServerBuilder {

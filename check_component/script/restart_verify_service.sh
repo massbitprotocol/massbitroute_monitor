@@ -1,1 +1,1 @@
-sudo systemctl restart verification
+sudo supervisorctl restart verification

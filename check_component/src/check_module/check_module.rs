@@ -25,6 +25,7 @@ type StepResult = HashMap<String, String>;
 type ComponentId = String;
 
 const RESPONSE_TIME_KEY: &str = "response_time_ms";
+const MAX_LENGTH_REPORT_DETAIL: usize = 512;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
@@ -475,10 +476,17 @@ impl CheckComponent {
         //End clock
         let response_time_ms = now.elapsed().as_millis();
 
-        let resp = res??.text().await?;
+        let str_resp = res??.text().await?;
+        debug!("response call: {:?}", str_resp);
+        let mut str_resp_short = str_resp.clone();
+        str_resp_short.truncate(MAX_LENGTH_REPORT_DETAIL);
 
-        let resp: Value = serde_json::from_str(&resp)?;
-        debug!("response call: {:?}", resp);
+        let resp: Value = serde_json::from_str(&str_resp).map_err(|e| {
+            anyhow::Error::msg(format!(
+                "Err {} when parsing response: {} ",
+                e, str_resp_short,
+            ))
+        })?;
 
         // get result
         let mut result: HashMap<String, String> = HashMap::new();

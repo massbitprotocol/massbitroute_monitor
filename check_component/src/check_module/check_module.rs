@@ -292,7 +292,7 @@ impl CheckComponent {
         let res_data = reqwest::get(url).await?.text().await?;
         debug!("res_data Node: {:?}", res_data);
         let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str())?;
-        println!("components Node: {:?}", components);
+        debug!("components Node: {:?}", components);
         for component in components.iter_mut() {
             component.component_type = ComponentType::Node;
         }
@@ -303,7 +303,7 @@ impl CheckComponent {
         let res_data = reqwest::get(url).await?.text().await?;
         debug!("res_data Gateway: {:?}", res_data);
         let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str()).unwrap();
-        println!("components Gateway: {:?}", components);
+        debug!("components Gateway: {:?}", components);
         for component in components.iter_mut() {
             component.component_type = ComponentType::Gateway;
         }
@@ -445,6 +445,7 @@ impl CheckComponent {
         // Replace body for transport result of previous step
         let body = Self::replace_string(action.body.clone(), step_result)?;
 
+        debug!("body: {:?}", body);
         let request_builder = match action.is_base_node {
             true => client
                 .post(url)
@@ -494,8 +495,8 @@ impl CheckComponent {
                 value = value
                     .get(key.clone())
                     .ok_or(anyhow::Error::msg(format!(
-                        "cannot find key {} in result ",
-                        &key
+                        "cannot find key {} in result: {:?} ",
+                        &key, resp
                     )))?
                     .clone();
                 //debug!("value: {:?}", value);

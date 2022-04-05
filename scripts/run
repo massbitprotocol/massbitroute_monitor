@@ -20,7 +20,9 @@ service_dir=/massbit/massbitroute/app/src/sites/services
 sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
 arg="request_format=python&output_format=json"
 host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
-
+_prepare() {
+	echo "Prepare"
+}
 _load_env() {
 	ROOT_DIR=$SITE_ROOT
 	if [ -f "$ROOT_DIR/.env" ]; then

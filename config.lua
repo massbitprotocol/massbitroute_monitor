@@ -11,10 +11,10 @@ local _config = {
     supervisors = {
         ["monitor_client"] = [[
 [program:monitor_client]
-command=/bin/bash _SITE_ROOT_/../mkagent/agents/push.sh _SITE_ROOT_
+command=/bin/bash _SITE_ROOT_/../mkagent/agents/push.sh _SITE_ROOT_/../mkagent
 autorestart=true
 redirect_stderr=true
-stdout_logfile=_SITE_ROOT_/logs/monitor_client.log
+stdout_logfile=_SITE_ROOT_/../mkagent/logs/monitor_client.log
     ]]
     },
     supervisor = [[

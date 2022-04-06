@@ -13,6 +13,8 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+use anyhow::anyhow;
+use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
@@ -80,10 +82,6 @@ pub struct UserInfo {
 }
 
 impl ComponentInfo {
-    // fn get_node_url(&self) -> UrlType {
-    //     format!("http://{}.node.mbr.massbitroute.com", self.id)
-    // }
-
     fn get_url(&self) -> UrlType {
         format!("https://{}", self.ip)
     }
@@ -139,13 +137,21 @@ pub struct CheckComponent {
     pub list_gateways: Vec<ComponentInfo>,
     pub list_dapis: Vec<ComponentInfo>,
     pub list_users: Vec<UserInfo>,
-    pub base_nodes: HashMap<BlockChainType, UrlType>,
+    pub base_nodes: HashMap<BlockChainType, Vec<EndpointInfo>>,
     pub check_flows: CheckFlows,
     pub is_loop_check: bool,
     pub is_write_to_file: bool,
 }
 
 type CheckFlows = HashMap<TaskType, Vec<CheckFlow>>;
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct EndpointInfo {
+    url: UrlType,
+    #[serde(default, rename = "X-Api-Key")]
+    x_api_key: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct CheckFlow {
     #[serde(default)]
@@ -425,7 +431,7 @@ impl CheckComponent {
             })
     }
 
-    async fn call_action(
+    async fn call_action_check_node(
         &self,
         action: &ActionCall,
         node: &ComponentInfo,
@@ -433,31 +439,113 @@ impl CheckComponent {
         step_result: &StepResult,
     ) -> Result<ActionResponse, anyhow::Error> {
         // prepare rpc call
-        //let ref_dapi = node.get_component_same_chain(&self.list_dapis).unwrap();
         let node_url = node.get_url();
+        let url = &node_url;
 
-        let url = match action.is_base_node {
-            true => self.base_nodes.get(node.blockchain.as_str()),
-            false => Some(&node_url),
-        }
-        .ok_or(anyhow::Error::msg("Cannot get url"))?;
         let client_builder = reqwest::ClientBuilder::new();
         let client = client_builder.danger_accept_invalid_certs(true).build()?;
         // Replace body for transport result of previous step
         let body = Self::replace_string(action.body.clone(), step_result)?;
 
         debug!("body: {:?}", body);
-        let request_builder = match action.is_base_node {
-            true => client
+        let request_builder = client
+            .post(url)
+            .header("content-type", "application/json")
+            .header("x-api-key", node.token.as_str())
+            .header("host", node.get_host_header(&self.domain))
+            .body(body);
+
+        debug!("request_builder: {:?}", request_builder);
+
+        let sender = request_builder.send();
+        pin_mut!(sender);
+
+        // Call rpc
+        // Start clock to meansure call time
+        let now = Instant::now();
+        let res = tokio::time::timeout(
+            std::time::Duration::from_secs(action.time_out as u64),
+            &mut sender,
+        )
+        .await;
+        //End clock
+        let response_time_ms = now.elapsed().as_millis();
+
+        let str_resp = res??.text().await?;
+        debug!("response call: {:?}", str_resp);
+        let mut str_resp_short = str_resp.clone();
+        str_resp_short.truncate(MAX_LENGTH_REPORT_DETAIL);
+
+        let resp: Value = serde_json::from_str(&str_resp).map_err(|e| {
+            anyhow::Error::msg(format!(
+                "Err {} when parsing response: {} ",
+                e, str_resp_short,
+            ))
+        })?;
+
+        // get result
+        let mut result: HashMap<String, String> = HashMap::new();
+
+        // Add response_time
+        result.insert(RESPONSE_TIME_KEY.to_string(), response_time_ms.to_string());
+
+        for (name, path) in action.return_fields.clone() {
+            let mut value = resp.clone();
+            let path: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
+            //debug!("path: {:?}", path);
+            for key in path.into_iter() {
+                //debug!("key: {:?}", key);
+                value = value
+                    .get(key.clone())
+                    .ok_or(anyhow::Error::msg(format!(
+                        "cannot find key {} in result: {:?} ",
+                        &key, resp
+                    )))?
+                    .clone();
+                //debug!("value: {:?}", value);
+            }
+            result.insert(name, value.as_str().unwrap().to_string());
+        }
+
+        let action_resp = ActionResponse {
+            success: true,
+            return_name: return_name.clone(),
+            result,
+            message: format!("call {}: {}", return_name.clone(), true),
+        };
+
+        debug!("action_resp: {:#?}", action_resp);
+
+        Ok(action_resp)
+    }
+
+    async fn call_action_base_node(
+        &self,
+        action: &ActionCall,
+        node: &ComponentInfo,
+        return_name: &String,
+        step_result: &StepResult,
+        base_endpoint: &EndpointInfo,
+    ) -> Result<ActionResponse, anyhow::Error> {
+        let url = &base_endpoint.url;
+
+        let client_builder = reqwest::ClientBuilder::new();
+        let client = client_builder.danger_accept_invalid_certs(true).build()?;
+        // Replace body for transport result of previous step
+        let body = Self::replace_string(action.body.clone(), step_result)?;
+
+        debug!("body: {:?}", body);
+        let request_builder = if base_endpoint.x_api_key.is_empty() {
+            client
                 .post(url)
                 .header("content-type", "application/json")
-                .body(body),
-            false => client
+                .body(body)
+        } else {
+            client
                 .post(url)
                 .header("content-type", "application/json")
-                .header("x-api-key", node.token.as_str())
-                .header("host", node.get_host_header(&self.domain))
-                .body(body),
+                .header("x-api-key", base_endpoint.x_api_key.as_str())
+                .body(body)
         };
 
         debug!("request_builder: {:?}", request_builder);
@@ -547,8 +635,41 @@ impl CheckComponent {
                 "call" => {
                     let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
                     debug!("call action: {:?}", &action);
-                    self.call_action(&action, component, &step.return_name, &step_result)
+                    if action.is_base_node {
+                        let mut report = Err(anyhow::Error::msg("Cannot found working base node"));
+                        let base_endpoints = self.base_nodes.get(&component.blockchain).ok_or(
+                            anyhow::Error::msg(format!(
+                                "Cannot found base node for chain {:?}",
+                                &component.blockchain
+                            )),
+                        )?;
+                        for endpoint in base_endpoints {
+                            info!("try endpoint:{:?}", endpoint);
+                            let res = self
+                                .call_action_base_node(
+                                    &action,
+                                    component,
+                                    &step.return_name,
+                                    &step_result,
+                                    endpoint,
+                                )
+                                .await;
+                            if res.is_ok() {
+                                report = res;
+                                info!("endpoint {:?} success return: {:?}", endpoint, report);
+                                break;
+                            }
+                        }
+                        report
+                    } else {
+                        self.call_action_check_node(
+                            &action,
+                            component,
+                            &step.return_name,
+                            &step_result,
+                        )
                         .await
+                    }
                 }
                 "compare" => {
                     let action: ActionCompare =
@@ -1002,9 +1123,10 @@ impl GeneratorBuilder {
     pub fn with_base_endpoint_file(mut self, path: String) -> Self {
         let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
-        let base_nodes: HashMap<BlockChainType, UrlType> =
+
+        let base_nodes: HashMap<BlockChainType, Vec<EndpointInfo>> =
             serde_json::from_str(&minify(&json)).unwrap_or_default();
-        self.inner.check_flow_file = path;
+        self.inner.base_endpoint_file = path;
         self.inner.base_nodes = base_nodes;
         self
     }

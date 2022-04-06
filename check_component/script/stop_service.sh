@@ -1,0 +1,1 @@
+ssh mbr-verify 'sudo supervisorctl stop verification'

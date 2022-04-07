@@ -33,4 +33,9 @@ fisherman/target/*
 # The cache for docker container dependency
 .cargo
 
+
 logs/
+
+# Config basenode
+check_component/src/archive/base-endpoint.json
+

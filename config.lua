@@ -14,6 +14,9 @@ local _config = {
 command=/bin/bash _SITE_ROOT_/../mkagent/agents/push.sh _SITE_ROOT_/../mkagent
 autorestart=true
 redirect_stderr=true
+stopasgroup=true
+killasgroup=true
+stopsignal=INT
 stdout_logfile=_SITE_ROOT_/../mkagent/logs/monitor_client.log
     ]]
     },
@@ -22,12 +25,18 @@ stdout_logfile=_SITE_ROOT_/../mkagent/logs/monitor_client.log
 command=/bin/bash _SITE_ROOT_/scripts/checkmk/dapi loop _collect
 autorestart=true
 redirect_stderr=true
+stopasgroup=true
+killasgroup=true
+stopsignal=INT
 stdout_logfile=_SITE_ROOT_/logs/check_mk_dapi_collect.log
 
 [program:monitor_server]
 command=/bin/bash _SITE_ROOT_/scripts/server.sh
 autorestart=true
 redirect_stderr=true
+stopasgroup=true
+killasgroup=true
+stopsignal=INT
 stdout_logfile=_SITE_ROOT_/logs/monitor_server.log
     ]]
 }

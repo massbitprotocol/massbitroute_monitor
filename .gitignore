@@ -32,3 +32,5 @@ fisherman/target/*
 
 # The cache for docker container dependency
 .cargo
+
+logs/

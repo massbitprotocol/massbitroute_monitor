@@ -5,6 +5,8 @@ pub mod fisherman_service;
 lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
+    pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
+        vec!["checking_chain_type".to_string(),];
 }
 //Fixme: use better solution to get response time
 pub const RESPONSE_TIME_KEY_NAME: &str = "checkCall_response_time_ms";

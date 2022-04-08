@@ -5,7 +5,7 @@ use minifier::json::minify;
 use serde::{Deserialize, Serialize};
 
 use handlebars::Handlebars;
-use log::{debug, info};
+use log::{debug, info, warn};
 use serde_json::Value;
 
 use std::collections::HashMap;
@@ -13,11 +13,12 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use anyhow::anyhow;
 use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
+use crate::BASE_ENDPOINT_JSON;
+use crate::CHECK_TASK_LIST;
 use warp::{Rejection, Reply};
 
 type BlockChainType = String;
@@ -97,26 +98,6 @@ impl ComponentInfo {
             ComponentType::DApi => String::default(),
         }
     }
-
-    // fn get_component_same_chain(
-    //     &self,
-    //     list_components: &Vec<ComponentInfo>,
-    // ) -> Option<ComponentInfo> {
-    //     let mut result = None;
-    //
-    //     for component in list_components {
-    //         if (component.blockchain == self.blockchain) && (component.network == self.network) {
-    //             result = Some(component.clone());
-    //             break;
-    //         }
-    //     }
-    //     result
-    // }
-
-    // fn get_gateway_url(&self, fix_dapi: &ComponentInfo) -> UrlType {
-    //     // http://34.88.83.191/cb8a7cef-0ebd-4ce7-a39f-6c0d4ddd5f3a
-    //     format!("http://{ip}/{dapi_id}", ip = self.ip, dapi_id = fix_dapi.id)
-    // }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -197,12 +178,26 @@ impl std::default::Default for ComponentType {
     }
 }
 
+// #[derive(Clone, Debug, Deserialize, Serialize)]
+// pub enum ActionConclude {
+//     Passed,
+//     Failed,
+//     Unknown,
+// }
+// impl Default for ActionConclude {
+//     fn default() -> Self {
+//         ActionConclude::Unknown
+//     }
+// }
+
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct FailedCase {
     #[serde(default)]
     critical: bool,
     #[serde(default)]
     message: String,
+    #[serde(default)]
+    conclude: CheckMkStatus,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -234,18 +229,26 @@ impl ToString for CheckMkMetric {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-struct ActionResponse {
+pub struct ActionResponse {
     success: bool,
+    conclude: CheckMkStatus,
     return_name: String,
     result: HashMap<String, String>,
     message: String,
 }
 
-#[derive(PartialEq)]
-enum CheckMkStatus {
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize)]
+pub enum CheckMkStatus {
     Ok = 0,
     Warning = 1,
     Critical = 2,
+    Unknown = 3,
+}
+
+impl Default for CheckMkStatus {
+    fn default() -> Self {
+        CheckMkStatus::Unknown
+    }
 }
 
 impl ToString for CheckMkReport {
@@ -261,15 +264,6 @@ impl ToString for CheckMkReport {
 }
 
 impl CheckMkReport {
-    // fn to_json(&self) -> String {
-    //     format!(
-    //         r#"{{"status":{status},"service_name":{service_name},"metric":{metric},"status_detail":{status_detail}}}"#,
-    //         status = &self.status,
-    //         service_name = &self.service_name,
-    //         metric = self.metric.to_string(),
-    //         status_detail = self.status_detail
-    //     )
-    // }
     fn new_failed_report(msg: String) -> Self {
         let mut resp = CheckMkReport::default();
         resp.success = false;
@@ -277,7 +271,8 @@ impl CheckMkReport {
         resp
     }
     pub fn is_component_status_ok(&self) -> bool {
-        (self.success == true) && (self.status == 0)
+        //Fixme: currently count unknown status as success call should seperate 2 case
+        ((self.success == true) && (self.status == 0)) || (self.status == 4)
     }
 }
 
@@ -331,28 +326,29 @@ impl CheckComponent {
         &self,
         blockchain: &String,
         component_type: &String,
-        task: &TaskType,
+        tasks: &Vec<TaskType>,
     ) -> Result<Vec<CheckStep>, anyhow::Error> {
         // info!("blockchain:{:?}", blockchain);
         // info!("component_type:{:?}", component_type);
         // info!("self.check_flows:{:?}", self.check_flows);
-        match self.check_flows.get(task.as_str()) {
-            Some(check_flows) => {
-                for check_flow in check_flows {
-                    if &check_flow.blockchain == blockchain
-                        && &check_flow.component == component_type
-                    {
-                        return Ok(check_flow.check_steps.clone());
+        let mut check_steps = Vec::new();
+        for task in tasks {
+            match self.check_flows.get(task.as_str()) {
+                Some(check_flows) => {
+                    for check_flow in check_flows {
+                        if &check_flow.blockchain == blockchain
+                            && &check_flow.component == component_type
+                        {
+                            check_steps.extend(check_flow.check_steps.clone());
+                        }
                     }
                 }
-                Err(anyhow::Error::msg(
-                    "Cannot find suitable check_flow in Task",
-                ))
+                None => {
+                    warn!("Cannot find suitable task: {} in check-flow.json", task);
+                }
             }
-            None => Err(anyhow::Error::msg(
-                "Cannot find suitable task in check-flow.json",
-            )),
         }
+        Ok(check_steps)
     }
 
     fn do_compare(
@@ -372,16 +368,21 @@ impl CheckComponent {
             "eq" => {
                 let items: Vec<String> = serde_json::from_value(operator.params.clone())?;
                 let mut item_values = Vec::new();
-                for item in items {
-                    let item_value = step_result
-                        .get(item.as_str())
-                        .ok_or(anyhow::Error::msg("Cannot find key"))?;
-                    item_values.push(item_value);
+                for mut item in items {
+                    if item.starts_with("#") {
+                        item.remove(0);
+                        item_values.push(item.clone());
+                    } else {
+                        let item_value = step_result
+                            .get(item.as_str())
+                            .ok_or(anyhow::Error::msg("Cannot find key"))?;
+                        item_values.push(item_value.clone());
+                    }
                 }
                 debug!("item_values: {:?}", item_values);
                 if item_values.len() > 1 {
-                    let first = item_values[0];
-                    for item_value in item_values {
+                    let first = &item_values[0];
+                    for item_value in item_values.iter() {
                         if item_value != first {
                             return Ok(false);
                         }
@@ -414,7 +415,11 @@ impl CheckComponent {
         let mut result: HashMap<String, String> = HashMap::new();
         result.insert(return_name.clone(), success.to_string());
         return Ok(ActionResponse {
-            success,
+            success: true,
+            conclude: match success {
+                true => CheckMkStatus::Ok,
+                false => CheckMkStatus::Unknown,
+            },
             return_name: return_name.clone(),
             result,
             message: format!("compare items: {:?}", action.operator_items),
@@ -429,6 +434,45 @@ impl CheckComponent {
                 println!("err:{:?}", err);
                 anyhow::Error::msg(format!("{}", err))
             })
+    }
+
+    pub async fn call_action(
+        &self,
+        component: &ComponentInfo,
+        step_result: &StepResult,
+        step: &CheckStep,
+    ) -> Result<ActionResponse, anyhow::Error> {
+        let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
+        debug!("call action: {:?}", &action);
+
+        if action.is_base_node {
+            // Get base_endpoints
+            let mut report = Err(anyhow::Error::msg("Cannot found working base node"));
+            let base_endpoints =
+                self.base_nodes
+                    .get(&component.blockchain)
+                    .ok_or(anyhow::Error::msg(format!(
+                        "Cannot found base node for chain {:?}",
+                        &component.blockchain
+                    )))?;
+            // Calling to Base node retry if failed
+            for endpoint in base_endpoints {
+                debug!("try endpoint:{:?}", endpoint);
+                let res = self
+                    .call_action_base_node(&action, &step.return_name, &step_result, endpoint)
+                    .await;
+                if res.is_ok() {
+                    report = res;
+                    debug!("endpoint {:?} success return: {:?}", endpoint, report);
+                    break;
+                }
+            }
+            report
+        } else {
+            // Calling check node only runs once
+            self.call_action_check_node(&action, component, &step.return_name, &step_result)
+                .await
+        }
     }
 
     async fn call_action_check_node(
@@ -473,6 +517,15 @@ impl CheckComponent {
 
         let str_resp = res??.text().await?;
         debug!("response call: {:?}", str_resp);
+        Self::prepare_result(&str_resp, response_time_ms, action, return_name)
+    }
+
+    fn prepare_result(
+        str_resp: &String,
+        response_time_ms: u128,
+        action: &ActionCall,
+        return_name: &String,
+    ) -> Result<ActionResponse, anyhow::Error> {
         let mut str_resp_short = str_resp.clone();
         str_resp_short.truncate(MAX_LENGTH_REPORT_DETAIL);
 
@@ -504,11 +557,21 @@ impl CheckComponent {
                     .clone();
                 //debug!("value: {:?}", value);
             }
-            result.insert(name, value.as_str().unwrap().to_string());
+            result.insert(
+                name,
+                value
+                    .as_str()
+                    .ok_or(anyhow::Error::msg(format!(
+                        "value {:?} cannot parse to string",
+                        value
+                    )))?
+                    .to_string(),
+            );
         }
 
         let action_resp = ActionResponse {
             success: true,
+            conclude: CheckMkStatus::Ok,
             return_name: return_name.clone(),
             result,
             message: format!("call {}: {}", return_name.clone(), true),
@@ -522,7 +585,6 @@ impl CheckComponent {
     async fn call_action_base_node(
         &self,
         action: &ActionCall,
-        node: &ComponentInfo,
         return_name: &String,
         step_result: &StepResult,
         base_endpoint: &EndpointInfo,
@@ -566,50 +628,8 @@ impl CheckComponent {
 
         let str_resp = res??.text().await?;
         debug!("response call: {:?}", str_resp);
-        let mut str_resp_short = str_resp.clone();
-        str_resp_short.truncate(MAX_LENGTH_REPORT_DETAIL);
-
-        let resp: Value = serde_json::from_str(&str_resp).map_err(|e| {
-            anyhow::Error::msg(format!(
-                "Err {} when parsing response: {} ",
-                e, str_resp_short,
-            ))
-        })?;
-
-        // get result
-        let mut result: HashMap<String, String> = HashMap::new();
-
-        // Add response_time
-        result.insert(RESPONSE_TIME_KEY.to_string(), response_time_ms.to_string());
-
-        for (name, path) in action.return_fields.clone() {
-            let mut value = resp.clone();
-            let path: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
-            //debug!("path: {:?}", path);
-            for key in path.into_iter() {
-                //debug!("key: {:?}", key);
-                value = value
-                    .get(key.clone())
-                    .ok_or(anyhow::Error::msg(format!(
-                        "cannot find key {} in result: {:?} ",
-                        &key, resp
-                    )))?
-                    .clone();
-                //debug!("value: {:?}", value);
-            }
-            result.insert(name, value.as_str().unwrap().to_string());
-        }
-
-        let action_resp = ActionResponse {
-            success: true,
-            return_name: return_name.clone(),
-            result,
-            message: format!("call {}: {}", return_name.clone(), true),
-        };
-
-        debug!("action_resp: {:#?}", action_resp);
-
-        Ok(action_resp)
+        // Prepare return result
+        Self::prepare_result(&str_resp, response_time_ms, action, return_name)
     }
 
     pub async fn run_check_steps(
@@ -632,45 +652,7 @@ impl CheckComponent {
                 .as_str()
                 .unwrap_or_default()
             {
-                "call" => {
-                    let action: ActionCall = serde_json::from_value(step.action.clone()).unwrap();
-                    debug!("call action: {:?}", &action);
-                    if action.is_base_node {
-                        let mut report = Err(anyhow::Error::msg("Cannot found working base node"));
-                        let base_endpoints = self.base_nodes.get(&component.blockchain).ok_or(
-                            anyhow::Error::msg(format!(
-                                "Cannot found base node for chain {:?}",
-                                &component.blockchain
-                            )),
-                        )?;
-                        for endpoint in base_endpoints {
-                            info!("try endpoint:{:?}", endpoint);
-                            let res = self
-                                .call_action_base_node(
-                                    &action,
-                                    component,
-                                    &step.return_name,
-                                    &step_result,
-                                    endpoint,
-                                )
-                                .await;
-                            if res.is_ok() {
-                                report = res;
-                                info!("endpoint {:?} success return: {:?}", endpoint, report);
-                                break;
-                            }
-                        }
-                        report
-                    } else {
-                        self.call_action_check_node(
-                            &action,
-                            component,
-                            &step.return_name,
-                            &step_result,
-                        )
-                        .await
-                    }
-                }
+                "call" => self.call_action(component, &step_result, &step).await,
                 "compare" => {
                     let action: ActionCompare =
                         serde_json::from_value(step.action.clone()).unwrap();
@@ -679,8 +661,6 @@ impl CheckComponent {
                 }
                 _ => Err(anyhow::Error::msg("not support action")),
             };
-
-            //debug!("report: {:?}", report);
 
             // Handle report
             match report {
@@ -710,15 +690,14 @@ impl CheckComponent {
                             }
                         }
                         false => {
+                            status = step.failed_case.conclude;
                             if step.failed_case.critical {
-                                status = CheckMkStatus::Critical;
                                 message.push_str(&format!(
                                     "Failed at step {} due to critical error, message: {}",
                                     &step.return_name, report.message
                                 ));
                                 break;
                             } else {
-                                status = CheckMkStatus::Warning;
                                 message.push_str(&format!(
                                     "Failed at step {}, message: {}",
                                     &step.return_name, report.message
@@ -732,11 +711,9 @@ impl CheckComponent {
                         "Failed at step {}, err: {}.",
                         &step.return_name, e
                     ));
+                    status = step.failed_case.conclude;
                     if step.failed_case.critical {
-                        status = CheckMkStatus::Critical;
                         break;
-                    } else {
-                        status = CheckMkStatus::Warning;
                     }
                 }
             }
@@ -783,7 +760,7 @@ impl CheckComponent {
             .get_check_steps(
                 &component_info.blockchain,
                 &component_info.component_type.to_string(),
-                &"checking_chain_type".to_string(),
+                &CHECK_TASK_LIST,
             )
             .unwrap_or_default();
         info!("check_steps:{:?}", check_steps);
@@ -802,8 +779,10 @@ impl CheckComponent {
         }
     }
 
+    //Using in fisherman service
     pub async fn check_components(
         &self,
+        tasks: &Vec<TaskType>,
     ) -> Result<Vec<(ComponentInfo, CheckMkReport)>, anyhow::Error> {
         info!("Check components");
         // Call node
@@ -811,19 +790,15 @@ impl CheckComponent {
         //header 'x-api-key: vnihqf14qk5km71aatvfr7c3djiej9l6mppd5k20uhs62p0b1cm79bfkmcubal9ug44e8cu2c74m29jpusokv6ft6r01o5bnv5v4gb8='
         // Check node
         let nodes = &self.list_nodes;
-        let mut tasks = Vec::new();
+        let mut list_tasks = Vec::new();
         for node in nodes {
-            let steps = self.get_check_steps(
-                &node.blockchain,
-                &"node".to_string(),
-                &"checking_chain_type".to_string(),
-            );
+            let steps = self.get_check_steps(&node.blockchain, &"node".to_string(), &tasks);
 
             match steps {
                 Ok(steps) => {
                     //debug!("steps:{:#?}", steps);
                     //info!("Do the check steps");
-                    tasks.push(self.run_check_steps(steps, node));
+                    list_tasks.push(self.run_check_steps(steps, node));
                 }
                 Err(_err) => {
                     debug!("There are no check steps");
@@ -834,17 +809,13 @@ impl CheckComponent {
         // Check Gateway
         let gateways = &self.list_gateways;
         for gateway in gateways {
-            let steps = self.get_check_steps(
-                &gateway.blockchain,
-                &"gateway".to_string(),
-                &"checking_chain_type".to_string(),
-            );
+            let steps = self.get_check_steps(&gateway.blockchain, &"gateway".to_string(), &tasks);
 
             match steps {
                 Ok(steps) => {
                     //debug!("steps:{:#?}", steps);
                     //info!("Do the check steps");
-                    tasks.push(self.run_check_steps(steps, gateway));
+                    list_tasks.push(self.run_check_steps(steps, gateway));
                 }
                 Err(_err) => {
                     debug!("There are no check steps");
@@ -852,48 +823,13 @@ impl CheckComponent {
             };
         }
 
-        let responses = join_all(tasks).await;
+        let responses = join_all(list_tasks).await;
         let reports = responses
             .into_iter()
             .filter_map(|report| report.ok())
             .collect();
 
         Ok(reports)
-    }
-
-    pub async fn run_check(&self, check_interval_ms: u64) -> Result<(), anyhow::Error> {
-        // Begin run check
-        debug!("run_check");
-        // Infinity run check loop
-        loop {
-            info!("check_components");
-            let reports = self.check_components().await;
-            debug!("reports:{:?}", reports);
-            // Write reports to file
-            match reports {
-                Ok(reports) => {
-                    let report_content: String = reports
-                        .iter()
-                        .map(|(_component, report)| report.to_string())
-                        .collect::<Vec<String>>()
-                        .join("\n");
-                    if self.is_write_to_file {
-                        std::fs::write(self.output_file.clone(), report_content)
-                            .expect("Unable to write file");
-                    } else {
-                        println!("{}", report_content);
-                    }
-                }
-                Err(_err) => (),
-            }
-            if !self.is_loop_check {
-                break;
-            }
-            // Repeat every CHECK_INTERVAL secs
-            thread::sleep(::std::time::Duration::from_millis(check_interval_ms));
-        }
-
-        Ok(())
     }
 }
 
@@ -1110,8 +1046,9 @@ impl GeneratorBuilder {
     pub fn with_check_flow_file(mut self, path: String) -> Self {
         let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
-        info!("json: {:#?}", json);
-        let test_flow: CheckFlows = serde_json::from_str(&minify(&json)).unwrap_or_default();
+        debug!("json: {:#?}", json);
+        let test_flow: CheckFlows = serde_json::from_str(&minify(&json)).unwrap();
+        debug!("test_flow: {:#?}", test_flow);
         self.inner.check_flow_file = path;
         self.inner.check_flows = test_flow;
         self
@@ -1121,8 +1058,13 @@ impl GeneratorBuilder {
         self
     }
     pub fn with_base_endpoint_file(mut self, path: String) -> Self {
-        let json = std::fs::read_to_string(&path)
-            .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err));
+        let json = if !path.is_empty() {
+            std::fs::read_to_string(&path)
+                .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err))
+        } else {
+            println!("Load base endpoint from env: \n{:?}", *BASE_ENDPOINT_JSON);
+            BASE_ENDPOINT_JSON.clone()
+        };
 
         let base_nodes: HashMap<BlockChainType, Vec<EndpointInfo>> =
             serde_json::from_str(&minify(&json)).unwrap_or_default();

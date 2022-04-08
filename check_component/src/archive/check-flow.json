@@ -227,7 +227,7 @@
             "time_out":5,
             "return_fields":{"result":"result"}
           },
-          "return_name":"checkCall",
+          "return_name":"checkCallSync",
           "failed_case": {
             "critical": true,
             "message": "cannot get call check_node_url",
@@ -239,7 +239,7 @@
             "action_type":"compare",
             "operator_items": {
               "operator_type": "eq",
-              "params": ["checkCall_result","#false"]
+              "params": ["checkCallSync_result","#false"]
             }
           },
           "return_name":"compareBaseAndCheckCall",
@@ -266,7 +266,7 @@
             "time_out":5,
             "return_fields":{ "blockNumber":"result/block/header/number"}
           },
-          "return_name":"checkCall",
+          "return_name":"checkCallSync",
           "failed_case": {
             "critical": true,
             "message": "cannot get call check_node_url",
@@ -278,7 +278,7 @@
             "action_type":"compare",
             "operator_items": {
               "operator_type": "eq",
-              "params": ["checkCall_blockNumber","#0x1"]
+              "params": ["checkCallSync_blockNumber","#0x1"]
             }
           },
           "return_name":"compareBaseAndCheckCall",

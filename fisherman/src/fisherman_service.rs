@@ -1,15 +1,14 @@
 use crate::{
-    DELAY_BETWEEN_CHECK_LOOP_MS, GATEWAY_RESPONSE_FAILED_NUMBER, GATEWAY_RESPONSE_TIME_THRESHOLD,
-    MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT, NODE_RESPONSE_FAILED_NUMBER,
-    NODE_RESPONSE_TIME_THRESHOLD, NUMBER_OF_SAMPLES, REPORTS_HISTORY_QUEUE_LENGTH_MAX,
-    RESPONSE_TIME_KEY_NAME, SUCCESS_PERCENT_THRESHOLD,
+    CHECK_TASK_LIST_FISHERMAN, DELAY_BETWEEN_CHECK_LOOP_MS, GATEWAY_RESPONSE_FAILED_NUMBER,
+    GATEWAY_RESPONSE_TIME_THRESHOLD, MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT,
+    NODE_RESPONSE_FAILED_NUMBER, NODE_RESPONSE_TIME_THRESHOLD, NUMBER_OF_SAMPLES,
+    REPORTS_HISTORY_QUEUE_LENGTH_MAX, RESPONSE_TIME_KEY_NAME, SUCCESS_PERCENT_THRESHOLD,
 };
 use anyhow::Error;
 use log::{debug, info};
 use mbr_check_component::check_module::check_module::{
     CheckComponent, CheckMkReport, ComponentInfo, ComponentType,
 };
-use mbr_check_component::CHECK_TASK_LIST;
 use mbr_stats::chain_adapter::ChainAdapter;
 use mbr_stats::chain_adapter::MVP_EXTRINSIC_DAPI;
 use sp_keyring::AccountKeyring;
@@ -190,7 +189,7 @@ impl FishermanService {
                 info!("Run {} times", n + 1);
                 if let Ok(reports) = self
                     .check_component_service
-                    .check_components(&CHECK_TASK_LIST)
+                    .check_components(&CHECK_TASK_LIST_FISHERMAN)
                     .await
                 {
                     debug!("reports:{:?}", reports);
@@ -219,9 +218,10 @@ impl FishermanService {
 
             // Display report for debug
             for (component, report) in average_reports.iter() {
-                info!("id: {}, type: {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
+                info!("id: {}, type: {:?}, chain {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
                     component.id,
                     component.component_type,
+                    component.blockchain,
                     report.request_number,
                     report.success_number,
                     report.response_time_ms,

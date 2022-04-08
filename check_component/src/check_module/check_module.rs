@@ -17,8 +17,8 @@ use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
-use crate::BASE_ENDPOINT_JSON;
-use crate::CHECK_TASK_LIST;
+use crate::{BASE_ENDPOINT_JSON, CHECK_TASK_LIST_ALL};
+use crate::{CHECK_TASK_LIST_GATEWAY, CHECK_TASK_LIST_NODE};
 use warp::{Rejection, Reply};
 
 type BlockChainType = String;
@@ -557,16 +557,19 @@ impl CheckComponent {
                     .clone();
                 //debug!("value: {:?}", value);
             }
-            result.insert(
-                name,
-                value
+            // Fixme: check other type
+            let str_value: String = match value.as_bool() {
+                Some(value) => value.to_string(),
+                None => value
                     .as_str()
                     .ok_or(anyhow::Error::msg(format!(
                         "value {:?} cannot parse to string",
                         value
                     )))?
                     .to_string(),
-            );
+            };
+
+            result.insert(name, str_value);
         }
 
         let action_resp = ActionResponse {
@@ -760,7 +763,7 @@ impl CheckComponent {
             .get_check_steps(
                 &component_info.blockchain,
                 &component_info.component_type.to_string(),
-                &CHECK_TASK_LIST,
+                &CHECK_TASK_LIST_ALL,
             )
             .unwrap_or_default();
         info!("check_steps:{:?}", check_steps);

@@ -9,8 +9,13 @@ lazy_static! {
         env::var("CHECK_COMPONENT_ENDPOINT").unwrap_or(String::from("0.0.0.0:3030"));
     pub static ref BASE_ENDPOINT_JSON: String = env::var("BASE_ENDPOINT_JSON").unwrap();
     pub static ref CHECK_INTERVAL_MS: u64 = 3000;
-    pub static ref CHECK_TASK_LIST: Vec<String> = vec![
+    pub static ref CHECK_TASK_LIST_NODE: Vec<String> = vec![
         "checking_chain_type".to_string(),
         "checking_chain_sync".to_string(),
     ];
+    pub static ref CHECK_TASK_LIST_ALL: Vec<String> = vec![
+        "checking_chain_type".to_string(),
+        "checking_chain_sync".to_string(),
+    ];
+    pub static ref CHECK_TASK_LIST_GATEWAY: Vec<String> = vec!["checking_chain_type".to_string(),];
 }

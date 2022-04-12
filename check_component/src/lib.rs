@@ -5,10 +5,10 @@ use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::env;
 
-pub const CONFIG_FILE: &str = "config.json";
+pub const CONFIG_FILE: &str = "config_check_component.json";
 
 #[derive(Deserialize, Debug)]
-pub struct Config {
+pub(crate) struct Config {
     pub check_interval_ms: u64,
     pub check_task_list_node: Vec<String>,
     pub check_task_list_all: Vec<String>,
@@ -32,7 +32,7 @@ lazy_static! {
     //     "checking_chain_sync".to_string(),
     // ];
     // pub static ref CHECK_TASK_LIST_GATEWAY: Vec<String> = vec!["checking_chain_type".to_string(),];
-    pub static ref CONFIG: Config = get_config();
+    pub(crate) static ref CONFIG: Config = get_config();
 }
 
 fn get_config() -> Config {

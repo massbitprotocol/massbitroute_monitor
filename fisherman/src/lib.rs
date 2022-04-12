@@ -22,7 +22,7 @@ pub struct Config {
     pub mvp_extrinsic_submit_project_usage: String,
     pub mvp_event_project_registered: String,
 }
-pub const CONFIG_FILE: &str = "config.json";
+const CONFIG_FILE: &str = "config_fisherman.json";
 lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));

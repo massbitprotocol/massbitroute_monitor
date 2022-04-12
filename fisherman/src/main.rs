@@ -3,7 +3,8 @@ use logger;
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
 use mbr_fisherman::fisherman_service::FishermanService;
-use mbr_fisherman::{CONFIG, FISHERMAN_ENDPOINT};
+use mbr_fisherman::CONFIG;
+use mbr_fisherman::FISHERMAN_ENDPOINT;
 
 #[tokio::main]
 async fn main() {

@@ -26,9 +26,6 @@ type TaskType = String;
 type StepResult = HashMap<String, String>;
 type ComponentId = String;
 
-// const RESPONSE_TIME_KEY: &str = "response_time_ms";
-// const MAX_LENGTH_REPORT_DETAIL: usize = 512;
-
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
     action_type: String,

@@ -1,0 +1,9 @@
+{
+  "check_interval_ms": 3000,
+  "check_task_list_node": ["checking_chain_type","checking_chain_sync"],
+  "check_task_list_all": ["checking_chain_type","checking_chain_sync"],
+  "check_task_list_gateway": ["checking_chain_type"],
+  "max_json_body_size": 1048576,
+  "response_time_key": "response_time_ms",
+  "max_length_report_detail": 512
+}

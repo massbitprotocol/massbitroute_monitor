@@ -3,7 +3,7 @@ use logger;
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
 use mbr_fisherman::fisherman_service::FishermanService;
-use mbr_fisherman::{FISHERMAN_ENDPOINT, NUMBER_OF_SAMPLES, SAMPLE_INTERVAL_MS};
+use mbr_fisherman::{CONFIG, FISHERMAN_ENDPOINT};
 
 #[tokio::main]
 async fn main() {
@@ -69,8 +69,8 @@ async fn main() {
         // };
 
         let fisherman_service = FishermanService::builder()
-            .with_number_of_sample(NUMBER_OF_SAMPLES)
-            .with_sample_interval_ms(SAMPLE_INTERVAL_MS)
+            .with_number_of_sample(CONFIG.number_of_samples)
+            .with_sample_interval_ms(CONFIG.sample_interval_ms)
             .with_entry_point(socket_addr.to_string())
             .with_check_component_service(check_component)
             .with_signer_phrase(signer_phrase.to_string())

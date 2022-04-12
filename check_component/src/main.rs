@@ -1,32 +1,12 @@
 use clap::{App, Arg};
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
-// use regex::Regex;
 
-use lazy_static::lazy_static;
 use log::info;
 use logger;
 use mbr_check_component::config::AccessControl;
 use mbr_check_component::server_builder::ServerBuilder;
-
-use std::env;
-
-lazy_static! {
-    pub static ref CHECK_COMPONENT_ENDPOINT: String =
-        env::var("CHECK_COMPONENT_ENDPOINT").unwrap_or(String::from("0.0.0.0:3030"));
-    pub static ref CHECK_INTERVAL_MS: u64 = 3000;
-}
-
-// pub fn get_node_url_from_cli() -> String {
-//     let yml = load_yaml!("../../src/examples/cli.yml");
-//     let matches = App::from_yaml(yml).get_matches();
-//
-//     let node_ip = matches.value_of("node-server").unwrap_or("ws://127.0.0.1");
-//     let node_port = matches.value_of("node-port").unwrap_or("9944");
-//     let url = format!("{}:{}", node_ip, node_port);
-//     println!("Interacting with node on {}\n", url);
-//     url
-// }
+use mbr_check_component::CHECK_COMPONENT_ENDPOINT;
 
 #[tokio::main]
 async fn main() {
@@ -54,9 +34,7 @@ async fn main() {
         let check_flow_file = matches
             .value_of("check-flow")
             .unwrap_or("src/example/check-flow.json");
-        let base_endpoint_file = matches
-            .value_of("base-endpoint")
-            .unwrap_or("src/example/base-endpoint.json");
+        let base_endpoint_file = matches.value_of("base-endpoint").unwrap_or_default();
         let _massbit_chain_endpoint = matches
             .value_of("massbit-chain-endpoint")
             .unwrap_or("ws://127.0.0.1:9944");
@@ -65,6 +43,7 @@ async fn main() {
         let output = matches
             .value_of("output")
             .unwrap_or("src/example/output.json");
+
         let check_component = CheckComponent::builder()
             .with_list_node_id_file(list_node_id_file.to_string(), None)
             .await

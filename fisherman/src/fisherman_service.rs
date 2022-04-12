@@ -1,8 +1,8 @@
 use crate::{
-    DELAY_BETWEEN_CHECK_LOOP_MS, GATEWAY_RESPONSE_FAILED_NUMBER, GATEWAY_RESPONSE_TIME_THRESHOLD,
-    MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT, NODE_RESPONSE_FAILED_NUMBER,
-    NODE_RESPONSE_TIME_THRESHOLD, NUMBER_OF_SAMPLES, REPORTS_HISTORY_QUEUE_LENGTH_MAX,
-    RESPONSE_TIME_KEY_NAME, SUCCESS_PERCENT_THRESHOLD,
+    CHECK_TASK_LIST_FISHERMAN, DELAY_BETWEEN_CHECK_LOOP_MS, GATEWAY_RESPONSE_FAILED_NUMBER,
+    GATEWAY_RESPONSE_TIME_THRESHOLD, MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT,
+    NODE_RESPONSE_FAILED_NUMBER, NODE_RESPONSE_TIME_THRESHOLD, NUMBER_OF_SAMPLES,
+    REPORTS_HISTORY_QUEUE_LENGTH_MAX, RESPONSE_TIME_KEY_NAME, SUCCESS_PERCENT_THRESHOLD,
 };
 use anyhow::Error;
 use log::{debug, info};
@@ -78,6 +78,7 @@ pub struct FishermanService {
     pub mvp_url: String,
     pub signer_phrase: String,
     pub chain_adapter: Arc<ChainAdapter>,
+    pub is_no_report: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -137,6 +138,10 @@ impl FishermanBuilder {
         self.inner.chain_adapter = chain_adapter;
         self
     }
+    pub fn with_no_report(mut self, no_report_mode: bool) -> Self {
+        self.inner.is_no_report = no_report_mode;
+        self
+    }
 }
 
 impl FishermanService {
@@ -182,7 +187,11 @@ impl FishermanService {
             let mut collect_reports: HashMap<ComponentInfo, Vec<CheckMkReport>> = HashMap::new();
             for n in 0..number_of_sample {
                 info!("Run {} times", n + 1);
-                if let Ok(reports) = self.check_component_service.check_components().await {
+                if let Ok(reports) = self
+                    .check_component_service
+                    .check_components(&CHECK_TASK_LIST_FISHERMAN)
+                    .await
+                {
                     debug!("reports:{:?}", reports);
                     for (component, report) in reports {
                         // with each component collect reports in to vector
@@ -202,16 +211,17 @@ impl FishermanService {
 
             debug!("collect_reports: {:?}", collect_reports);
             // Calculate average report
-            for (component, report) in collect_reports.iter() {
+            for (component, reports) in collect_reports.iter() {
                 info!("component:{:?}", component.id);
-                average_reports.insert(component.clone(), ComponentReport::from(report));
+                average_reports.insert(component.clone(), ComponentReport::from(reports));
             }
 
             // Display report for debug
             for (component, report) in average_reports.iter() {
-                info!("id: {}, type: {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
+                info!("id: {}, type: {:?}, chain {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
                     component.id,
                     component.component_type,
+                    component.blockchain,
                     report.request_number,
                     report.success_number,
                     report.response_time_ms,
@@ -219,54 +229,58 @@ impl FishermanService {
                 );
             }
 
-            // Check and send report
-            for (component_info, report) in average_reports.iter() {
-                // Check for healthy and submit report
-                if !report.is_healthy(&component_info.component_type)
-                    && component_info.status == "staked"
-                    && Self::is_history_continuous_fail_reach_limit(
-                        &reports_history,
-                        &component_info,
-                    )
-                {
-                    info!("Submit report: {:?}", component_info);
-                    let provider_id: [u8; 36] = component_info.id.as_bytes().try_into().unwrap();
-                    info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
-                    // Submit report
-                    if let Err(e) = self
-                        .chain_adapter
-                        .submit_provider_report(
-                            provider_id,
-                            report.request_number,
-                            report.get_success_percent(),
-                            report.response_time_ms.unwrap_or_default(),
+            if !self.is_no_report {
+                // Check and send report
+                for (component_info, report) in average_reports.iter() {
+                    // Check for healthy and submit report
+                    if !report.is_healthy(&component_info.component_type)
+                        && component_info.status == "staked"
+                        && Self::is_history_continuous_fail_reach_limit(
+                            &reports_history,
+                            &component_info,
                         )
-                        .and_then(|_| {
-                            match component_info.component_type {
-                                ComponentType::Node => {
-                                    self.check_component_service
-                                        .list_nodes
-                                        .retain(|component| *component.id != component_info.id);
-                                }
-                                ComponentType::Gateway => {
-                                    self.check_component_service
-                                        .list_gateways
-                                        .retain(|component| *component.id != component_info.id);
-                                }
-                                _ => {}
-                            }
-                            info!("list_nodes:{:?}", self.check_component_service.list_nodes);
-                            info!(
-                                "list_gateways:{:?}",
-                                self.check_component_service.list_gateways
-                            );
-                            Ok(())
-                        })
                     {
-                        info!("submit_provider_report error:{:?}", e);
+                        info!("Submit report: {:?}", component_info);
+                        let provider_id: [u8; 36] =
+                            component_info.id.as_bytes().try_into().unwrap();
+                        info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
+                        // Submit report
+                        if let Err(e) = self
+                            .chain_adapter
+                            .submit_provider_report(
+                                provider_id,
+                                report.request_number,
+                                report.get_success_percent(),
+                                report.response_time_ms.unwrap_or_default(),
+                            )
+                            .and_then(|_| {
+                                match component_info.component_type {
+                                    ComponentType::Node => {
+                                        self.check_component_service
+                                            .list_nodes
+                                            .retain(|component| *component.id != component_info.id);
+                                    }
+                                    ComponentType::Gateway => {
+                                        self.check_component_service
+                                            .list_gateways
+                                            .retain(|component| *component.id != component_info.id);
+                                    }
+                                    _ => {}
+                                }
+                                info!("list_nodes:{:?}", self.check_component_service.list_nodes);
+                                info!(
+                                    "list_gateways:{:?}",
+                                    self.check_component_service.list_gateways
+                                );
+                                Ok(())
+                            })
+                        {
+                            info!("submit_provider_report error:{:?}", e);
+                        }
                     }
                 }
             }
+
             // Store to history
             reports_history.push_back(average_reports);
             while reports_history.len() > REPORTS_HISTORY_QUEUE_LENGTH_MAX {

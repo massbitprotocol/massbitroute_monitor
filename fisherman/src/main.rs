@@ -41,6 +41,7 @@ async fn main() {
             .value_of("signer-phrase")
             .unwrap_or("bottom drive obey lake curtain smoke basket hold race lonely fit walk"); //Alice
         let domain = matches.value_of("domain").unwrap_or("massbitroute.dev");
+        let no_report_mode = matches.is_present("no-report-mode");
 
         let check_component = CheckComponent::builder()
             .with_list_node_id_file(list_node_id_file.to_string(), Some("staked".to_string()))
@@ -75,6 +76,7 @@ async fn main() {
             .with_signer_phrase(signer_phrase.to_string())
             .with_mvp_url(mvp_url.to_string())
             .await
+            .with_no_report(no_report_mode)
             .build();
 
         // Check component
@@ -157,5 +159,12 @@ fn create_run_fisherman() -> Command<'static> {
                 .value_name("domain")
                 .help("domain name")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::new("no-report-mode")
+                .long("no-report-mode")
+                .value_name("no-report-mode")
+                .help("enable no-report-mode")
+                .takes_value(false),
         )
 }

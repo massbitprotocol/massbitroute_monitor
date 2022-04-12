@@ -5,6 +5,8 @@ pub mod fisherman_service;
 lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
+    pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
+        vec!["checking_chain_type".to_string(),];
 }
 //Fixme: use better solution to get response time
 pub const RESPONSE_TIME_KEY_NAME: &str = "checkCall_response_time_ms";
@@ -17,8 +19,8 @@ const SUCCESS_PERCENT_THRESHOLD: u32 = 50;
 const NODE_RESPONSE_TIME_THRESHOLD: u32 = 3000;
 const GATEWAY_RESPONSE_TIME_THRESHOLD: u32 = 4000;
 
-const NODE_RESPONSE_FAILED_NUMBER: i32 = 0;
-const GATEWAY_RESPONSE_FAILED_NUMBER: i32 = 1;
+const NODE_RESPONSE_FAILED_NUMBER: i32 = 1;
+const GATEWAY_RESPONSE_FAILED_NUMBER: i32 = 2;
 
 const MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT: &str = "submit_provider_report";
-const REPORTS_HISTORY_QUEUE_LENGTH_MAX: usize = 1;
+const REPORTS_HISTORY_QUEUE_LENGTH_MAX: usize = 3;

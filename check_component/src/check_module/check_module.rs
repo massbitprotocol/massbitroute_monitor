@@ -17,8 +17,7 @@ use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
-use crate::{BASE_ENDPOINT_JSON, CHECK_TASK_LIST_ALL};
-use crate::{CHECK_TASK_LIST_GATEWAY, CHECK_TASK_LIST_NODE};
+use crate::{BASE_ENDPOINT_JSON, CONFIG};
 use warp::{Rejection, Reply};
 
 type BlockChainType = String;
@@ -27,8 +26,8 @@ type TaskType = String;
 type StepResult = HashMap<String, String>;
 type ComponentId = String;
 
-const RESPONSE_TIME_KEY: &str = "response_time_ms";
-const MAX_LENGTH_REPORT_DETAIL: usize = 512;
+// const RESPONSE_TIME_KEY: &str = "response_time_ms";
+// const MAX_LENGTH_REPORT_DETAIL: usize = 512;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
@@ -527,7 +526,7 @@ impl CheckComponent {
         return_name: &String,
     ) -> Result<ActionResponse, anyhow::Error> {
         let mut str_resp_short = str_resp.clone();
-        str_resp_short.truncate(MAX_LENGTH_REPORT_DETAIL);
+        str_resp_short.truncate(CONFIG.max_length_report_detail);
 
         let resp: Value = serde_json::from_str(&str_resp).map_err(|e| {
             anyhow::Error::msg(format!(
@@ -540,7 +539,10 @@ impl CheckComponent {
         let mut result: HashMap<String, String> = HashMap::new();
 
         // Add response_time
-        result.insert(RESPONSE_TIME_KEY.to_string(), response_time_ms.to_string());
+        result.insert(
+            CONFIG.response_time_key.to_string(),
+            response_time_ms.to_string(),
+        );
 
         for (name, path) in action.return_fields.clone() {
             let mut value = resp.clone();
@@ -668,14 +670,16 @@ impl CheckComponent {
             // Handle report
             match report {
                 Ok(report) => {
-                    let resp_time =
-                        if let Some(response_time_ms) = report.result.get(RESPONSE_TIME_KEY) {
-                            Some(response_time_ms.parse::<i64>().unwrap_or_default())
-                        } else {
-                            None
-                        };
+                    let resp_time = if let Some(response_time_ms) =
+                        report.result.get(&*CONFIG.response_time_key)
+                    {
+                        Some(response_time_ms.parse::<i64>().unwrap_or_default())
+                    } else {
+                        None
+                    };
                     if let Some(resp_time) = resp_time {
-                        let metric_name = format!("{}_{}", report.return_name, RESPONSE_TIME_KEY);
+                        let metric_name =
+                            format!("{}_{}", report.return_name, CONFIG.response_time_key);
                         metric.insert(metric_name, resp_time.into());
                     }
 
@@ -763,7 +767,7 @@ impl CheckComponent {
             .get_check_steps(
                 &component_info.blockchain,
                 &component_info.component_type.to_string(),
-                &CHECK_TASK_LIST_ALL,
+                &CONFIG.check_task_list_all,
             )
             .unwrap_or_default();
         info!("check_steps:{:?}", check_steps);

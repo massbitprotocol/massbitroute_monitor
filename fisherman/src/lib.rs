@@ -22,12 +22,12 @@ pub struct Config {
     pub mvp_extrinsic_submit_project_usage: String,
     pub mvp_event_project_registered: String,
 }
-pub const CONFIG_FILE: &str = "src/config.json";
+pub const CONFIG_FILE: &str = "config.json";
 lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
-    pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
-        vec!["checking_chain_type".to_string(),];
+    // pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
+    //     vec!["checking_chain_type".to_string(),];
     pub static ref CONFIG: Config = get_config();
 }
 

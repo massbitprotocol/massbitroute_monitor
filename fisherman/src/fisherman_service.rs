@@ -1,9 +1,4 @@
-use crate::{
-    CHECK_TASK_LIST_FISHERMAN, DELAY_BETWEEN_CHECK_LOOP_MS, GATEWAY_RESPONSE_FAILED_NUMBER,
-    GATEWAY_RESPONSE_TIME_THRESHOLD, MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT,
-    NODE_RESPONSE_FAILED_NUMBER, NODE_RESPONSE_TIME_THRESHOLD, NUMBER_OF_SAMPLES,
-    REPORTS_HISTORY_QUEUE_LENGTH_MAX, RESPONSE_TIME_KEY_NAME, SUCCESS_PERCENT_THRESHOLD,
-};
+use crate::CONFIG;
 use anyhow::Error;
 use log::{debug, info};
 use mbr_check_component::check_module::check_module::{
@@ -45,8 +40,8 @@ impl SubmitProviderReport for ChainAdapter {
         #[allow(clippy::redundant_clone)]
         let xt: UncheckedExtrinsicV4<_> = compose_extrinsic!(
             api,
-            MVP_EXTRINSIC_DAPI,
-            MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT,
+            &CONFIG.mvp_extrinsic_dapi,
+            &CONFIG.mvp_extrinsic_submit_provider_report,
             provider_id,
             requests,
             success_percent,
@@ -167,8 +162,8 @@ impl FishermanService {
         }
         println!("Number continuous-fails of id {}: {}", component.id, count);
         match component.component_type {
-            ComponentType::Node => count >= NODE_RESPONSE_FAILED_NUMBER,
-            ComponentType::Gateway => count >= GATEWAY_RESPONSE_FAILED_NUMBER,
+            ComponentType::Node => count >= CONFIG.node_response_failed_number,
+            ComponentType::Gateway => count >= CONFIG.gateway_response_failed_number,
             ComponentType::DApi => false,
         }
     }
@@ -189,7 +184,7 @@ impl FishermanService {
                 info!("Run {} times", n + 1);
                 if let Ok(reports) = self
                     .check_component_service
-                    .check_components(&CHECK_TASK_LIST_FISHERMAN)
+                    .check_components(&CONFIG.check_task_list_fisherman)
                     .await
                 {
                     debug!("reports:{:?}", reports);
@@ -283,11 +278,11 @@ impl FishermanService {
 
             // Store to history
             reports_history.push_back(average_reports);
-            while reports_history.len() > REPORTS_HISTORY_QUEUE_LENGTH_MAX {
+            while reports_history.len() > CONFIG.reports_history_queue_length_max {
                 reports_history.pop_front();
             }
 
-            tokio::time::sleep(Duration::from_millis(DELAY_BETWEEN_CHECK_LOOP_MS)).await;
+            tokio::time::sleep(Duration::from_millis(CONFIG.delay_between_check_loop_ms)).await;
             if let Err(e) = self
                 .check_component_service
                 .reload_components_list(Some("staked".to_string()))
@@ -317,15 +312,15 @@ pub struct ComponentReport {
 impl ComponentReport {
     pub fn is_healthy(&self, component_type: &ComponentType) -> bool {
         let response_threshold = match component_type {
-            ComponentType::Node => NODE_RESPONSE_TIME_THRESHOLD,
-            ComponentType::Gateway => GATEWAY_RESPONSE_TIME_THRESHOLD,
+            ComponentType::Node => CONFIG.node_response_time_threshold,
+            ComponentType::Gateway => CONFIG.gateway_response_time_threshold,
             _ => u32::default(),
         };
         // If there is not enough info return false
         if self.success_number == 0 || self.response_time_ms == None {
             return false;
         }
-        (self.get_success_percent() >= SUCCESS_PERCENT_THRESHOLD)
+        (self.get_success_percent() >= CONFIG.success_percent_threshold)
             && (self.response_time_ms.unwrap() <= response_threshold)
     }
     pub fn get_success_percent(&self) -> u32 {
@@ -339,7 +334,7 @@ impl ComponentReport {
 
 impl From<&Vec<CheckMkReport>> for ComponentReport {
     fn from(reports: &Vec<CheckMkReport>) -> Self {
-        let check_number = NUMBER_OF_SAMPLES;
+        let check_number = CONFIG.number_of_samples;
         let mut success_number = 0;
         let response_times = reports
             .iter()
@@ -347,7 +342,9 @@ impl From<&Vec<CheckMkReport>> for ComponentReport {
                 if report.is_component_status_ok() {
                     success_number += 1;
                 }
-                if let Some(response_time) = report.metric.metric.get(RESPONSE_TIME_KEY_NAME) {
+                if let Some(response_time) =
+                    report.metric.metric.get(&*CONFIG.response_time_key_name)
+                {
                     Some(serde_json::from_value(response_time.clone()).unwrap())
                 } else {
                     None

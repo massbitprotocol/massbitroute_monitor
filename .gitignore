@@ -39,3 +39,4 @@ logs/
 # Config basenode
 check_component/src/archive/base-endpoint.json
 
+.gitconfig

@@ -48,7 +48,10 @@ impl SubmitProviderReport for ChainAdapter {
             response_time
         );
 
-        info!("[+] Composed Extrinsic:\n {:?}\n", xt);
+        info!(
+            "[+] Composed Extrinsic report provider {:?}:\n {:?}\n",
+            provider_id, xt,
+        );
 
         // send and watch extrinsic until InBlock
         let tx_hash = self

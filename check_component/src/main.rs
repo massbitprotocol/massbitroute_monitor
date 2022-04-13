@@ -4,8 +4,8 @@ use mbr_check_component::check_module::check_module::CheckComponent;
 
 use log::info;
 use logger;
-use mbr_check_component::config::AccessControl;
 use mbr_check_component::server_builder::ServerBuilder;
+use mbr_check_component::server_config::AccessControl;
 use mbr_check_component::CHECK_COMPONENT_ENDPOINT;
 
 #[tokio::main]

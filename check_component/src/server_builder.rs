@@ -1,5 +1,5 @@
 use crate::check_module::check_module::{CheckComponent, ComponentInfo};
-use crate::config::AccessControl;
+use crate::server_config::AccessControl;
 
 use log::{debug, info};
 use serde::{Deserialize, Serialize};

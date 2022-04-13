@@ -1,26 +1,44 @@
 use lazy_static::lazy_static;
+use mbr_check_component::check_module::check_module::Zone;
+use serde::Deserialize;
 use std::env;
+
 pub mod fisherman_service;
 
+#[derive(Deserialize, Debug)]
+pub struct Config {
+    pub response_time_key_name: String,
+    pub number_of_samples: u64,
+    pub sample_interval_ms: u64,
+    pub delay_between_check_loop_ms: u64,
+    pub success_percent_threshold: u32,
+    pub node_response_time_threshold: u32,
+    pub gateway_response_time_threshold: u32,
+    pub node_response_failed_number: i32,
+    pub gateway_response_failed_number: i32,
+    pub reports_history_queue_length_max: usize,
+    pub check_task_list_fisherman: Vec<String>,
+    pub checking_component_status: String,
+    // for submit report
+    pub mvp_extrinsic_submit_provider_report: String,
+    pub mvp_extrinsic_dapi: String,
+    pub mvp_extrinsic_submit_project_usage: String,
+    pub mvp_event_project_registered: String,
+}
+const CONFIG_FILE: &str = "config_fisherman.json";
 lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
-    pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
-        vec!["checking_chain_type".to_string(),];
+    pub static ref ZONE: Zone =
+        env::var("ZONE").unwrap_or(String::from("Global")).parse().unwrap_or_default();
+    // pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
+    //     vec!["checking_chain_type".to_string(),];
+    pub static ref CONFIG: Config = get_config();
 }
-//Fixme: use better solution to get response time
-pub const RESPONSE_TIME_KEY_NAME: &str = "checkCall_response_time_ms";
-pub const NUMBER_OF_SAMPLES: u64 = 5;
-pub const SAMPLE_INTERVAL_MS: u64 = 200;
-pub const DELAY_BETWEEN_CHECK_LOOP_MS: u64 = 1000;
-// Good health response
-const SUCCESS_PERCENT_THRESHOLD: u32 = 50;
 
-const NODE_RESPONSE_TIME_THRESHOLD: u32 = 3000;
-const GATEWAY_RESPONSE_TIME_THRESHOLD: u32 = 4000;
-
-const NODE_RESPONSE_FAILED_NUMBER: i32 = 1;
-const GATEWAY_RESPONSE_FAILED_NUMBER: i32 = 2;
-
-const MVP_EXTRINSIC_SUBMIT_PROVIDER_REPORT: &str = "submit_provider_report";
-const REPORTS_HISTORY_QUEUE_LENGTH_MAX: usize = 3;
+fn get_config() -> Config {
+    let json = std::fs::read_to_string(CONFIG_FILE)
+        .unwrap_or_else(|err| panic!("Unable to read config file `{}`: {}", CONFIG_FILE, err));
+    let config: Config = serde_json::from_str(&*json).unwrap();
+    config
+}

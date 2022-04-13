@@ -17,9 +17,10 @@ use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
-use crate::{BASE_ENDPOINT_JSON, CHECK_TASK_LIST_ALL};
-use crate::{CHECK_TASK_LIST_GATEWAY, CHECK_TASK_LIST_NODE};
+use crate::{BASE_ENDPOINT_JSON, CONFIG};
 use warp::{Rejection, Reply};
+
+use strum_macros::EnumString;
 
 type BlockChainType = String;
 type UrlType = String;
@@ -27,8 +28,29 @@ type TaskType = String;
 type StepResult = HashMap<String, String>;
 type ComponentId = String;
 
-const RESPONSE_TIME_KEY: &str = "response_time_ms";
-const MAX_LENGTH_REPORT_DETAIL: usize = 512;
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize, Hash, Eq, EnumString)]
+pub enum Zone {
+    // Asia
+    AS,
+    // Europe
+    EU,
+    // North America
+    NA,
+    // South america
+    SA,
+    // Africa
+    AF,
+    // Oceania
+    OC,
+    // Global
+    Global,
+}
+
+impl Default for Zone {
+    fn default() -> Self {
+        Zone::Global
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionCall {
@@ -61,7 +83,8 @@ pub struct ComponentInfo {
     #[serde(rename = "userId", default)]
     pub user_id: String,
     pub ip: String,
-    pub zone: String,
+    #[serde(default)]
+    pub zone: Zone,
     #[serde(rename = "countryCode", default)]
     pub country_code: String,
     #[serde(rename = "appKey", default)]
@@ -287,11 +310,21 @@ impl CheckComponent {
 
     pub async fn reload_components_list(
         &mut self,
-        status: Option<String>,
+        filter_status: Option<&String>,
+        filter_zone: &Zone,
     ) -> Result<(), anyhow::Error> {
+        // Get nodes
         let url = &self.list_node_id_file;
-        debug!("url:{}", url);
-        let res_data = reqwest::get(url).await?.text().await?;
+        debug!("list_node_id url:{}", url);
+        let res_data = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap()
+            .get(url)
+            .send()
+            .await?
+            .text()
+            .await?;
         debug!("res_data Node: {:?}", res_data);
         let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str())?;
         debug!("components Node: {:?}", components);
@@ -300,9 +333,18 @@ impl CheckComponent {
         }
         self.list_nodes = components;
 
+        //Get gateway
         let url = &self.list_gateway_id_file;
-        debug!("url:{}", url);
-        let res_data = reqwest::get(url).await?.text().await?;
+        debug!("list_gateway_id url:{}", url);
+        let res_data = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap()
+            .get(url)
+            .send()
+            .await?
+            .text()
+            .await?;
         debug!("res_data Gateway: {:?}", res_data);
         let mut components: Vec<ComponentInfo> = serde_json::from_str(res_data.as_str()).unwrap();
         debug!("components Gateway: {:?}", components);
@@ -312,13 +354,19 @@ impl CheckComponent {
         self.list_gateways = components;
 
         //Filter components
-        if let Some(status) = status {
+        if let Some(status) = filter_status {
             self.list_nodes
-                .retain(|component| *component.status == status);
+                .retain(|component| &component.status == status);
             self.list_gateways
-                .retain(|component| *component.status == status);
+                .retain(|component| &component.status == status);
         }
-
+        //Filter zones
+        if *filter_zone != Zone::Global {
+            self.list_nodes
+                .retain(|component| component.zone == *filter_zone);
+            self.list_gateways
+                .retain(|component| component.zone == *filter_zone);
+        }
         Ok(())
     }
 
@@ -527,7 +575,7 @@ impl CheckComponent {
         return_name: &String,
     ) -> Result<ActionResponse, anyhow::Error> {
         let mut str_resp_short = str_resp.clone();
-        str_resp_short.truncate(MAX_LENGTH_REPORT_DETAIL);
+        str_resp_short.truncate(CONFIG.max_length_report_detail);
 
         let resp: Value = serde_json::from_str(&str_resp).map_err(|e| {
             anyhow::Error::msg(format!(
@@ -540,7 +588,10 @@ impl CheckComponent {
         let mut result: HashMap<String, String> = HashMap::new();
 
         // Add response_time
-        result.insert(RESPONSE_TIME_KEY.to_string(), response_time_ms.to_string());
+        result.insert(
+            CONFIG.response_time_key.to_string(),
+            response_time_ms.to_string(),
+        );
 
         for (name, path) in action.return_fields.clone() {
             let mut value = resp.clone();
@@ -668,14 +719,16 @@ impl CheckComponent {
             // Handle report
             match report {
                 Ok(report) => {
-                    let resp_time =
-                        if let Some(response_time_ms) = report.result.get(RESPONSE_TIME_KEY) {
-                            Some(response_time_ms.parse::<i64>().unwrap_or_default())
-                        } else {
-                            None
-                        };
+                    let resp_time = if let Some(response_time_ms) =
+                        report.result.get(&*CONFIG.response_time_key)
+                    {
+                        Some(response_time_ms.parse::<i64>().unwrap_or_default())
+                    } else {
+                        None
+                    };
                     if let Some(resp_time) = resp_time {
-                        let metric_name = format!("{}_{}", report.return_name, RESPONSE_TIME_KEY);
+                        let metric_name =
+                            format!("{}_{}", report.return_name, CONFIG.response_time_key);
                         metric.insert(metric_name, resp_time.into());
                     }
 
@@ -763,7 +816,7 @@ impl CheckComponent {
             .get_check_steps(
                 &component_info.blockchain,
                 &component_info.component_type.to_string(),
-                &CHECK_TASK_LIST_ALL,
+                &CONFIG.check_task_list_all,
             )
             .unwrap_or_default();
         info!("check_steps:{:?}", check_steps);
@@ -872,13 +925,6 @@ impl GeneratorBuilder {
         status: Option<String>,
     ) -> GeneratorBuilder {
         self.inner.list_node_id_file = path.clone();
-
-        let list_nodes: Vec<ComponentInfo> = self
-            .get_list_component(ComponentType::Node, status)
-            .await
-            .unwrap_or_default();
-        info!("list_nodes:{:?}", list_nodes);
-        self.inner.list_nodes = list_nodes;
         self
     }
 
@@ -888,23 +934,10 @@ impl GeneratorBuilder {
         status: Option<String>,
     ) -> GeneratorBuilder {
         self.inner.list_gateway_id_file = path.clone();
-
-        let list_gateways: Vec<ComponentInfo> = self
-            .get_list_component(ComponentType::Gateway, status)
-            .await
-            .unwrap_or_default();
-        info!("list_gateways:{:?}", list_gateways);
-        self.inner.list_gateways = list_gateways;
         self
     }
     pub async fn with_list_dapi_id_file(mut self, path: String) -> GeneratorBuilder {
         self.inner.list_dapi_id_file = path.clone();
-
-        // let list_dapis: Vec<ComponentInfo> = self
-        //     .get_list_component(ComponentType::DApi)
-        //     .await
-        //     .unwrap_or_default();
-        // self.inner.list_dapis = list_dapis;
         self
     }
     pub async fn with_list_user_file(mut self, path: String) -> GeneratorBuilder {
@@ -957,94 +990,6 @@ impl GeneratorBuilder {
 
         return Ok(users);
     }
-
-    async fn get_list_component(
-        &self,
-        component_type: ComponentType,
-        status: Option<String>,
-    ) -> Result<Vec<ComponentInfo>, anyhow::Error> {
-        let mut components: Vec<ComponentInfo> = Vec::new();
-        debug!("----------Create list of nodes info details----------");
-        let list_id_file = match component_type {
-            ComponentType::Node => &self.inner.list_node_id_file,
-            ComponentType::Gateway => &self.inner.list_gateway_id_file,
-            ComponentType::DApi => &self.inner.list_dapi_id_file,
-        };
-        let mut lines: Vec<String> = Vec::new();
-        match list_id_file.starts_with("http") {
-            true => {
-                let url = list_id_file;
-                debug!("url:{}", url);
-                let res_data = reqwest::get(url).await?.text().await?;
-                debug!("res_data: {:?}", res_data);
-                components = serde_json::from_str(res_data.as_str())?;
-            }
-            false => {
-                let file = File::open(list_id_file)?;
-                let reader = BufReader::new(file);
-                lines = reader.lines().into_iter().filter_map(|s| s.ok()).collect();
-            }
-        };
-        for line in lines {
-            if !line.is_empty() {
-                //println!("line: {}", &line);
-                //debug!("line: {:?}", &line);
-                let data: Vec<String> = line.split(' ').map(|piece| piece.to_string()).collect();
-                //debug!("data: {:?}", &data);
-
-                let node = match component_type {
-                    ComponentType::Node | ComponentType::Gateway => ComponentInfo {
-                        blockchain: data[2].clone(),
-                        network: data[3].clone(),
-                        id: data[0].clone(),
-                        user_id: data[1].clone(),
-                        ip: data[4].clone(),
-                        zone: data[5].clone(),
-                        country_code: data[6].clone(),
-                        token: data[7].clone(),
-                        component_type: component_type.clone(),
-                        endpoint: Default::default(),
-                        status: "".to_string(),
-                    },
-                    //77762f16-4344-4c58-9851-9e2e4488a2c0 87f54452-18e7-4582-b699-110e061a6248 ftm mainnet cd0pfbm2tjq3.ftm-mainnet.massbitroute.com 77762f16-4344-4c58-9851-9e2e4488a2c0
-                    ComponentType::DApi => ComponentInfo {
-                        blockchain: data[2].clone(),
-                        network: data[3].clone(),
-                        id: data[0].clone(),
-                        user_id: data[1].clone(),
-                        ip: Default::default(),
-                        zone: Default::default(),
-                        country_code: Default::default(),
-                        token: Default::default(),
-                        component_type: component_type.clone(),
-                        endpoint: Some(data[4].clone()),
-                        status: "".to_string(),
-                    },
-                };
-
-                components.push(node);
-            }
-        }
-
-        //Filter components
-        if let Some(status) = status {
-            components.retain(|component| *component.status == status);
-        }
-        // Set component type
-        for component in components.iter_mut() {
-            component.component_type = component_type.clone();
-        }
-
-        return Ok(components);
-    }
-
-    // pub fn get_token(node_data: String) -> Result<String,anyhow::Error> {
-    //     let data: Value = serde_json::from_str(&minify(&node_data))?;
-    //     let token: Option<String> = data.get("token").and_then(|value| Some(value.to_string()));
-    //
-    //     debug!("data: {:#?}",data);
-    //     Ok(token.expect("cannot get token"))
-    // }
 
     pub fn with_check_flow_file(mut self, path: String) -> Self {
         let json = std::fs::read_to_string(&path)

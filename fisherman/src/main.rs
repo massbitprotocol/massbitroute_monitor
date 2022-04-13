@@ -3,8 +3,8 @@ use logger;
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
 use mbr_fisherman::fisherman_service::FishermanService;
-use mbr_fisherman::CONFIG;
 use mbr_fisherman::FISHERMAN_ENDPOINT;
+use mbr_fisherman::{CONFIG, ZONE};
 
 #[tokio::main]
 async fn main() {
@@ -44,7 +44,7 @@ async fn main() {
         let domain = matches.value_of("domain").unwrap_or("massbitroute.dev");
         let no_report_mode = matches.is_present("no-report-mode");
 
-        let check_component = CheckComponent::builder()
+        let mut check_component = CheckComponent::builder()
             .with_list_node_id_file(list_node_id_file.to_string(), Some("staked".to_string()))
             .await
             .with_list_gateway_id_file(list_gateway_id_file.to_string(), Some("staked".to_string()))

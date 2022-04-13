@@ -10,6 +10,7 @@
   "gateway_response_failed_number": 2,
   "reports_history_queue_length_max": 3,
   "check_task_list_fisherman": ["checking_chain_type"],
+  "checking_component_status": "staked",
 
   "mvp_extrinsic_submit_provider_report": "submit_provider_report",
   "mvp_extrinsic_dapi": "Dapi",

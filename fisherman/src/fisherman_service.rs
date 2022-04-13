@@ -1,11 +1,10 @@
-use crate::CONFIG;
+use crate::{CONFIG, ZONE};
 use anyhow::Error;
 use log::{debug, info};
 use mbr_check_component::check_module::check_module::{
     CheckComponent, CheckMkReport, ComponentInfo, ComponentType,
 };
 use mbr_stats::chain_adapter::ChainAdapter;
-use mbr_stats::chain_adapter::MVP_EXTRINSIC_DAPI;
 use sp_keyring::AccountKeyring;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
@@ -179,8 +178,27 @@ impl FishermanService {
         let mut reports_history: VecDeque<HashMap<ComponentInfo, ComponentReport>> =
             VecDeque::new();
 
+        info!("Run check component");
         loop {
-            info!("Run check component");
+            // Load new nodes/gateways list
+            if let Err(e) = self
+                .check_component_service
+                .reload_components_list(Some(&CONFIG.checking_component_status), &ZONE)
+                .await
+            {
+                info!("reload_components_list error: {:?}", e);
+                tokio::time::sleep(Duration::from_millis(CONFIG.delay_between_check_loop_ms)).await;
+                continue;
+            };
+            info!(
+                "Reload list node: {:?}",
+                self.check_component_service.list_nodes
+            );
+            info!(
+                "Reload list gateway: {:?}",
+                self.check_component_service.list_gateways
+            );
+
             let mut average_reports: HashMap<ComponentInfo, ComponentReport> = HashMap::new();
             let mut collect_reports: HashMap<ComponentInfo, Vec<CheckMkReport>> = HashMap::new();
             for n in 0..number_of_sample {
@@ -286,21 +304,6 @@ impl FishermanService {
             }
 
             tokio::time::sleep(Duration::from_millis(CONFIG.delay_between_check_loop_ms)).await;
-            if let Err(e) = self
-                .check_component_service
-                .reload_components_list(Some("staked".to_string()))
-                .await
-            {
-                info!("reload_components_list error: {:?}", e);
-            };
-            info!(
-                "Reload list node: {:?}",
-                self.check_component_service.list_nodes
-            );
-            info!(
-                "Reload list gateway: {:?}",
-                self.check_component_service.list_gateways
-            );
         }
     }
 }

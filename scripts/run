@@ -35,15 +35,13 @@ _repo() {
 	REPOS="\
 $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
 /etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
- $mbr_root/gbc/bin/.asdf|https://github.com/massbitprotocol/massbitroute_asdf|$ASDF_BRANCH \
+ $mbr_root/gbc|https://github.com/massbitprotocol/massbitroute_gbc|$GBC_BRANCH \
   $service_dir/mkagent|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_mkagent.git|$MKAGENT_BRANCH \
 "
 }
 
 _repo
 
-# . $SITE_ROOT/.env
-#source $SITE_ROOT/.env
 git="git -C $SITE_ROOT"
 type="monitor"
 dir="/massbit/massbitroute/app/src/sites/services/$type"
@@ -56,47 +54,11 @@ service_dir=/massbit/massbitroute/app/src/sites/services
 sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
 arg="request_format=python&output_format=json"
 host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
+
 _prepare() {
 	echo "Prepare"
-	_git_clone $GIT_PRIVATE_READ_URL/massbitroute/env.git /massbit/massbitroute/app/src/env $BRANCH
-
-	source $SITE_ROOT/.env
-	_git_clone $GIT_PUBLIC_URL/massbitprotocol/massbitroute_gbc.git /massbit/massbitroute/app/gbc
-	bash $SITE_ROOT/cmd_server _env
-	source $SITE_ROOT/.env_raw
-	_repo
+	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db
 }
-# _load_env() {
-# 	ROOT_DIR=$SITE_ROOT
-# 	if [ -f "$ROOT_DIR/.env" ]; then
-# 		source $ROOT_DIR/.env
-# 		_file=$ROOT_DIR/.env
-# 		if [ -z "$MBR_ENV" ]; then
-# 			if [ -f "$ROOT_DIR/vars/ENV" ]; then
-# 				export MBR_ENV=$(cat "$ROOT_DIR/vars/ENV")
-# 			fi
-# 		fi
-
-# 		if [ -n "$MBR_ENV" ]; then
-# 			_file=$ROOT_DIR/.env.$MBR_ENV
-# 		fi
-# 		source $_file
-# 		mkdir -p $ROOT_DIR/src
-# 		cat $_file | grep -v "^#" | awk -F'=' 'BEGIN{cfg="return {\n"}{sub(/^export\s*/,"",$1);cfg=cfg"[\""$1"\"]""=\""$2"\",\n"}END{print cfg"}"}' >$ROOT_DIR/src/env.lua
-# 	fi
-# 	env
-# }
-
-# _cron() {
-# 	#    * * * * * $SITE_ROOT/scripts/checkmk/dapi _collect
-# 	cat >/tmp/cron <<EOF
-# EOF
-# 	crontab /tmp/cron
-# }
-# _git_config() {
-# 	$git config --global user.name "Vu Tran"
-# 	$git config --global user.email "baysao@gmail.com"
-# }
 _reload() {
 	# _cron
 	bash $SITE_ROOT/scripts/server.sh _kill
@@ -106,6 +68,7 @@ _reload() {
 }
 
 _install_repos() {
+	_git_config
 	_repo
 	for _pathgit in $REPOS; do
 		_path=$(echo $_pathgit | cut -d'|' -f1)
@@ -114,58 +77,44 @@ _install_repos() {
 		_git_clone $_url $_path $_branch
 	done
 }
-_install() {
+_init() {
 	if [ -z "$GIT_PRIVATE_READ_URL" ]; then
 		echo "Need GIT_PRIVATE_READ_URL"
 		exit 1
 	fi
-
 	_tune_os
+	if [ ! -f "$SITE_ROOT/.env" ]; then
+		echo "$MBR_ENV" >$SITE_ROOT/.env
+	fi
 
-	git clone $GIT_PRIVATE_READ_URL/massbitroute/env.git $SITE_ROOT/env -b $BRANCH
+	source $SITE_ROOT/.env
 
-	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp
-	_git_config
-	_prepare
-	# _init
-	_install_repos
-	# mkdir -p $service_dir
-	# user=$GIT_USER
-	# pass=$GIT_PASSWORD
+	_git_clone $GIT_PRIVATE_READ_URL/massbitroute/env.git /massbit/massbitroute/app/src/env $MBR_ENV
+	_git_clone $GIT_PUBLIC_URL/massbitprotocol/massbitroute_gbc.git /massbit/massbitroute/app/gbc
 
-	# service=gbc
-	# git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git /massbit/massbitroute/app/$service
-	# git -C /massbit/massbitroute/app/$service remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
+	bash $SITE_ROOT/cmd_server _env
+	source $SITE_ROOT/.env_raw
+	_repo
+}
 
-	# service=asdf
-	# git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git /massbit/massbitroute/app/gbc/bin/.asdf
-
-	# git -C /massbit/massbitroute/app/gbc/bin/.asdf remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
-
-	# service=ssl
-	# git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git /etc/letsencrypt
-	# git -C /etc/letsencrypt remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
-
-	# service=mkagent
-	# git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git $SITE_ROOT/etc/$service
-
-	# git -C $SITE_ROOT/etc/$service remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
-
-	# service=$type
-	# user=$GIT_USER_MONITOR
-	# pass=$GIT_PASSWORD_MONITOR
-	# git clone http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git $service_dir/$service
-	# git -C $service_dir/$service remote set-url origin http://$user:$pass@$GIT_DOMAIN/massbitroute/${service}.git
-
+_supervisor() {
 	ln -sf /massbit/massbitroute/app/gbc /massbit/massbitroute/app/src/gbc
 	ln -sf /massbit/massbitroute/app/gbc/bin/openresty /usr/local/openresty
 	apt-get update
 	apt-get install -y git apache2-utils supervisor jq python-is-python2 libssl-dev
-	cp supervisor.conf /etc/supervisor/conf.d/${type}.conf
+	cp supervisor.conf /etc/supervisor/conf.d/${TYPE}.conf
 	systemctl enable supervisor
 	systemctl start supervisor
 	supervisorctl update
-
+}
+_install_one() {
+	_init
+	_prepare
+	_install_repos
+}
+_install() {
+	_install_one
+	_supervisor
 }
 _del_monitor_host() {
 	hostname=$1
@@ -363,14 +312,9 @@ _del_monitors() {
 	#_monitor_activate
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
-# loop() {
-# 	while true; do
-# 		$0 $@
-# 		sleep 3
-# 	done
-# }
 
 _update_repos() {
+	_git_config
 	_repo
 	_update_sources $REPOS
 	_st_repo=$?
@@ -387,18 +331,6 @@ _update() {
 }
 
 _monitor() {
-	# is_reload=0
-
-	# for d in \
-	# 	/massbit/massbitroute/app/gbc \
-	# 	$SITE_ROOT \
-	# 	$SITE_ROOT/etc/mkagent \
-	# 	/etc/letsencrypt; do
-	# 	git -C $d pull | grep -i "updating"
-	# 	if [ $? -eq 0 ]; then
-	# 		is_reload=1
-	# 	fi
-	# done
 
 	_update
 	is_reload=$?
@@ -416,7 +348,6 @@ _monitor() {
 
 _run() {
 	rm -rf $SITE_ROOT/tmp/*
-
 	$SITE_ROOT/start_server
 }
 

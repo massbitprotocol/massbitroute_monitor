@@ -1,6 +1,5 @@
 #!/bin/bash
-TYPE="monitor
-"
+TYPE="monitor"
 GRAFANA_VERSION=v8.2.1
 PROMETHEUS_VERSION=v2.30.3
 
@@ -43,8 +42,8 @@ $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
 _repo
 
 git="git -C $SITE_ROOT"
-type="monitor"
-dir="/massbit/massbitroute/app/src/sites/services/$type"
+
+dir="/massbit/massbitroute/app/src/sites/services/$TYPE"
 mbr_cli="$dir/mbr"
 script_run="$dir/scripts/run"
 cmd="$dir/cmd_server"
@@ -209,14 +208,14 @@ _remove_hosts() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp1=$(mktemp)
 	tmp2=$(mktemp)
-	type=gateway
-	curl -sk https://dapi.massbit.io/deploy/info/$type/listid | awk -v type=$type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	_type=gateway
+	curl -sk https://dapi.massbit.io/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
 		_del_monitor_host $h
 	done
-	type=node
-	curl -sk https://dapi.massbit.io/deploy/info/$type/listid | awk -v type=$type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	_type=node
+	curl -sk https://dapi.massbit.io/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
 		_del_monitor_host $h

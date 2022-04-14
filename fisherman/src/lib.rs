@@ -30,7 +30,7 @@ lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
     pub static ref ZONE: Zone =
-        env::var("ZONE").unwrap_or(String::from("Global")).parse().unwrap_or_default();
+        env::var("ZONE").unwrap_or(String::from("GB")).to_uppercase().parse().unwrap_or_default();
     // pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
     //     vec!["checking_chain_type".to_string(),];
     pub static ref CONFIG: Config = get_config();

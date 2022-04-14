@@ -43,12 +43,12 @@ pub enum Zone {
     // Oceania
     OC,
     // Global
-    Global,
+    GB,
 }
 
 impl Default for Zone {
     fn default() -> Self {
-        Zone::Global
+        Zone::GB
     }
 }
 
@@ -361,7 +361,7 @@ impl CheckComponent {
                 .retain(|component| &component.status == status);
         }
         //Filter zones
-        if *filter_zone != Zone::Global {
+        if *filter_zone != Zone::GB {
             self.list_nodes
                 .retain(|component| component.zone == *filter_zone);
             self.list_gateways

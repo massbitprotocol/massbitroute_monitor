@@ -10,4 +10,4 @@ echo "Update run script"
 rsync -avz run.sh mbr-verify:/opt/verification/run.sh
 
 echo "Restart service"
-ssh mbr-verify < restart_verify_service.sh
+ssh mbr-verify "sudo supervisorctl restart verification"

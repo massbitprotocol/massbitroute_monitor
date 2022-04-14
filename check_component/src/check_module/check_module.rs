@@ -361,7 +361,7 @@ impl CheckComponent {
                 .retain(|component| &component.status == status);
         }
         //Filter zones
-        if *filter_zone != Zone::Global {
+        if *filter_zone != Zone::GB {
             self.list_nodes
                 .retain(|component| component.zone == *filter_zone);
             self.list_gateways

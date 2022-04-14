@@ -57,6 +57,8 @@ host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 _prepare() {
 	echo "Prepare"
 	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db
+	rm -rf $SITE_ROOT/tmp/*
+
 }
 _reload() {
 	# _cron

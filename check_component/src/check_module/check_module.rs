@@ -43,12 +43,12 @@ pub enum Zone {
     // Oceania
     OC,
     // Global
-    Global,
+    GB,
 }
 
 impl Default for Zone {
     fn default() -> Self {
-        Zone::Global
+        Zone::GB
     }
 }
 

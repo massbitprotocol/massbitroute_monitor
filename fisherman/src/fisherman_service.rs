@@ -5,6 +5,7 @@ use mbr_check_component::check_module::check_module::{
     CheckComponent, CheckMkReport, ComponentInfo, ComponentType,
 };
 use mbr_stats::chain_adapter::ChainAdapter;
+use parity_scale_codec::Encode;
 use sp_keyring::AccountKeyring;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
@@ -19,22 +20,29 @@ pub trait SubmitProviderReport {
     fn submit_provider_report(
         &self,
         provider_id: [u8; 36],
-        requests: u64,
-        success_percent: u32,
-        response_time: u32,
+        reason: ProviderReportReason,
     ) -> Result<(), anyhow::Error>;
+}
+
+#[derive(Clone, Debug, Encode)]
+pub enum ProviderReportReason {
+    BadPerformance(u64, u32, u32),
+    OutOfSync,
 }
 
 impl SubmitProviderReport for ChainAdapter {
     fn submit_provider_report(
         &self,
         provider_id: [u8; 36],
-        requests: u64,
-        success_percent: u32,
-        response_time: u32,
+        reason: ProviderReportReason,
     ) -> Result<(), Error> {
         // set the recipient
         let api = self.api.as_ref().unwrap().clone();
+
+        info!(
+            "[+] Composed Extrinsic report provider {:?} with reason {:?}",
+            provider_id, &reason
+        );
         // the names are given as strings
         #[allow(clippy::redundant_clone)]
         let xt: UncheckedExtrinsicV4<_> = compose_extrinsic!(
@@ -42,16 +50,12 @@ impl SubmitProviderReport for ChainAdapter {
             &CONFIG.mvp_extrinsic_dapi,
             &CONFIG.mvp_extrinsic_submit_provider_report,
             provider_id,
-            requests,
-            success_percent,
-            response_time
+            reason
         );
-
-        info!(
-            "[+] Composed Extrinsic report provider {:?}:\n {:?}\n",
+        debug!(
+            "[+] Finish composed Extrinsic report provider {:?}:\n {:?}\n",
             provider_id, xt,
         );
-
         // send and watch extrinsic until InBlock
         let tx_hash = self
             .api
@@ -248,50 +252,59 @@ impl FishermanService {
             if !self.is_no_report {
                 // Check and send report
                 for (component_info, report) in average_reports.iter() {
+                    let reason = if !report.is_healthy(&component_info.component_type) {
+                        Some(ProviderReportReason::BadPerformance(
+                            report.request_number,
+                            report.get_success_percent(),
+                            report.response_time_ms.unwrap_or_default(),
+                        ))
+                    } else {
+                        None
+                    };
                     // Check for healthy and submit report
-                    if !report.is_healthy(&component_info.component_type)
-                        && component_info.status == "staked"
-                        && Self::is_history_continuous_fail_reach_limit(
-                            &reports_history,
-                            &component_info,
-                        )
-                    {
-                        info!("Submit report: {:?}", component_info);
-                        let provider_id: [u8; 36] =
-                            component_info.id.as_bytes().try_into().unwrap();
-                        info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
-                        // Submit report
-                        if let Err(e) = self
-                            .chain_adapter
-                            .submit_provider_report(
-                                provider_id,
-                                report.request_number,
-                                report.get_success_percent(),
-                                report.response_time_ms.unwrap_or_default(),
+                    if let Some(reason) = reason {
+                        if component_info.status == "staked"
+                            && Self::is_history_continuous_fail_reach_limit(
+                                &reports_history,
+                                &component_info,
                             )
-                            .and_then(|_| {
-                                match component_info.component_type {
-                                    ComponentType::Node => {
-                                        self.check_component_service
-                                            .list_nodes
-                                            .retain(|component| *component.id != component_info.id);
-                                    }
-                                    ComponentType::Gateway => {
-                                        self.check_component_service
-                                            .list_gateways
-                                            .retain(|component| *component.id != component_info.id);
-                                    }
-                                    _ => {}
-                                }
-                                info!("list_nodes:{:?}", self.check_component_service.list_nodes);
-                                info!(
-                                    "list_gateways:{:?}",
-                                    self.check_component_service.list_gateways
-                                );
-                                Ok(())
-                            })
                         {
-                            info!("submit_provider_report error:{:?}", e);
+                            info!("Submit report: {:?}", component_info);
+                            let provider_id: [u8; 36] =
+                                component_info.id.as_bytes().try_into().unwrap();
+                            info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
+
+                            // Submit report
+                            if let Err(e) = self
+                                .chain_adapter
+                                .submit_provider_report(provider_id, reason)
+                                .and_then(|_| {
+                                    match component_info.component_type {
+                                        ComponentType::Node => {
+                                            self.check_component_service.list_nodes.retain(
+                                                |component| *component.id != component_info.id,
+                                            );
+                                        }
+                                        ComponentType::Gateway => {
+                                            self.check_component_service.list_gateways.retain(
+                                                |component| *component.id != component_info.id,
+                                            );
+                                        }
+                                        _ => {}
+                                    }
+                                    info!(
+                                        "list_nodes:{:?}",
+                                        self.check_component_service.list_nodes
+                                    );
+                                    info!(
+                                        "list_gateways:{:?}",
+                                        self.check_component_service.list_gateways
+                                    );
+                                    Ok(())
+                                })
+                            {
+                                info!("submit_provider_report error:{:?}", e);
+                            }
                         }
                     }
                 }
@@ -335,6 +348,10 @@ impl ComponentReport {
         } else {
             0
         }
+    }
+    pub fn is_out_of_sync(&self) -> bool {
+        //Todo: implement
+        false
     }
 }
 

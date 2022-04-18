@@ -12,7 +12,7 @@
   "check_task_list_fisherman": ["checking_chain_type"],
   "checking_component_status": "staked",
 
-  "mvp_extrinsic_submit_provider_report": "submit_provider_report",
+  "mvp_extrinsic_submit_provider_report": "report_provider_offence",
   "mvp_extrinsic_dapi": "Dapi",
   "mvp_extrinsic_submit_project_usage": "submit_project_usage",
   "mvp_event_project_registered": "ProjectRegistered"

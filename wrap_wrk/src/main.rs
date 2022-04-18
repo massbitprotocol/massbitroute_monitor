@@ -69,7 +69,6 @@ impl WrkBenchmark {
     }
 
     fn get_report(stdout: &String) -> Result<WrkReport, Error> {
-        let mut report;
         let tmp: Vec<String> = stdout
             .split("Latency")
             .into_iter()
@@ -81,85 +80,66 @@ impl WrkBenchmark {
             .into_iter()
             .map(|s| s.to_string())
             .collect();
+
+        println!("{:?}", arr);
+        let latency = ValueMetric::<Duration> {
+            avg: Self::parse_string_duration(&arr[0]),
+            stdev: Self::parse_string_duration(&arr[1]),
+            max: Self::parse_string_duration(&arr[2]),
+            stdev_percent: arr[3].strip_suffix("%").unwrap().parse::<f32>().ok(),
+        };
+        let success_req_per_sec = ValueMetric::<f32> {
+            avg: arr[5].parse::<f32>().ok(),
+            stdev: arr[6].parse::<f32>().ok(),
+            max: arr[7].parse::<f32>().ok(),
+            stdev_percent: arr[8]
+                .strip_suffix("%")
+                .unwrap()
+                .clone()
+                .parse::<f32>()
+                .ok(),
+        };
+        println!("latency:{:?}", latency);
+        println!("success_req_per_sec:{:?}", success_req_per_sec);
+        let total_req = arr[9].parse::<usize>().unwrap();
+        let total_duration =
+            Self::parse_string_duration(&arr[12].strip_suffix(",").unwrap().to_string()).unwrap();
+        let total_read = ByteSize::from_str(&arr[13]).unwrap();
+
+        let mut socket_error = None;
         if tmp.contains("Socket error") {
-            println!("{:?}", arr);
-            let latency = ValueMetric::<Duration> {
-                avg: Self::parse_string_duration(&arr[0]),
-                stdev: Self::parse_string_duration(&arr[1]),
-                max: Self::parse_string_duration(&arr[2]),
-                stdev_percent: arr[3].strip_suffix("%").unwrap().parse::<f32>().ok(),
-            };
-            let success_req_per_sec = ValueMetric::<f32> {
-                avg: arr[5].parse::<f32>().ok(),
-                stdev: arr[6].parse::<f32>().ok(),
-                max: arr[7].parse::<f32>().ok(),
-                stdev_percent: arr[8]
-                    .strip_suffix("%")
-                    .unwrap()
-                    .clone()
-                    .parse::<f32>()
-                    .ok(),
-            };
-            let socket_error = SocketError {
+            socket_error = Some(SocketError {
                 connect: arr[18].strip_suffix(",").unwrap().parse::<usize>().unwrap(),
                 read: arr[20].strip_suffix(",").unwrap().parse::<usize>().unwrap(),
                 write: arr[22].strip_suffix(",").unwrap().parse::<usize>().unwrap(),
                 timeout: arr[24].parse::<usize>().unwrap(),
-            };
-            println!("latency:{:?}", latency);
-            println!("success_req_per_sec:{:?}", success_req_per_sec);
-
-            report = Ok(WrkReport {
-                latency,
-                success_req_per_sec,
-                total_req: arr[9].parse::<usize>().unwrap(),
-                total_duration: Self::parse_string_duration(
-                    &arr[12].strip_suffix(",").unwrap().to_string(),
-                )
-                .unwrap(),
-                total_read: ByteSize::from_str(&arr[13]).unwrap(),
-                req_per_sec: arr[26].parse::<f32>().unwrap(),
-                tran_per_sec: ByteSize::from_str(&arr[28]).unwrap(),
-                socket_error: Some(socket_error),
             });
-            println!("report:{:#?}", report);
-        } else {
-            println!("{:?}", arr);
-            let latency = ValueMetric::<Duration> {
-                avg: Self::parse_string_duration(&arr[0]),
-                stdev: Self::parse_string_duration(&arr[1]),
-                max: Self::parse_string_duration(&arr[2]),
-                stdev_percent: arr[3].strip_suffix("%").unwrap().parse::<f32>().ok(),
-            };
-            let success_req_per_sec = ValueMetric::<f32> {
-                avg: arr[5].parse::<f32>().ok(),
-                stdev: arr[6].parse::<f32>().ok(),
-                max: arr[7].parse::<f32>().ok(),
-                stdev_percent: arr[8]
-                    .strip_suffix("%")
-                    .unwrap()
-                    .clone()
-                    .parse::<f32>()
-                    .ok(),
-            };
-            println!("latency:{:?}", latency);
-            println!("success_req_per_sec:{:?}", success_req_per_sec);
-
-            report = Ok(WrkReport {
-                latency,
-                success_req_per_sec,
-                total_req: arr[9].parse::<usize>().unwrap(),
-                total_duration: Self::parse_string_duration(
-                    &arr[12].strip_suffix(",").unwrap().to_string(),
-                )
-                .unwrap(),
-                total_read: ByteSize::from_str(&arr[13]).unwrap(),
-                req_per_sec: arr[16].parse::<f32>().unwrap(),
-                tran_per_sec: ByteSize::from_str(&arr[18]).unwrap(),
-                socket_error: None,
-            });
-            println!("report:{:#?}", report);
         }
+
+        let tmp: Vec<String> = tmp
+            .split("Requests/sec:")
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+        let tmp = tmp[1].clone();
+        let arr: Vec<String> = tmp
+            .split_whitespace()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+        let req_per_sec = arr[0].parse::<f32>().unwrap();
+        let tran_per_sec = ByteSize::from_str(&arr[2]).unwrap();
+        let report = Ok(WrkReport {
+            latency,
+            success_req_per_sec,
+            total_req,
+            total_duration,
+            total_read,
+            req_per_sec,
+            tran_per_sec,
+            socket_error,
+        });
+
         report
     }
 }

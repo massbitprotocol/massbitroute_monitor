@@ -40,3 +40,4 @@ logs/
 check_component/src/archive/base-endpoint.json
 
 .gitconfig
+wrap_wrk/target/

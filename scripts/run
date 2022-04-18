@@ -56,8 +56,17 @@ host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 
 _prepare() {
 	echo "Prepare"
-	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db
+	cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
+	if [ ! -f "/usr/bin/pip" ]; then
+		apt install -y python3-pip
+	fi
+
+	pip install --upgrade pip
+	pip install -r requirements.txt
+
+	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db $SITE_ROOT/vars
 	rm -rf $SITE_ROOT/tmp/*
+	echo "mbr-monitor" >$SITE_ROOT/vars/TYPE
 
 }
 _reload() {

@@ -56,7 +56,7 @@ impl CheckComponentServer {
 
         warp::serve(router).run(socket_addr).await;
     }
-    /// Indexer deploy from cli api
+    /// Get status of component
     fn create_get_status(
         &self,
         service: Arc<CheckComponent>,
@@ -69,6 +69,7 @@ impl CheckComponentServer {
                 info!("#### Received request body ####");
                 info!("{}", body);
                 let component_info: ComponentInfo = serde_json::from_value(body).unwrap();
+                let component_info_clone = component_info.clone();
                 let clone_service = service.clone();
                 async move { clone_service.get_components_status(component_info).await }
             })

@@ -16,12 +16,19 @@ pub(crate) struct Config {
     pub max_json_body_size: u64,
     pub response_time_key: String,
     pub max_length_report_detail: usize,
+    pub benchmark_thread: i32,
+    pub benchmark_connection: i32,
+    pub benchmark_duration: String,
+    pub benchmark_rate: i32,
+    pub benchmark_script: String,
+    pub benchmark_wrk_path: String,
 }
 
 lazy_static! {
     pub static ref CHECK_COMPONENT_ENDPOINT: String =
         env::var("CHECK_COMPONENT_ENDPOINT").unwrap_or(String::from("0.0.0.0:3030"));
     pub static ref BASE_ENDPOINT_JSON: String = env::var("BASE_ENDPOINT_JSON").unwrap();
+    pub static ref BENCHMARK_WRK_PATH: String = env::var("BENCHMARK_WRK_PATH").unwrap_or("./".to_string());
     // pub static ref CHECK_INTERVAL_MS: u64 = 3000;
     // pub static ref CHECK_TASK_LIST_NODE: Vec<String> = vec![
     //     "checking_chain_type".to_string(),

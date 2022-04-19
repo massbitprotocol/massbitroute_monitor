@@ -30,3 +30,4 @@ slog = "2.7"
 lazy_static = "1.4"
 strum_macros = "0.24"
 strum = "0.24"
+wrap_wrk = {path = "../wrap_wrk"}

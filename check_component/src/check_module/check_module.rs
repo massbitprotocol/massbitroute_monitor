@@ -17,10 +17,13 @@ use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
-use crate::{BASE_ENDPOINT_JSON, CONFIG};
+use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG};
 use warp::{Rejection, Reply};
 
+use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
 use strum_macros::EnumString;
+use test::bench::benchmark;
+use wrap_wrk::{WrkBenchmark, WrkReport};
 
 type BlockChainType = String;
 type UrlType = String;
@@ -287,6 +290,22 @@ impl ToString for CheckMkReport {
 }
 
 impl CheckMkReport {
+    fn from_wrk_report(wrk_report: WrkReport, success_percent_threshold: u32, response_time_threshold: u32) -> Self {
+        let mut status = 0;
+        if wrk_report.latency.avg > response_time_threshold || wrk_report.{
+            status = 3
+        }
+        CheckMkReport {
+            status: 0,
+            service_name: "benchmark",
+            metric: Default::default(),
+            status_detail: "".to_string(),
+            success: false,
+        }
+    }
+}
+
+impl CheckMkReport {
     fn new_failed_report(msg: String) -> Self {
         let mut resp = CheckMkReport::default();
         resp.success = false;
@@ -294,8 +313,44 @@ impl CheckMkReport {
         resp
     }
     pub fn is_component_status_ok(&self) -> bool {
-        //Fixme: currently count unknown status as success call should seperate 2 case
+        //Fixme: currently count unknown status as success call. It should separate into 2 cases.
         ((self.success == true) && (self.status == 0)) || (self.status == 4)
+    }
+    pub fn combine_report(logic_check: &CheckMkReport, benchmark_check: &CheckMkReport) -> Self {
+        let mut status = CheckMkStatus::Ok;
+        if logic_check.status == CheckMkStatus::Critical as u8
+            || benchmark_check.status == CheckMkStatus::Critical as u8
+        {
+            status = CheckMkStatus::Critical
+        } else if logic_check.status == CheckMkStatus::Unknown as u8
+            || logic_check.status == CheckMkStatus::Unknown as u8
+        {
+            status = CheckMkStatus::Unknown
+        } else if logic_check.status == CheckMkStatus::Warning as u8
+            || logic_check.status == CheckMkStatus::Warning as u8
+        {
+            status = CheckMkStatus::Warning
+        }
+
+        // Should be the same service_name
+        assert_eq!(logic_check.service_name, benchmark_check.service_name);
+        let service_name = logic_check.service_name.clone();
+
+        let mut metric = logic_check.metric.clone();
+        metric.metric.extend(benchmark_check.metric.metric.clone());
+
+        let mut status_detail = format!(
+            "Logic check:{}\nBenchmark check:{}",
+            logic_check.status_detail, benchmark_check.status_detail
+        );
+        let success = logic_check.success && benchmark_check.success;
+        CheckMkReport {
+            status: status as u8,
+            service_name,
+            metric,
+            status_detail,
+            success,
+        }
     }
 }
 
@@ -690,7 +745,7 @@ impl CheckComponent {
         &self,
         steps: Vec<CheckStep>,
         component: &ComponentInfo,
-    ) -> Result<(ComponentInfo, CheckMkReport), anyhow::Error> {
+    ) -> Result<CheckMkReport, anyhow::Error> {
         let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
         let mut message = String::new();
@@ -786,23 +841,20 @@ impl CheckComponent {
         }
 
         message.push_str(&user_info);
-        Ok((
-            component.clone(),
-            CheckMkReport {
-                status: status as u8,
-                service_name: format!(
-                    "{}-http-{}-{}-{}-{}",
-                    component.component_type.to_string(),
-                    component.blockchain,
-                    component.network,
-                    component.id,
-                    component.ip
-                ),
-                metric: CheckMkMetric { metric },
-                status_detail: message,
-                success: true,
-            },
-        ))
+        Ok(CheckMkReport {
+            status: status as u8,
+            service_name: format!(
+                "{}-http-{}-{}-{}-{}",
+                component.component_type.to_string(),
+                component.blockchain,
+                component.network,
+                component.id,
+                component.ip
+            ),
+            metric: CheckMkMetric { metric },
+            status_detail: message,
+            success: true,
+        })
     }
 
     pub(crate) async fn get_components_status(
@@ -825,21 +877,48 @@ impl CheckComponent {
                 "check_steps is empty".to_string(),
             )));
         }
-        let res = self.run_check_steps(check_steps, &component_info).await;
-        info!("res:{:?}", res);
-        match res {
-            Ok(res) => Ok(warp::reply::json(&res.1)),
+        let res_check_data = self.run_check_steps(check_steps, &component_info).await;
+        info!("res:{:?}", res_check_data);
+
+        let res_benchmark = self.run_benchmark(&component_info).await;
+
+        match res_check_data {
+            Ok(res) => Ok(warp::reply::json(&res)),
             Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
                 format!("{:?}", err),
             ))),
         }
     }
 
+    pub async fn run_benchmark(
+        &self,
+        component: &ComponentInfo,
+    ) -> Result<CheckMkReport, anyhow::Error> {
+        let dapi_url = format!("http://{}", component.ip);
+        let component_type = component.component_type.to_string().to_lowercase();
+        let host = format!("{}.{}.mbr.{}", component.id, component_type, self.domain);
+        let benchmark = WrkBenchmark::build(
+            CONFIG.benchmark_thread,
+            CONFIG.benchmark_connection,
+            CONFIG.benchmark_duration.to_string(),
+            CONFIG.benchmark_rate,
+            dapi_url,
+            component.token.clone(),
+            host,
+            CONFIG.benchmark_script.to_string(),
+            CONFIG.benchmark_wrk_path.to_string(),
+            BENCHMARK_WRK_PATH.clone().to_string(),
+        );
+        let wrk_res = benchmark.run()?;
+
+        Ok(CheckMkReport::default())
+    }
+
     //Using in fisherman service
     pub async fn check_components(
         &self,
         tasks: &Vec<TaskType>,
-    ) -> Result<Vec<(ComponentInfo, CheckMkReport)>, anyhow::Error> {
+    ) -> Result<Vec<CheckMkReport>, anyhow::Error> {
         info!("Check components");
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com

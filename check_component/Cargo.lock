@@ -1996,6 +1996,7 @@ dependencies = [
  "anyhow",
  "bytesize",
  "duration-string",
+ "regex",
 ]
 
 [[package]]

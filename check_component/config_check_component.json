@@ -6,10 +6,13 @@
   "max_json_body_size": 1048576,
   "response_time_key": "response_time_ms",
   "max_length_report_detail": 512,
-  "benchmark_thread": 20,
-  "benchmark_connection": 20,
-  "benchmark_duration": "20s",
-  "benchmark_rate": 10,
+  "benchmark_thread": 5,
+  "benchmark_connection": 5,
+  "benchmark_duration": "15s",
+  "benchmark_rate": 50,
   "benchmark_script": "./massbit.lua",
-  "benchmark_wrk_path": "./wrk"
+  "benchmark_wrk_path": "./wrk",
+  "success_percent_threshold": 80,
+  "node_response_time_threshold": 2000,
+  "gateway_response_time_threshold": 2000
 }

@@ -58,12 +58,16 @@ impl WrkBenchmark {
     }
 
     fn parse_string_duration(time: &String) -> Option<Duration> {
-        if time.contains("-nan") {
+        if time.contains("-nan") || time.contains("-nanus") {
             return None;
         }
         if time.contains("ms") {
             Some(Duration::from_secs_f32(
                 time.strip_suffix("ms").unwrap().parse::<f32>().unwrap() / 1000f32,
+            ))
+        } else if time.contains("us") {
+            Some(Duration::from_secs_f32(
+                time.strip_suffix("us").unwrap().parse::<f32>().unwrap() / 1000_000f32,
             ))
         } else {
             Some(Duration::from_secs_f32(
@@ -74,12 +78,18 @@ impl WrkBenchmark {
 
     fn get_report(stdout: &String) -> Result<WrkReport, Error> {
         let re = Regex::new(r"Non-2xx or 3xx responses: (?P<non_2xx_3xx_req>\d+)")?;
-        let caps = re.captures(stdout).unwrap();
+        let caps = re.captures(stdout);
         let non_2xx_3xx_req = caps
-            .name("non_2xx_3xx_req")
-            .unwrap()
-            .as_str()
-            .parse::<usize>()?;
+            .and_then(|caps| {
+                Some(
+                    caps.name("non_2xx_3xx_req")
+                        .unwrap()
+                        .as_str()
+                        .parse::<usize>()
+                        .unwrap_or(0),
+                )
+            })
+            .unwrap_or(0);
 
         let tmp: Vec<String> = stdout
             .split("Latency")
@@ -186,7 +196,11 @@ pub struct WrkReport {
 
 impl WrkReport {
     pub fn get_success_percent(&self) -> Option<u32> {
-        if
+        if self.total_req > 0 {
+            Some(((self.total_req - self.non_2xx_3xx_req) * 100 / self.total_req) as u32)
+        } else {
+            None
+        }
     }
 }
 

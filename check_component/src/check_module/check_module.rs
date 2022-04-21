@@ -296,7 +296,7 @@ impl CheckMkReport {
         success_percent_threshold: u32,
         response_time_threshold: u32,
     ) -> Self {
-        let mut status = 0;
+        let mut status = CheckMkStatus::Ok as u8;
         let mut message = String::new();
         let latency = wrk_report
             .latency
@@ -312,7 +312,7 @@ impl CheckMkReport {
             .as_str(),
         );
         if latency > response_time_threshold as u128 {
-            status = 3;
+            status = CheckMkStatus::Critical as u8;
             message.push_str(
                 format!(
                     "False latency: test {} > require {} . ",
@@ -322,7 +322,7 @@ impl CheckMkReport {
             );
         }
         if success_percent <= success_percent_threshold {
-            status = 3;
+            status = CheckMkStatus::Critical as u8;
             message.push_str(
                 format!(
                     "False success-percent: test {} <= require {} . ",
@@ -926,22 +926,26 @@ impl CheckComponent {
                 format!("{:?}", err),
             ))),
             Ok(res_check_data) => {
-                let res_benchmark = self
-                    .run_benchmark(
-                        CONFIG.success_percent_threshold,
-                        response_time_threshold,
-                        &component_info,
-                    )
-                    .await;
-                match res_benchmark {
-                    Ok(res_benchmark) => {
-                        let summary_res =
-                            CheckMkReport::combine_report(&res_check_data, &res_benchmark);
-                        Ok(warp::reply::json(&summary_res))
+                if res_check_data.success == true && res_check_data.status == 0 {
+                    let res_benchmark = self
+                        .run_benchmark(
+                            CONFIG.success_percent_threshold,
+                            response_time_threshold,
+                            &component_info,
+                        )
+                        .await;
+                    match res_benchmark {
+                        Ok(res_benchmark) => {
+                            let summary_res =
+                                CheckMkReport::combine_report(&res_check_data, &res_benchmark);
+                            Ok(warp::reply::json(&summary_res))
+                        }
+                        Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
+                            format!("{:?}", err),
+                        ))),
                     }
-                    Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
-                        format!("{:?}", err),
-                    ))),
+                } else {
+                    Ok(warp::reply::json(&res_check_data))
                 }
             }
         }
@@ -968,9 +972,17 @@ impl CheckComponent {
         response_time_threshold: u32,
         component: &ComponentInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
-        let dapi_url = format!("http://{}", component.ip);
-        let component_type = component.component_type.to_string().to_lowercase();
-        let host = format!("{}.{}.mbr.{}", component.id, component_type, self.domain);
+        let dapi_url = format!("https://{}", component.ip);
+        let host = match component.component_type {
+            ComponentType::Node => {
+                format!("{}.node.mbr.{}", component.id, self.domain)
+            }
+            ComponentType::Gateway => {
+                format!("{}.gw.mbr.{}", component.id, self.domain)
+            }
+            ComponentType::DApi => String::default(),
+        };
+
         let mut benchmark = WrkBenchmark::build(
             CONFIG.benchmark_thread,
             CONFIG.benchmark_connection,

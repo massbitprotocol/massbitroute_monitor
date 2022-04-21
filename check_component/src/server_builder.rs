@@ -51,6 +51,7 @@ impl CheckComponentServer {
         let router = self
             .create_get_status(self.check_component_service.clone())
             .with(&cors)
+            .or(self.create_ping().with(&cors))
             .recover(handle_rejection);
         let socket_addr: SocketAddr = self.entry_point.parse().unwrap();
 
@@ -73,6 +74,19 @@ impl CheckComponentServer {
                 let clone_service = service.clone();
                 async move { clone_service.get_components_status(component_info).await }
             })
+    }
+
+    /// Ping API
+    fn create_ping(
+        &self,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("ping")
+            .and(warp::get())
+            .and_then(move || async move { Self::ping().await })
+    }
+    pub(crate) async fn ping() -> Result<impl Reply, Rejection> {
+        info!("Receive ping request.");
+        Ok(warp::reply::reply())
     }
 
     fn log_headers() -> impl Filter<Extract = (), Error = Infallible> + Copy {

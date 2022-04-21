@@ -65,7 +65,7 @@ _prepare() {
 	pip install -r requirements.txt
 
 	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db $SITE_ROOT/vars
-	rm -rf $SITE_ROOT/tmp/*
+	# rm -rf $SITE_ROOT/tmp/*
 	echo "mbr-monitor" >$SITE_ROOT/vars/TYPE
 
 }

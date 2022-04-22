@@ -2,15 +2,8 @@
 # type=monitor
 # dir=/massbit/massbitroute/app/src/sites/services/$type/etc/mkagent/agents
 dir=$(dirname $(realpath $0))
-pip="pip install"
-cd $dir
-if [ ! -f "/usr/bin/python3" ]; then
-	apt install -y python3
-fi
 
-if [ ! -f "/usr/bin/pip" ]; then
-	apt install -y python3-pip
-fi
+cd $dir
 
 export TOKEN_FILE=$dir/tokens.txt
 if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
@@ -34,8 +27,8 @@ _kill() {
 	pkill -f server.py
 }
 if [ $# -eq 0 ]; then
-	$pip --upgrade pip
-	$pip -r requirements.txt
+	# $pip --upgrade pip
+	# $pip -r requirements.txt
 	python3 $dir/server.py
 else
 	$@

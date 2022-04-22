@@ -937,7 +937,7 @@ impl CheckComponent {
                             service_name: "Skip benchmark".to_string(),
                             metric: Default::default(),
                             status_detail: "Skip benchmark".to_string(),
-                            success: false,
+                            success: true,
                         }),
                         false => {
                             self.run_benchmark(

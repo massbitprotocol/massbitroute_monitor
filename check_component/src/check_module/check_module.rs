@@ -931,14 +931,25 @@ impl CheckComponent {
             ))),
             Ok(res_check_data) => {
                 if res_check_data.success == true && res_check_data.status == 0 {
-                    let res_benchmark = self
-                        .run_benchmark(
-                            CONFIG.success_percent_threshold,
-                            response_time_threshold,
-                            CONFIG.accepted_low_latency_percent,
-                            &component_info,
-                        )
-                        .await;
+                    let res_benchmark = match CONFIG.skip_benchmark {
+                        true => Ok(CheckMkReport {
+                            status: 0,
+                            service_name: "Skip benchmark".to_string(),
+                            metric: Default::default(),
+                            status_detail: "Skip benchmark".to_string(),
+                            success: false,
+                        }),
+                        false => {
+                            self.run_benchmark(
+                                CONFIG.success_percent_threshold,
+                                response_time_threshold,
+                                CONFIG.accepted_low_latency_percent,
+                                &component_info,
+                            )
+                            .await
+                        }
+                    };
+
                     match res_benchmark {
                         Ok(res_benchmark) => {
                             let summary_res =

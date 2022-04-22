@@ -26,6 +26,7 @@ pub(crate) struct Config {
     pub node_response_time_threshold_ms: f32,
     pub gateway_response_time_threshold_ms: f32,
     pub accepted_low_latency_percent: f32,
+    pub skip_benchmark: bool,
 }
 
 lazy_static! {

@@ -17,7 +17,7 @@ do
 #  rsync -avz run.sh "mbr-verify-$ZN:/opt/verification/run.sh"
   cat run.tpl | sed "s/\[\[ZONE\]\]/$ZN/g" > _run_$ZN.sh
   rsync -avz _run_$ZN.sh "mbr-verify-$ZN:~/run.sh"
-
+  rm _run_$ZN.sh
   echo "Restart service"
   ssh "mbr-verify-$ZN" < restart_verify_service.sh
 done

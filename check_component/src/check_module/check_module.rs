@@ -294,7 +294,8 @@ impl CheckMkReport {
     fn from_wrk_report(
         wrk_report: WrkReport,
         success_percent_threshold: u32,
-        response_time_threshold: u32,
+        response_time_threshold_ms: f32,
+        accepted_percent_low_latency: f32,
     ) -> Self {
         let mut status = CheckMkStatus::Ok as u8;
         let mut message = String::new();
@@ -306,21 +307,23 @@ impl CheckMkReport {
         let success_percent = wrk_report.get_success_percent().unwrap();
         message.push_str(
             format!(
-                "Benchmark report: Latency: {}, Success_percent: {}.",
-                latency, success_percent
+                "Benchmark report: Percent Latency lower than {}ms: {}%, average latency: {}ms, Success_percent: {}%.",
+                response_time_threshold_ms, wrk_report.percent_low_latency*100f32, latency, success_percent
             )
             .as_str(),
         );
-        if latency > response_time_threshold as u128 {
+
+        if accepted_percent_low_latency > wrk_report.percent_low_latency {
             status = CheckMkStatus::Critical as u8;
             message.push_str(
                 format!(
-                    "False latency: test {} > require {} . ",
-                    latency, response_time_threshold
+                    "False latency: percent_low_latency {} < accepted_percent_low_latency {} . ",
+                    wrk_report.percent_low_latency, accepted_percent_low_latency
                 )
                 .as_str(),
             );
         }
+
         if success_percent <= success_percent_threshold {
             status = CheckMkStatus::Critical as u8;
             message.push_str(
@@ -331,6 +334,7 @@ impl CheckMkReport {
                 .as_str(),
             );
         }
+
         CheckMkReport {
             status,
             service_name: "benchmark".to_string(),
@@ -916,9 +920,9 @@ impl CheckComponent {
         info!("res:{:?}", res_check_data);
 
         let response_time_threshold = if component_info.component_type == ComponentType::Gateway {
-            CONFIG.node_response_time_threshold
+            CONFIG.node_response_time_threshold_ms
         } else {
-            CONFIG.gateway_response_time_threshold
+            CONFIG.gateway_response_time_threshold_ms
         };
 
         match res_check_data {
@@ -931,6 +935,7 @@ impl CheckComponent {
                         .run_benchmark(
                             CONFIG.success_percent_threshold,
                             response_time_threshold,
+                            CONFIG.accepted_low_latency_percent,
                             &component_info,
                         )
                         .await;
@@ -969,7 +974,8 @@ impl CheckComponent {
     pub async fn run_benchmark(
         &self,
         success_percent_threshold: u32,
-        response_time_threshold: u32,
+        response_time_threshold: f32,
+        accepted_low_latency_percent: f32,
         component: &ComponentInfo,
     ) -> Result<CheckMkReport, anyhow::Error> {
         let dapi_url = format!("https://{}", component.ip);
@@ -994,12 +1000,14 @@ impl CheckComponent {
             CONFIG.benchmark_script.to_string(),
             CONFIG.benchmark_wrk_path.to_string(),
             BENCHMARK_WRK_PATH.clone().to_string(),
+            response_time_threshold,
         );
         let wrk_res = benchmark.run()?;
         let benchmark_res = CheckMkReport::from_wrk_report(
             wrk_res,
             success_percent_threshold,
             response_time_threshold,
+            accepted_low_latency_percent,
         );
         Ok(benchmark_res)
     }

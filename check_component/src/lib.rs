@@ -23,8 +23,9 @@ pub(crate) struct Config {
     pub benchmark_script: String,
     pub benchmark_wrk_path: String,
     pub success_percent_threshold: u32,
-    pub node_response_time_threshold: u32,
-    pub gateway_response_time_threshold: u32,
+    pub node_response_time_threshold_ms: f32,
+    pub gateway_response_time_threshold_ms: f32,
+    pub accepted_low_latency_percent: f32,
 }
 
 lazy_static! {

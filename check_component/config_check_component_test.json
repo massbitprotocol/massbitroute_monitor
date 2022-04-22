@@ -13,8 +13,8 @@
   "benchmark_script": "./massbit.lua",
   "benchmark_wrk_path": "./wrk",
   "success_percent_threshold": 80,
-  "node_response_time_threshold_ms": 2000,
-  "gateway_response_time_threshold_ms": 2000,
-  "accepted_low_latency_percent": 0.90,
-  "skip_benchmark": false
+  "node_response_time_threshold_ms": 10000,
+  "gateway_response_time_threshold_ms": 10000,
+  "accepted_low_latency_percent": 0.80,
+  "skip_benchmark": true
 }

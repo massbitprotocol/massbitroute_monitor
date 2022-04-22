@@ -1,0 +1,12 @@
+[package]
+name = "wrap_wrk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytesize = "1.1"
+anyhow = "1.0"
+duration-string = "0.0.6"
+regex = "1.5"

@@ -13,14 +13,18 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+use anyhow::Error;
 use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
-use crate::{BASE_ENDPOINT_JSON, CONFIG};
+use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG};
 use warp::{Rejection, Reply};
 
+use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
+use crate::check_module::check_module::ComponentType::Gateway;
 use strum_macros::EnumString;
+use wrap_wrk::{WrkBenchmark, WrkReport};
 
 type BlockChainType = String;
 type UrlType = String;
@@ -287,6 +291,61 @@ impl ToString for CheckMkReport {
 }
 
 impl CheckMkReport {
+    fn from_wrk_report(
+        wrk_report: WrkReport,
+        success_percent_threshold: u32,
+        response_time_threshold_ms: f32,
+        accepted_percent_low_latency: f32,
+    ) -> Self {
+        let mut status = CheckMkStatus::Ok as u8;
+        let mut message = String::new();
+        let latency = wrk_report
+            .latency
+            .avg
+            .and_then(|avg| Some(avg.as_millis()))
+            .unwrap_or(u128::MAX);
+        let success_percent = wrk_report.get_success_percent().unwrap();
+        message.push_str(
+            format!(
+                "Benchmark report: Percent Latency lower than {}ms: {}%, average latency: {}ms, Success_percent: {}%.",
+                response_time_threshold_ms, wrk_report.percent_low_latency*100f32, latency, success_percent
+            )
+            .as_str(),
+        );
+
+        if accepted_percent_low_latency > wrk_report.percent_low_latency {
+            status = CheckMkStatus::Critical as u8;
+            message.push_str(
+                format!(
+                    "False latency: percent_low_latency {} < accepted_percent_low_latency {} . ",
+                    wrk_report.percent_low_latency, accepted_percent_low_latency
+                )
+                .as_str(),
+            );
+        }
+
+        if success_percent <= success_percent_threshold {
+            status = CheckMkStatus::Critical as u8;
+            message.push_str(
+                format!(
+                    "False success-percent: test {} <= require {} . ",
+                    success_percent, success_percent_threshold
+                )
+                .as_str(),
+            );
+        }
+
+        CheckMkReport {
+            status,
+            service_name: "benchmark".to_string(),
+            metric: Default::default(),
+            status_detail: message,
+            success: true,
+        }
+    }
+}
+
+impl CheckMkReport {
     fn new_failed_report(msg: String) -> Self {
         let mut resp = CheckMkReport::default();
         resp.success = false;
@@ -294,8 +353,43 @@ impl CheckMkReport {
         resp
     }
     pub fn is_component_status_ok(&self) -> bool {
-        //Fixme: currently count unknown status as success call should seperate 2 case
+        //Fixme: currently count unknown status as success call. It should separate into 2 cases.
         ((self.success == true) && (self.status == 0)) || (self.status == 4)
+    }
+    pub fn combine_report(logic_check: &CheckMkReport, benchmark_check: &CheckMkReport) -> Self {
+        let mut status = CheckMkStatus::Ok;
+        if logic_check.status == CheckMkStatus::Critical as u8
+            || benchmark_check.status == CheckMkStatus::Critical as u8
+        {
+            status = CheckMkStatus::Critical
+        } else if logic_check.status == CheckMkStatus::Unknown as u8
+            || logic_check.status == CheckMkStatus::Unknown as u8
+        {
+            status = CheckMkStatus::Unknown
+        } else if logic_check.status == CheckMkStatus::Warning as u8
+            || logic_check.status == CheckMkStatus::Warning as u8
+        {
+            status = CheckMkStatus::Warning
+        }
+
+        // assert_eq!(logic_check.service_name, benchmark_check.service_name);
+        let service_name = logic_check.service_name.clone();
+
+        let mut metric = logic_check.metric.clone();
+        metric.metric.extend(benchmark_check.metric.metric.clone());
+
+        let mut status_detail = format!(
+            "Logic check:{} Benchmark check:{}",
+            logic_check.status_detail, benchmark_check.status_detail
+        );
+        let success = logic_check.success && benchmark_check.success;
+        CheckMkReport {
+            status: status as u8,
+            service_name,
+            metric,
+            status_detail,
+            success,
+        }
     }
 }
 
@@ -690,7 +784,7 @@ impl CheckComponent {
         &self,
         steps: Vec<CheckStep>,
         component: &ComponentInfo,
-    ) -> Result<(ComponentInfo, CheckMkReport), anyhow::Error> {
+    ) -> Result<CheckMkReport, anyhow::Error> {
         let mut step_result: StepResult = HashMap::new();
         let mut status = CheckMkStatus::Ok;
         let mut message = String::new();
@@ -786,23 +880,20 @@ impl CheckComponent {
         }
 
         message.push_str(&user_info);
-        Ok((
-            component.clone(),
-            CheckMkReport {
-                status: status as u8,
-                service_name: format!(
-                    "{}-http-{}-{}-{}-{}",
-                    component.component_type.to_string(),
-                    component.blockchain,
-                    component.network,
-                    component.id,
-                    component.ip
-                ),
-                metric: CheckMkMetric { metric },
-                status_detail: message,
-                success: true,
-            },
-        ))
+        Ok(CheckMkReport {
+            status: status as u8,
+            service_name: format!(
+                "{}-http-{}-{}-{}-{}",
+                component.component_type.to_string(),
+                component.blockchain,
+                component.network,
+                component.id,
+                component.ip
+            ),
+            metric: CheckMkMetric { metric },
+            status_detail: message,
+            success: true,
+        })
     }
 
     pub(crate) async fn get_components_status(
@@ -825,21 +916,118 @@ impl CheckComponent {
                 "check_steps is empty".to_string(),
             )));
         }
-        let res = self.run_check_steps(check_steps, &component_info).await;
-        info!("res:{:?}", res);
-        match res {
-            Ok(res) => Ok(warp::reply::json(&res.1)),
+        let res_check_data = self.run_check_steps(check_steps, &component_info).await;
+        info!("res:{:?}", res_check_data);
+
+        let response_time_threshold = if component_info.component_type == ComponentType::Gateway {
+            CONFIG.node_response_time_threshold_ms
+        } else {
+            CONFIG.gateway_response_time_threshold_ms
+        };
+
+        match res_check_data {
             Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
                 format!("{:?}", err),
             ))),
+            Ok(res_check_data) => {
+                if res_check_data.success == true && res_check_data.status == 0 {
+                    let res_benchmark = match CONFIG.skip_benchmark {
+                        true => Ok(CheckMkReport {
+                            status: 0,
+                            service_name: "Skip benchmark".to_string(),
+                            metric: Default::default(),
+                            status_detail: "Skip benchmark".to_string(),
+                            success: true,
+                        }),
+                        false => {
+                            self.run_benchmark(
+                                CONFIG.success_percent_threshold,
+                                response_time_threshold,
+                                CONFIG.accepted_low_latency_percent,
+                                &component_info,
+                            )
+                            .await
+                        }
+                    };
+
+                    match res_benchmark {
+                        Ok(res_benchmark) => {
+                            let summary_res =
+                                CheckMkReport::combine_report(&res_check_data, &res_benchmark);
+                            Ok(warp::reply::json(&summary_res))
+                        }
+                        Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
+                            format!("{:?}", err),
+                        ))),
+                    }
+                } else {
+                    Ok(warp::reply::json(&res_check_data))
+                }
+            }
         }
+
+        // match (res_check_data, res_benchmark) {
+        //     (Ok(res_check_data), Ok(res_benchmark)) => {
+        //         let summary_res = CheckMkReport::combine_report(&res_check_data, &res_benchmark);
+        //         Ok(warp::reply::json(&summary_res))
+        //     }
+        //     (Ok(res), Err(err)) | (Err(err), Ok(res)) => {
+        //         Ok(warp::reply::json(&CheckMkReport::new_failed_report(
+        //             format!("OK report:{:?} - Error: {:?}", res, err),
+        //         )))
+        //     }
+        //     (Err(err_l), Err(err_b)) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
+        //         format!("Logic error:{:?} \nBenchmark error{:?}", err_l, err_b),
+        //     ))),
+        // }
+    }
+
+    pub async fn run_benchmark(
+        &self,
+        success_percent_threshold: u32,
+        response_time_threshold: f32,
+        accepted_low_latency_percent: f32,
+        component: &ComponentInfo,
+    ) -> Result<CheckMkReport, anyhow::Error> {
+        let dapi_url = format!("https://{}", component.ip);
+        let host = match component.component_type {
+            ComponentType::Node => {
+                format!("{}.node.mbr.{}", component.id, self.domain)
+            }
+            ComponentType::Gateway => {
+                format!("{}.gw.mbr.{}", component.id, self.domain)
+            }
+            ComponentType::DApi => String::default(),
+        };
+
+        let mut benchmark = WrkBenchmark::build(
+            CONFIG.benchmark_thread,
+            CONFIG.benchmark_connection,
+            CONFIG.benchmark_duration.to_string(),
+            CONFIG.benchmark_rate,
+            dapi_url,
+            component.token.clone(),
+            host,
+            CONFIG.benchmark_script.to_string(),
+            CONFIG.benchmark_wrk_path.to_string(),
+            BENCHMARK_WRK_PATH.clone().to_string(),
+            response_time_threshold,
+        );
+        let wrk_res = benchmark.run()?;
+        let benchmark_res = CheckMkReport::from_wrk_report(
+            wrk_res,
+            success_percent_threshold,
+            response_time_threshold,
+            accepted_low_latency_percent,
+        );
+        Ok(benchmark_res)
     }
 
     //Using in fisherman service
     pub async fn check_components(
         &self,
         tasks: &Vec<TaskType>,
-    ) -> Result<Vec<(ComponentInfo, CheckMkReport)>, anyhow::Error> {
+    ) -> Result<Vec<CheckMkReport>, anyhow::Error> {
         info!("Check components");
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com

@@ -72,7 +72,7 @@ impl CheckComponentServer {
                 let component_info: ComponentInfo = serde_json::from_value(body).unwrap();
                 let component_info_clone = component_info.clone();
                 let clone_service = service.clone();
-                async move { clone_service.get_components_status(component_info).await }
+                async move { clone_service.get_components_status(&component_info).await }
             })
     }
 

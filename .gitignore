@@ -42,3 +42,7 @@ check_component/src/archive/base-endpoint.json
 
 .gitconfig
 wrap_wrk/target/
+
+check_component/.env
+
+fisherman/.env

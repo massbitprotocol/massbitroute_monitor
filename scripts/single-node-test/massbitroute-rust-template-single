@@ -88,7 +88,7 @@ stopasgroup=true" > /etc/supervisor/conf.d/verification.conf
   #  Install VERIFICATION (RUST)
   #-------------------------------------------
   sudo mkdir -p /massbit/massbitroute/app/src/sites/services/monitor
-  sudo git clone https://github.com/massbitprotocol/massbitroute_monitor.git -b dev /massbit/massbitroute/app/src/sites/services/monitor
+  sudo git clone https://github.com/massbitprotocol/massbitroute_monitor.git -b [[DEPLOY_BRANCH]] /massbit/massbitroute/app/src/sites/services/monitor
   cd /massbit/massbitroute/app/src/sites/services/monitor/check_component
   /root/.cargo/bin/cargo build --release
   mkdir -p /opt/verification

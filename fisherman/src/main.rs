@@ -1,4 +1,5 @@
 use clap::{Arg, Command};
+use dotenv;
 use logger;
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
@@ -8,6 +9,9 @@ use mbr_fisherman::{CONFIG, ZONE};
 
 #[tokio::main]
 async fn main() {
+    // Load env file
+    dotenv::dotenv().ok();
+
     let res = init_logger(&String::from("Fisherman"));
     println!("Log output: {}", res); // Print log output type
 

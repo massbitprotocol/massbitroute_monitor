@@ -1,9 +1,11 @@
 use anyhow::Error;
 use bytesize::ByteSize;
+use log::{debug, info};
 use regex::Regex;
 use std::process::Command;
 use std::str::FromStr;
 use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug)]
 struct DetailedPercentileSpectrum {
@@ -41,6 +43,9 @@ impl WrkBenchmark {
         }
     }
     pub fn run(&mut self) -> Result<WrkReport, Error> {
+        info!("current_dir: {}", self.current_dir);
+        info!("wrk_path: {}", self.wrk_path);
+        info!("script: {}", self.script);
         let output = Command::new(&self.wrk_path)
             .current_dir(&self.current_dir)
             .arg(format!("--latency"))
@@ -59,9 +64,9 @@ impl WrkBenchmark {
         let status = output.status;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        println!("status: {}", status);
-        println!("stdout: {}", stdout);
-        println!("stderr: {}", stderr);
+        // info!("status: {}", status);
+        // info!("stdout: {}", stdout);
+        // info!("stderr: {}", stderr);
 
         //assert!(output.status.success());
         self.get_report(&stdout, 500f32)
@@ -92,17 +97,17 @@ impl WrkBenchmark {
         )?;
         let caps = re.captures(text).unwrap();
         let table = caps.name("table").unwrap().as_str();
-        println!("table:{}", table);
+        //info!("table:{}", table);
 
         let sorted_table: Vec<DetailedPercentileSpectrum> = table
             .split("\n")
             .filter_map(|line| {
-                println!("s:{}", line);
+                //info!("s:{}", line);
                 let arr = line
                     .split_whitespace()
                     .map(|value| value.to_string())
                     .collect::<Vec<String>>();
-                println!("arr:{:?}", arr);
+                //info!("arr:{:?}", arr);
                 if arr.len() == 4 {
                     Some(DetailedPercentileSpectrum {
                         latency: arr[0].parse::<f32>().unwrap_or(f32::MAX),
@@ -131,12 +136,12 @@ impl WrkBenchmark {
     }
 
     fn get_report(&self, stdout: &String, percent_pass_latency: f32) -> Result<WrkReport, Error> {
-        println!("{}", stdout);
+        //info!("{}", stdout);
         // Get percent_low_latency
         let sorted_table = self.get_latency_table(stdout)?;
-        println!("vec table:{:?}", sorted_table);
+        //info!("vec table:{:?}", sorted_table);
         let percent_low_latency = self.get_percent_latency(sorted_table);
-        println!("percent_low_latency:{:?}", percent_low_latency);
+        debug!("percent_low_latency:{:?}", percent_low_latency);
         //Get Non-2xx or 3xx responses
         let re = Regex::new(r"Non-2xx or 3xx responses: (?P<non_2xx_3xx_req>\d+)")?;
         let caps = re.captures(stdout);
@@ -180,7 +185,7 @@ impl WrkBenchmark {
             .parse::<f32>()
             .unwrap();
         let tran_per_sec = caps.name("tran_per_sec").unwrap().as_str();
-        println!("tran_per_sec:{}", tran_per_sec);
+        debug!("tran_per_sec:{}", tran_per_sec);
         let tran_per_sec = ByteSize::from_str(&tran_per_sec).unwrap();
 
         let tmp: Vec<String> = stdout
@@ -195,7 +200,7 @@ impl WrkBenchmark {
             .map(|s| s.to_string())
             .collect();
 
-        println!("{:?}", arr);
+        //info!("arr: {:?}", arr);
         let latency = ValueMetric::<Duration> {
             avg: Self::parse_string_duration(&arr[0]),
             stdev: Self::parse_string_duration(&arr[1]),
@@ -213,8 +218,8 @@ impl WrkBenchmark {
                 .parse::<f32>()
                 .ok(),
         };
-        println!("latency:{:?}", latency);
-        println!("success_req_per_sec:{:?}", success_req_per_sec);
+        debug!("latency:{:?}", latency);
+        debug!("success_req_per_sec:{:?}", success_req_per_sec);
 
         let mut socket_error = None;
         if tmp.contains("Socket error") {
@@ -225,7 +230,10 @@ impl WrkBenchmark {
                 timeout: arr[24].parse::<usize>().unwrap(),
             });
         }
-
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
         let report = Ok(WrkReport {
             latency,
             success_req_per_sec,
@@ -237,6 +245,7 @@ impl WrkBenchmark {
             socket_error,
             non_2xx_3xx_req,
             percent_low_latency,
+            timestamp,
         });
 
         report
@@ -270,6 +279,7 @@ pub struct WrkReport {
     pub socket_error: Option<SocketError>,
     pub non_2xx_3xx_req: usize,
     pub percent_low_latency: f32,
+    pub timestamp: u128,
 }
 
 impl WrkReport {

@@ -10,6 +10,9 @@ use mbr_check_component::CHECK_COMPONENT_ENDPOINT;
 
 #[tokio::main]
 async fn main() {
+    // Load env file
+    dotenv::dotenv().ok();
+
     let _res = init_logger(&String::from("CheckComponent"));
     //println!("Log output: {}", res); // Print log output type
 

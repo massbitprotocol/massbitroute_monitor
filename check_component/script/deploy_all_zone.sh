@@ -12,6 +12,7 @@ do
   rsync -avz ../config_check_component.json "mbr-verify-$ZN:~/config_check_component.json"
   rsync -avz ../../scripts/benchmark/massbit.lua "mbr-verify-$ZN:~/massbit.lua"
   rsync -avz ../../scripts/benchmark/wrk "mbr-verify-$ZN:~/wrk"
+  rsync -avz ../.env "mbr-verify-$ZN:~/.env"
 
 #  echo "Update run script"
 #  rsync -avz run.sh "mbr-verify-$ZN:/opt/verification/run.sh"

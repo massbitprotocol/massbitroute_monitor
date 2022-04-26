@@ -1,5 +1,6 @@
 use anyhow::Error;
 use bytesize::ByteSize;
+use log::info;
 use std::env::current_dir;
 use std::process::Command;
 use std::str::FromStr;
@@ -34,7 +35,7 @@ fn main() {
     );
     let report = wrk.run();
 
-    println!("{:?}", report)
+    info!("report: {:?}", report)
 
     //assert!(output.status.success());
 }

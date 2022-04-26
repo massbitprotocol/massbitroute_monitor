@@ -19,7 +19,7 @@ resource "google_compute_instance" "mbr-portal-new-commit-test" {
     network = "${var.network_interface}"
 
     access_config {
-      nat_ip = "35.219.10.198"
+      nat_ip = "34.101.215.184"
     }
   }
 

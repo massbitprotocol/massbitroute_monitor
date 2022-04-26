@@ -172,4 +172,3 @@ jobs:
           ls -l
           terraform init
           terraform destroy -auto-approve
-

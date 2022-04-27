@@ -74,6 +74,7 @@ _prepare() {
 
 	# rm -rf $SITE_ROOT/tmp/*
 	echo "mbr-monitor" >$SITE_ROOT/vars/TYPE
+	bash $SITE_ROOT/scripts/install.sh
 
 }
 _reload() {

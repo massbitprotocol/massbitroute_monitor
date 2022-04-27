@@ -1,9 +1,9 @@
 #!/bin/bash
-check_http="/opt/omd/versions/2.0.0p18.cre/lib/nagios/plugins/check_http"
+check_http="/opt/omd/versions/2.0.0p17.cre/lib/nagios/plugins/check_http"
 mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component
 
-if [ ! -f "/usr/bin/parallel" ];then
-    apt install -y parallel
+if [ ! -f "/usr/bin/parallel" ]; then
+	apt install -y parallel
 fi
 
 _check_component() {
@@ -55,25 +55,25 @@ _dapi() {
 
 }
 
-_check_http(){
-    type=$1
-    output=$2
-    
-    shift 2
-    
-    echo $@ |  while read id user_id block net ip continent country token status approved _remain; do
-			if [ $status -ne 1 ]; then continue; fi
-			if [ $approved -ne 1 ]; then continue; fi
-			hostname=${id}.${type}.mbr.massbitroute.com
-			_checkname=http_${type}-$block-${net}_$id
-			$check_http -k "x-api-key: $token" -H $hostname -I $ip -u / -T application/json --method=POST --post='{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false]}' -t 10 -p 443 --ssl | tail -1 |
-				awk -F'|' -v checkname=$_checkname '{st=0;perf="-";if(index($1,"CRITICAL") != 0){st=2} else if(index($1,"WARNING") != 0){st=1} else {gsub(/ /,"|",$2);perf=$2;};print st,checkname,perf,$1}' >> $output
+_check_http() {
+	type=$1
+	output=$2
 
-    done
+	shift 2
+
+	echo $@ | while read id user_id block net ip continent country token status approved _remain; do
+		if [ $status -ne 1 ]; then continue; fi
+		if [ $approved -ne 1 ]; then continue; fi
+		hostname=${id}.${type}.mbr.massbitroute.com
+		_checkname=http_${type}-$block-${net}_$id
+		$check_http -k "x-api-key: $token" -H $hostname -I $ip -u / -T application/json --method=POST --post='{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false]}' -t 10 -p 443 --ssl | tail -1 |
+			awk -F'|' -v checkname=$_checkname '{st=0;perf="-";if(index($1,"CRITICAL") != 0){st=2} else if(index($1,"WARNING") != 0){st=1} else {gsub(/ /,"|",$2);perf=$2;};print st,checkname,perf,$1}' >>$output
+
+	done
 }
 
 _gateway_v1() {
-    	type=gateway
+	type=gateway
 	output=/tmp/check_mk_$type
 
 	cache=$1
@@ -89,15 +89,15 @@ _gateway_v1() {
 	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 
-	    cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
-		echo $0 _check_http gw ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved 
-	    done | parallel -j$(nproc)
+		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
+			echo $0 _check_http gw ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
+		done | parallel -j$(nproc)
 
 		rm $tmp
 		mv ${output}.1 $output
 		cat $output
 	fi
-    }
+}
 _gateway() {
 	type=gateway
 	output=/tmp/check_mk_$type
@@ -131,7 +131,6 @@ _gateway() {
 	fi
 }
 
-
 _node_v1() {
 	type=node
 	output=/tmp/check_mk_$type
@@ -150,10 +149,10 @@ _node_v1() {
 	if [ $? -eq 0 ]; then
 
 		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
-	        
-echo $0 _check_http node ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
+
+			echo $0 _check_http node ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
 		done | parallel -j$(nproc)
-		
+
 		rm $tmp
 		mv ${output}.1 $output
 		cat $output

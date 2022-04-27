@@ -96,7 +96,6 @@ _init() {
 		echo "Need GIT_PRIVATE_READ_URL"
 		exit 1
 	fi
-	_tune_os
 	if [ ! -f "$SITE_ROOT/.env" ]; then
 		echo "$MBR_ENV" >$SITE_ROOT/.env
 	fi
@@ -116,9 +115,13 @@ _supervisor() {
 	ln -sf /massbit/massbitroute/app/gbc/bin/openresty /usr/local/openresty
 	apt-get update
 	apt-get install -y git apache2-utils supervisor jq python-is-python2 libssl-dev
-	cp supervisor.conf /etc/supervisor/conf.d/${TYPE}.conf
+
 	systemctl enable supervisor
 	systemctl start supervisor
+
+	mkdir -p /etc/supervisor/conf.d
+	cp supervisor.conf /etc/supervisor/conf.d/${TYPE}.conf
+
 	supervisorctl update
 }
 _install_one() {

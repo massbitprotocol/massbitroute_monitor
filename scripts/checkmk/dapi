@@ -1,5 +1,9 @@
 #!/bin/bash
-
+_env() {
+	if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
+	check_http="/opt/omd/versions/$CHECK_MK_VERSION/lib/nagios/plugins/check_http"
+	mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component
+}
 _check_component() {
 	type=component
 	output=/tmp/check_mk_$type
@@ -19,6 +23,9 @@ _check_component() {
 	cat $output
 }
 _dapi() {
+	SITE_ROOT=$1
+	_env
+	shift
 	type=dapi
 	output=/tmp/check_mk_$type
 	cache=$1
@@ -50,6 +57,11 @@ _dapi() {
 }
 
 _check_http() {
+
+	SITE_ROOT=$1
+	_env
+	shift
+
 	type=$1
 	output=$2
 
@@ -67,6 +79,9 @@ _check_http() {
 }
 
 _gateway_v1() {
+	SITE_ROOT=$1
+	_env
+	shift
 	type=gateway
 	output=/tmp/check_mk_$type
 
@@ -84,7 +99,7 @@ _gateway_v1() {
 	if [ $? -eq 0 ]; then
 
 		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
-			echo $0 _check_http gw ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
+			echo $0 _check_http $SITE_ROOT gw ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
 		done | parallel -j$(nproc)
 
 		rm $tmp
@@ -126,6 +141,10 @@ _gateway() {
 }
 
 _node_v1() {
+
+	SITE_ROOT=$1
+	_env
+	shift
 	type=node
 	output=/tmp/check_mk_$type
 
@@ -144,7 +163,7 @@ _node_v1() {
 
 		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
 
-			echo $0 _check_http node ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
+			echo $0 _check_http $SITE_ROOT node ${output}.1 $id $user_id $block $net $ip $continent $country $token $status $approved
 		done | parallel -j$(nproc)
 
 		rm $tmp
@@ -187,16 +206,14 @@ _node() {
 }
 _collect() {
 	SITE_ROOT=$1
-	if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
-	check_http="/opt/omd/versions/$CHECK_MK_VERSION/lib/nagios/plugins/check_http"
-	mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component
-
+	_env
+	shift
 	lock=/tmp/check_mk_lock
 	if [ -f "$lock" ]; then return; fi
 	touch $lock
 	# _dapi 1
-	_node_v1 1
-	_gateway_v1 1
+	_node_v1 $SITE_ROOT 1
+	_gateway_v1 $SITE_ROOT 1
 
 	#	_check_component 1
 	rm $lock

@@ -11,6 +11,9 @@ do
   rsync -avz ../../check_component/src/archive/base-endpoint.json "mbr-verify-$ZN:~/base-endpoint.json"
   rsync -avz ../config_check_component.json "mbr-verify-$ZN:~/config_check_component.json"
   rsync -avz ../config_fisherman.json "mbr-verify-$ZN:~/config_fisherman.json"
+  rsync -avz ../../scripts/benchmark/massbit.lua "mbr-verify-$ZN:~/massbit.lua"
+  rsync -avz ../../scripts/benchmark/wrk "mbr-verify-$ZN:~/wrk"
+  rsync -avz ../.env "mbr-verify-$ZN:~/.env"
 
   #Update run.sh later
 

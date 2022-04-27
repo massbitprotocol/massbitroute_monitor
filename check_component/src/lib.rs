@@ -2,6 +2,10 @@ pub mod check_module;
 pub mod server_builder;
 pub mod server_config;
 use lazy_static::lazy_static;
+use local_ip_address::local_ip;
+use std::net::IpAddr;
+
+use dotenv;
 use serde::Deserialize;
 use std::env;
 
@@ -34,6 +38,8 @@ lazy_static! {
         env::var("CHECK_COMPONENT_ENDPOINT").unwrap_or(String::from("0.0.0.0:3030"));
     pub static ref BASE_ENDPOINT_JSON: String = env::var("BASE_ENDPOINT_JSON").unwrap();
     pub static ref BENCHMARK_WRK_PATH: String = env::var("BENCHMARK_WRK_PATH").unwrap_or("./".to_string());
+    pub static ref PORTAL_AUTHORIZATION: String = env::var("PORTAL_AUTHORIZATION").expect("There is no env var PORTAL_AUTHORIZATION");
+    pub static ref LOCAL_IP: String = local_ip_address::local_ip().unwrap().to_string();
     // pub static ref CHECK_INTERVAL_MS: u64 = 3000;
     // pub static ref CHECK_TASK_LIST_NODE: Vec<String> = vec![
     //     "checking_chain_type".to_string(),

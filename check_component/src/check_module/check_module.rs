@@ -18,11 +18,12 @@ use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
-use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG};
+use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG, LOCAL_IP, PORTAL_AUTHORIZATION};
 use warp::{Rejection, Reply};
 
 use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
 use crate::check_module::check_module::ComponentType::Gateway;
+use crate::check_module::store_report::{ReporterRole, StoreReport};
 use strum_macros::EnumString;
 use wrap_wrk::{WrkBenchmark, WrkReport};
 
@@ -896,13 +897,14 @@ impl CheckComponent {
         })
     }
 
-    pub(crate) async fn get_components_status(
+    pub async fn get_report_component(
         &self,
-        component_info: ComponentInfo,
-    ) -> Result<impl Reply, Rejection> {
-        //-> HashMap<String, CheckMkStatus>
-        info!("component_info:{:?}", component_info);
-
+        component_info: &ComponentInfo,
+    ) -> Result<(CheckMkReport, WrkReport), Error> {
+        // Get logic report
+        let mut check_mk_report = CheckMkReport::default();
+        let mut wrk_report = WrkReport::default();
+        debug!("component_info:{:?}", component_info);
         let check_steps = self
             .get_check_steps(
                 &component_info.blockchain,
@@ -910,11 +912,9 @@ impl CheckComponent {
                 &CONFIG.check_task_list_all,
             )
             .unwrap_or_default();
-        info!("check_steps:{:?}", check_steps);
+        debug!("check_steps:{:?}", check_steps);
         if check_steps.is_empty() {
-            return Ok(warp::reply::json(&CheckMkReport::new_failed_report(
-                "check_steps is empty".to_string(),
-            )));
+            check_mk_report = CheckMkReport::new_failed_report("check_steps is empty".to_string())
         }
         let res_check_data = self.run_check_steps(check_steps, &component_info).await;
         info!("res:{:?}", res_check_data);
@@ -926,69 +926,76 @@ impl CheckComponent {
         };
 
         match res_check_data {
-            Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
-                format!("{:?}", err),
-            ))),
+            Err(err) => check_mk_report = CheckMkReport::new_failed_report(format!("{:?}", err)),
             Ok(res_check_data) => {
                 if res_check_data.success == true && res_check_data.status == 0 {
+                    // logic report is ok and not skip_benchmark run benchmark
                     let res_benchmark = match CONFIG.skip_benchmark {
-                        true => Ok(CheckMkReport {
+                        true => CheckMkReport {
                             status: 0,
                             service_name: "Skip benchmark".to_string(),
                             metric: Default::default(),
                             status_detail: "Skip benchmark".to_string(),
                             success: true,
-                        }),
+                        },
                         false => {
-                            self.run_benchmark(
+                            wrk_report = self
+                                .run_benchmark(response_time_threshold, &component_info)
+                                .await?;
+
+                            let res_benchmark = CheckMkReport::from_wrk_report(
+                                wrk_report.clone(),
                                 CONFIG.success_percent_threshold,
                                 response_time_threshold,
                                 CONFIG.accepted_low_latency_percent,
-                                &component_info,
-                            )
-                            .await
+                            );
+                            res_benchmark
                         }
                     };
 
-                    match res_benchmark {
-                        Ok(res_benchmark) => {
-                            let summary_res =
-                                CheckMkReport::combine_report(&res_check_data, &res_benchmark);
-                            Ok(warp::reply::json(&summary_res))
-                        }
-                        Err(err) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
-                            format!("{:?}", err),
-                        ))),
-                    }
+                    check_mk_report =
+                        CheckMkReport::combine_report(&res_check_data, &res_benchmark);
                 } else {
-                    Ok(warp::reply::json(&res_check_data))
+                    check_mk_report = res_check_data;
                 }
             }
         }
+        Ok((check_mk_report, wrk_report))
+    }
 
-        // match (res_check_data, res_benchmark) {
-        //     (Ok(res_check_data), Ok(res_benchmark)) => {
-        //         let summary_res = CheckMkReport::combine_report(&res_check_data, &res_benchmark);
-        //         Ok(warp::reply::json(&summary_res))
-        //     }
-        //     (Ok(res), Err(err)) | (Err(err), Ok(res)) => {
-        //         Ok(warp::reply::json(&CheckMkReport::new_failed_report(
-        //             format!("OK report:{:?} - Error: {:?}", res, err),
-        //         )))
-        //     }
-        //     (Err(err_l), Err(err_b)) => Ok(warp::reply::json(&CheckMkReport::new_failed_report(
-        //         format!("Logic error:{:?} \nBenchmark error{:?}", err_l, err_b),
-        //     ))),
-        // }
+    // Verification service
+    pub(crate) async fn get_components_status(
+        &self,
+        component: &ComponentInfo,
+    ) -> Result<impl Reply, Rejection> {
+        let res = self.get_report_component(component).await;
+        let (check_mk_report, wrk_report) = res.unwrap_or((
+            CheckMkReport::new_failed_report(format!(
+                "Cannot get component {:?} report",
+                component
+            )),
+            WrkReport::default(),
+        ));
+
+        // Store report to portal
+        let mut store_report = StoreReport::build(
+            &*LOCAL_IP,
+            ReporterRole::Verification,
+            &*PORTAL_AUTHORIZATION,
+            &self.domain,
+        );
+        store_report.set_report_data(&wrk_report, &check_mk_report, &component);
+        let res = store_report.send_data().await;
+        info!("Store report: {:?}", res.unwrap().text().await);
+
+        Ok(warp::reply::json(&check_mk_report))
     }
 
     pub async fn run_benchmark(
         &self,
-        success_percent_threshold: u32,
         response_time_threshold: f32,
-        accepted_low_latency_percent: f32,
         component: &ComponentInfo,
-    ) -> Result<CheckMkReport, anyhow::Error> {
+    ) -> Result<WrkReport, anyhow::Error> {
         let dapi_url = format!("https://{}", component.ip);
         let host = match component.component_type {
             ComponentType::Node => {
@@ -1013,66 +1020,46 @@ impl CheckComponent {
             BENCHMARK_WRK_PATH.clone().to_string(),
             response_time_threshold,
         );
-        let wrk_res = benchmark.run()?;
-        let benchmark_res = CheckMkReport::from_wrk_report(
-            wrk_res,
-            success_percent_threshold,
-            response_time_threshold,
-            accepted_low_latency_percent,
-        );
-        Ok(benchmark_res)
+        benchmark.run()
     }
 
     //Using in fisherman service
     pub async fn check_components(
         &self,
         tasks: &Vec<TaskType>,
-    ) -> Result<Vec<CheckMkReport>, anyhow::Error> {
-        info!("Check components");
+    ) -> Result<Vec<(ComponentInfo, CheckMkReport)>, anyhow::Error> {
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
         //header 'x-api-key: vnihqf14qk5km71aatvfr7c3djiej9l6mppd5k20uhs62p0b1cm79bfkmcubal9ug44e8cu2c74m29jpusokv6ft6r01o5bnv5v4gb8='
         // Check node
-        let nodes = &self.list_nodes;
-        let mut list_tasks = Vec::new();
-        for node in nodes {
-            let steps = self.get_check_steps(&node.blockchain, &"node".to_string(), &tasks);
-
-            match steps {
-                Ok(steps) => {
-                    //debug!("steps:{:#?}", steps);
-                    //info!("Do the check steps");
-                    list_tasks.push(self.run_check_steps(steps, node));
+        let mut components = Vec::new();
+        components.extend(self.list_nodes.clone());
+        components.extend(self.list_gateways.clone());
+        let mut reports = Vec::new();
+        for component in components {
+            match self.get_report_component(&component).await {
+                Ok((check_mk_report, wrk_report)) => {
+                    // Store report to portal
+                    let mut store_report = StoreReport::build(
+                        &*LOCAL_IP,
+                        ReporterRole::Fisherman,
+                        &*PORTAL_AUTHORIZATION,
+                        &self.domain,
+                    );
+                    store_report.set_report_data(&wrk_report, &check_mk_report, &component);
+                    let res = store_report.send_data().await;
+                    info!("Store report: {:?}", res.unwrap().text().await);
+                    // Store reports
+                    reports.push((component, check_mk_report));
                 }
-                Err(_err) => {
-                    debug!("There are no check steps");
+                Err(e) => {
+                    info!(
+                        "Cannot get report for component {:?}, error: {:?}",
+                        component, e
+                    );
                 }
-            };
+            }
         }
-
-        // Check Gateway
-        let gateways = &self.list_gateways;
-        for gateway in gateways {
-            let steps = self.get_check_steps(&gateway.blockchain, &"gateway".to_string(), &tasks);
-
-            match steps {
-                Ok(steps) => {
-                    //debug!("steps:{:#?}", steps);
-                    //info!("Do the check steps");
-                    list_tasks.push(self.run_check_steps(steps, gateway));
-                }
-                Err(_err) => {
-                    debug!("There are no check steps");
-                }
-            };
-        }
-
-        let responses = join_all(list_tasks).await;
-        let reports = responses
-            .into_iter()
-            .filter_map(|report| report.ok())
-            .collect();
-
         Ok(reports)
     }
 }

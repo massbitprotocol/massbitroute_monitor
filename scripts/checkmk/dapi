@@ -1,4 +1,6 @@
 #!/bin/bash
+SITE_ROOT=$1
+shift
 if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
 check_http="/opt/omd/versions/$CHECK_MK_VERSION/lib/nagios/plugins/check_http"
 mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component

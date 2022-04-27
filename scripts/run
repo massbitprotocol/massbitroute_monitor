@@ -52,20 +52,16 @@ cmd="$dir/cmd_server"
 nginx="$cmd nginx"
 service_dir=/massbit/massbitroute/app/src/sites/services
 
-sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
+sec="_username=automation&_secret=$CHECK_MK_AUTOMATION_SECRET"
 arg="request_format=python&output_format=json"
 host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 pip="pip install"
 _prepare() {
 	echo "Prepare"
 	cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
-	if [ ! -f "/usr/bin/python3" ]; then
-		apt install -y python3
-	fi
-	if [ ! -f "/usr/bin/pip" ]; then
-		apt install -y python3-pip
-	fi
 
+	apt update
+	apt install -y parallel python3 python3-pip
 	pip install --upgrade pip
 	pip install -r requirements.txt
 
@@ -210,22 +206,22 @@ _add_monitor_host() {
 _redis_monitor() {
 	/opt/omd/versions/2.0.0p18.cre/bin/redis-cli -s /omd/sites/mbr/tmp/run/redis $@
 }
-_add_core_monitors() {
-	_add_monitor_host mbr-stat-eu-1 34.88.224.156 mbr-stat
-	_add_monitor_host mbr-stat-eu-2 34.88.146.128 mbr-stat
+# _add_core_monitors() {
+# 	_add_monitor_host mbr-stat-eu-1 34.88.224.156 mbr-stat
+# 	_add_monitor_host mbr-stat-eu-2 34.88.146.128 mbr-stat
 
-	_add_monitor_host mbr-portal-as-1 34.126.181.168 mbr-portal
-	_add_monitor_host mbr-portal-as-2 34.126.176.201 mbr-portal
+# 	_add_monitor_host mbr-portal-as-1 34.126.181.168 mbr-portal
+# 	_add_monitor_host mbr-portal-as-2 34.126.176.201 mbr-portal
 
-	_add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
-	_add_monitor_host mbr-monitor-eu-2 34.88.133.22 mbr-monitor
+# 	_add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
+# 	_add_monitor_host mbr-monitor-eu-2 34.88.133.22 mbr-monitor
 
-	_add_monitor_host mbr-git-eu-1 34.88.161.189 mbr-git
-	_add_monitor_host mbr-git-eu-2 34.88.202.210 mbr-git
+# 	_add_monitor_host mbr-git-eu-1 34.88.161.189 mbr-git
+# 	_add_monitor_host mbr-git-eu-2 34.88.202.210 mbr-git
 
-	_add_monitor_host mbr-api-eu-1 34.88.231.165 mbr-api
-	_add_monitor_host mbr-api-as-1 34.87.189.191 mbr-api
-}
+# 	_add_monitor_host mbr-api-eu-1 34.88.231.165 mbr-api
+# 	_add_monitor_host mbr-api-as-1 34.87.189.191 mbr-api
+# }
 _refresh_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	su - mbr -c 'cmk -v -I;cmk -R'
@@ -239,19 +235,19 @@ _remove_hosts() {
 	tmp1=$(mktemp)
 	tmp2=$(mktemp)
 	_type=gateway
-	curl -sk https://dapi.massbit.io/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
 		_del_monitor_host $h
 	done
 	_type=node
-	curl -sk https://dapi.massbit.io/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
 		_del_monitor_host $h
 	done
 	# type=dapi
-	# curl -sk https://dapi.massbit.io/deploy/info/$type/listid | awk -v type=$type '{print type"-"$3"-"$4"-"$1}' | sort >$tmp1
+	# curl -sk https://$PORTAL_DOMAIN/deploy/info/$type/listid | awk -v type=$type '{print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	# su - mbr -c 'lq "GET services\nColumns: description\nFilter: host_name = mbr-monitor-eu-1"' | awk '/^dapi-/' | sort >$tmp2
 	# comm -23 $tmp2 $tmp1 | while read h; do
 	# 	$0 _del_monitor_host $h
@@ -261,7 +257,7 @@ _remove_hosts() {
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 _add_monitors() {
-	_add_core_monitors
+	# _add_core_monitors
 	token_file=$SITE_ROOT/scripts/tokens.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
@@ -273,7 +269,7 @@ _add_monitors() {
 	token_node=$(mktemp)
 	mk_reload=0
 
-	curl -sSfL https://dapi.massbit.io/deploy/info/gateway/listid -o ${tmp} >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
 			if [ -z "$id" ]; then continue; fi
@@ -291,7 +287,7 @@ _add_monitors() {
 	rm ${tmp}*
 
 	tmp=$(mktemp)
-	curl -sSfL https://dapi.massbit.io/deploy/info/node/listid -o ${tmp} >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 
 		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
@@ -323,14 +319,14 @@ _add_monitors() {
 _del_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp=$(mktemp)
-	curl -sSfL https://dapi.massbit.io/deploy/info/gateway/listid -o $tmp >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 		cat $tmp | while read id user_id block net ip; do
 			_del_monitor_host gateway-$block-$net-$id
 		done
 
 	fi
-	curl -sSfL https://dapi.massbit.io/deploy/info/node/listid -o $tmp >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 		cat $tmp | while read id user_id block net ip; do
 			_del_monitor_host node-$block-$net-$id

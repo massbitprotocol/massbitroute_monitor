@@ -11,5 +11,6 @@ omd create mbr
 # ln -sf /massbit/massbitroute/app/src/sites/services/monitor/etc/mkagent/agents/main.mk /opt/omd/sites/mbr/etc/check_mk/main.mk
 omd start mbr
 sed 's/Listen 80/Listen 8000/' -i /etc/apache2/ports.conf
+/etc/init.d/apache2 restart
 rsync -avz etc/check_mk/* /opt/omd/versions/2.0.0p17.cre/lib/python3/cmk/
 su - mbr -c 'htpasswd etc/htpasswd cmkadmin'

@@ -1,5 +1,4 @@
 #!/bin/bash
-
 if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
 check_http="/opt/omd/versions/$CHECK_MK_VERSION/lib/nagios/plugins/check_http"
 mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component
@@ -16,7 +15,7 @@ _check_component() {
 	fi
 
 	cd $(dirname $mbr_check_component)
-	RUST_LOG=debug RUST_LOG_TYPE=file ./mbr-check-component check-kind -n https://dapi.massbit.io/deploy/info/node/listid -g https://dapi.massbit.io/deploy/info/gateway/listid -d https://dapi.massbit.io/deploy/info/dapi/listid -u https://dapi.massbit.io/deploy/info/user/listid -b base-endpoint.json -o output.json -c check-flow.json >${output}.1
+	RUST_LOG=debug RUST_LOG_TYPE=file ./mbr-check-component check-kind -n https://$PORTAL_DOMAIN/deploy/info/node/listid -g https://$PORTAL_DOMAIN/deploy/info/gateway/listid -d https://$PORTAL_DOMAIN/deploy/info/dapi/listid -u https://$PORTAL_DOMAIN/deploy/info/user/listid -b base-endpoint.json -o output.json -c check-flow.json >${output}.1
 
 	mv ${output}.1 $output
 	cat $output
@@ -34,7 +33,7 @@ _dapi() {
 	fi
 
 	tmp=$(mktemp)
-	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/$type/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 		cat $tmp | while read id user_id block net hostname token status _remain; do
 			if [ $status -ne 1 ]; then continue; fi
@@ -83,7 +82,7 @@ _gateway_v1() {
 	fi
 
 	tmp=$(mktemp)
-	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/$type/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 
 		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
@@ -109,7 +108,7 @@ _gateway() {
 	fi
 
 	tmp=$(mktemp)
-	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/$type/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 
 		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
@@ -142,7 +141,7 @@ _node_v1() {
 	fi
 
 	tmp=$(mktemp)
-	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/$type/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 
 		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do
@@ -170,7 +169,7 @@ _node() {
 	fi
 
 	tmp=$(mktemp)
-	curl -sSfL https://dapi.massbit.io/deploy/info/$type/listid -o $tmp >/dev/null
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/$type/listid -o $tmp >/dev/null
 	if [ $? -eq 0 ]; then
 
 		cat $tmp | while read id user_id block net ip continent country token status approved _remain; do

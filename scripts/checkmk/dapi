@@ -1,9 +1,5 @@
 #!/bin/bash
-SITE_ROOT=$1
-shift
-if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
-check_http="/opt/omd/versions/$CHECK_MK_VERSION/lib/nagios/plugins/check_http"
-mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component
+
 _check_component() {
 	type=component
 	output=/tmp/check_mk_$type
@@ -190,6 +186,11 @@ _node() {
 	fi
 }
 _collect() {
+	SITE_ROOT=$1
+	if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
+	check_http="/opt/omd/versions/$CHECK_MK_VERSION/lib/nagios/plugins/check_http"
+	mbr_check_component=/massbit/massbitroute/app/src/sites/services/monitor/scripts/check_component/target/release/mbr-check-component
+
 	lock=/tmp/check_mk_lock
 	if [ -f "$lock" ]; then return; fi
 	touch $lock

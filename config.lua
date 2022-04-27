@@ -22,7 +22,7 @@ stdout_logfile=_SITE_ROOT_/../mkagent/logs/monitor_client.log
     },
     supervisor = [[
 [program:check_mk_dapi_collect]
-command=/bin/bash _SITE_ROOT_/scripts/checkmk/dapi _SITE_ROOT_ loop _collect
+command=/bin/bash _SITE_ROOT_/scripts/checkmk/dapi loop _collect _SITE_ROOT_
 autorestart=true
 redirect_stderr=true
 stopasgroup=true

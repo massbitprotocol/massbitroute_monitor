@@ -16,9 +16,11 @@ cd $SITE_ROOT
 mbr_root=/massbit/massbitroute/app
 service_dir=$mbr_root/src/sites/services
 
+export MBR_ENV=${MBR_ENV:-dev}
 export BRANCH=${BRANCH:-dev}
 export MBRAPP_BRANCH=${MBRAPP_BRANCH:-dev}
 export ASDF_BRANCH=${ASDF_BRANCH:-dev}
+export GBC_BRANCH=${GBC_BRANCH:-dev}
 export SSL_BRANCH=${SSL_BRANCH:-dev}
 export GWMAN_BRANCH=${GWMAN_BRANCH:-dev}
 export NODE_BRANCH=${NODE_BRANCH:-dev}
@@ -67,6 +69,7 @@ _prepare() {
 	pip install --upgrade pip
 	pip install -r requirements.txt
 
+	cd $SITE_ROOT
 	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db $SITE_ROOT/vars
 
 	# rm -rf $SITE_ROOT/tmp/*

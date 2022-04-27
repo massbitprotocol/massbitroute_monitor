@@ -23,7 +23,7 @@ use warp::{Rejection, Reply};
 
 use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
 use crate::check_module::check_module::ComponentType::Gateway;
-use crate::check_module::store_report::{ReporterRole, StoreReport};
+use crate::check_module::store_report::{ReporterRole, SendPurpose, StoreReport};
 use strum_macros::EnumString;
 use wrap_wrk::{WrkBenchmark, WrkReport};
 
@@ -963,34 +963,6 @@ impl CheckComponent {
         Ok((check_mk_report, wrk_report))
     }
 
-    // Verification service
-    pub(crate) async fn get_components_status(
-        &self,
-        component: &ComponentInfo,
-    ) -> Result<impl Reply, Rejection> {
-        let res = self.get_report_component(component).await;
-        let (check_mk_report, wrk_report) = res.unwrap_or((
-            CheckMkReport::new_failed_report(format!(
-                "Cannot get component {:?} report",
-                component
-            )),
-            WrkReport::default(),
-        ));
-
-        // Store report to portal
-        let mut store_report = StoreReport::build(
-            &*LOCAL_IP,
-            ReporterRole::Verification,
-            &*PORTAL_AUTHORIZATION,
-            &self.domain,
-        );
-        store_report.set_report_data(&wrk_report, &check_mk_report, &component);
-        let res = store_report.send_data().await;
-        info!("Store report: {:?}", res.unwrap().text().await);
-
-        Ok(warp::reply::json(&check_mk_report))
-    }
-
     pub async fn run_benchmark(
         &self,
         response_time_threshold: f32,
@@ -1047,7 +1019,7 @@ impl CheckComponent {
                         &self.domain,
                     );
                     store_report.set_report_data(&wrk_report, &check_mk_report, &component);
-                    let res = store_report.send_data().await;
+                    let res = store_report.send_data(SendPurpose::Store).await;
                     info!("Store report: {:?}", res.unwrap().text().await);
                     // Store reports
                     reports.push((component, check_mk_report));

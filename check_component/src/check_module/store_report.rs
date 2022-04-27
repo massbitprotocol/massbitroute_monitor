@@ -35,6 +35,11 @@ pub enum ReporterRole {
     Verification,
 }
 
+pub enum SendPurpose {
+    Verify,
+    Store,
+}
+
 impl Default for ReporterRole {
     fn default() -> Self {
         ReporterRole::Fisherman
@@ -88,22 +93,31 @@ impl StoreReport {
         Ok(serde_json::to_string(&self)?)
     }
 
-    fn get_url(&self) -> String {
-        let url = format!(
-            "https://portal.{}/mbr/benchmark/{}",
-            self.domain, self.provider_id
-        );
-        url
+    fn get_url(&self, send_purpose: SendPurpose) -> String {
+        match send_purpose {
+            SendPurpose::Verify => {
+                format!(
+                    "https://portal.{}/mbr/verify/{}",
+                    self.domain, self.provider_id
+                )
+            }
+            SendPurpose::Store => {
+                format!(
+                    "https://portal.{}/mbr/benchmark/{}",
+                    self.domain, self.provider_id
+                )
+            }
+        }
     }
 
-    pub async fn send_data(&self) -> Result<Response, Error> {
+    pub async fn send_data(&self, send_purpose: SendPurpose) -> Result<Response, Error> {
         let client_builder = reqwest::ClientBuilder::new();
         let client = client_builder.danger_accept_invalid_certs(true).build()?;
         // create body
         let body = self.create_body()?;
         debug!("body: {:?}", body);
         // get url
-        let url = self.get_url();
+        let url = self.get_url(send_purpose);
 
         let request_builder = client
             .post(url)

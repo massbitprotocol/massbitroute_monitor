@@ -27,12 +27,25 @@ pub struct StoreReport {
     pub provider_type: ComponentType,
     pub report_time: u128,
     pub status_detail: String,
+    pub report_type: ReportType,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ReporterRole {
     Fisherman,
     Verification,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ReportType {
+    ReportProvider,
+    Benchmark,
+}
+
+impl Default for ReportType {
+    fn default() -> Self {
+        ReportType::Benchmark
+    }
 }
 
 pub enum SendPurpose {
@@ -62,11 +75,18 @@ impl StoreReport {
         }
     }
 
+    pub fn set_report_type(&mut self, component: &ComponentInfo, report_type: ReportType) {
+        self.report_type = report_type;
+        self.provider_id = component.id.clone();
+        self.provider_type = component.component_type.clone();
+    }
+
     pub fn set_report_data(
         &mut self,
         wrk_report: &WrkReport,
         check_mk_report: &CheckMkReport,
         component: &ComponentInfo,
+        report_type: ReportType,
     ) {
         self.is_data_correct = check_mk_report.is_component_status_ok();
         self.non_2xx_3xx_req = wrk_report.non_2xx_3xx_req;
@@ -87,6 +107,7 @@ impl StoreReport {
         self.provider_id = component.id.clone();
         self.provider_type = component.component_type.clone();
         self.status_detail = check_mk_report.status_detail.clone();
+        self.report_type = report_type
     }
 
     fn create_body(&self) -> Result<String, Error> {
@@ -115,7 +136,7 @@ impl StoreReport {
         let client = client_builder.danger_accept_invalid_certs(true).build()?;
         // create body
         let body = self.create_body()?;
-        debug!("body: {:?}", body);
+        info!("body: {:?}", body);
         // get url
         let url = self.get_url(send_purpose);
 

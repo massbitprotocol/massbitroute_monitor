@@ -10,7 +10,9 @@ use std::thread;
 
 use log::{info, warn};
 use logger;
-use mbr_check_component::check_module::store_report::{ReporterRole, SendPurpose, StoreReport};
+use mbr_check_component::check_module::store_report::{
+    ReportType, ReporterRole, SendPurpose, StoreReport,
+};
 use mbr_check_component::server_builder::ServerBuilder;
 use mbr_check_component::server_config::AccessControl;
 use mbr_check_component::{CHECK_COMPONENT_ENDPOINT, LOCAL_IP, PORTAL_AUTHORIZATION};
@@ -105,7 +107,12 @@ async fn main() {
                                 &check_component.domain,
                             );
 
-                            store_report.set_report_data(&wrk_report, &check_mk_report, &component);
+                            store_report.set_report_data(
+                                &wrk_report,
+                                &check_mk_report,
+                                &component,
+                                ReportType::Benchmark,
+                            );
                             // Send report to verify
                             let res = store_report.send_data(SendPurpose::Verify).await;
                             match res {

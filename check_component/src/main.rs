@@ -8,7 +8,7 @@ use mbr_check_component::check_module::check_module::{
 use std::sync::Arc;
 use std::thread;
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use logger;
 use mbr_check_component::check_module::store_report::{
     ReportType, ReporterRole, SendPurpose, StoreReport,
@@ -17,7 +17,6 @@ use mbr_check_component::server_builder::ServerBuilder;
 use mbr_check_component::server_config::AccessControl;
 use mbr_check_component::{CHECK_COMPONENT_ENDPOINT, LOCAL_IP, PORTAL_AUTHORIZATION};
 use reqwest::Response;
-use slog::debug;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use wrap_wrk::WrkReport;
 

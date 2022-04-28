@@ -28,6 +28,14 @@ pub struct StoreReport {
     pub report_time: u128,
     pub status_detail: String,
     pub report_type: ReportType,
+
+    pub request_rate: f32,
+    pub transfer_rate: f32,
+    pub histogram_90: f32,
+    pub histogram_95: f32,
+    pub histogram_99: f32,
+    pub stdev_latency: f32,
+    pub max_latency: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -107,7 +115,15 @@ impl StoreReport {
         self.provider_id = component.id.clone();
         self.provider_type = component.component_type.clone();
         self.status_detail = check_mk_report.status_detail.clone();
-        self.report_type = report_type
+        self.report_type = report_type;
+
+        self.request_rate = wrk_report.req_per_sec;
+        self.transfer_rate = wrk_report.tran_per_sec.as_u64() as f32;
+        self.histogram_90 = wrk_report.histogram_90;
+        self.histogram_95 = wrk_report.histogram_95;
+        self.histogram_99 = wrk_report.histogram_99;
+        self.stdev_latency = wrk_report.latency.stdev.unwrap_or_default().as_millis() as f32;
+        self.max_latency = wrk_report.latency.max.unwrap_or_default().as_millis() as f32;
     }
 
     fn create_body(&self) -> Result<String, Error> {

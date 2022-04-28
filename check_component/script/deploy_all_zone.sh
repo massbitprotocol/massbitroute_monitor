@@ -1,7 +1,7 @@
 #!/bin/bash
 cargo build --release
 #ZONES=( 'as' 'eu' 'na' 'sa' 'af' 'oc' )
-ZONES=( 'as')
+ZONES=( 'as' 'eu' 'na' )
 
 for ZN in "${ZONES[@]}"
 do

@@ -23,9 +23,10 @@ use warp::{Rejection, Reply};
 
 use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
 use crate::check_module::check_module::ComponentType::Gateway;
-use crate::check_module::store_report::{ReporterRole, SendPurpose, StoreReport};
+use crate::check_module::store_report::ReportType::ReportProvider;
+use crate::check_module::store_report::{ReportType, ReporterRole, SendPurpose, StoreReport};
 use strum_macros::EnumString;
-use wrap_wrk::{WrkBenchmark, WrkReport};
+pub use wrap_wrk::{WrkBenchmark, WrkReport};
 
 type BlockChainType = String;
 type UrlType = String;
@@ -1018,7 +1019,12 @@ impl CheckComponent {
                         &*PORTAL_AUTHORIZATION,
                         &self.domain,
                     );
-                    store_report.set_report_data(&wrk_report, &check_mk_report, &component);
+                    store_report.set_report_data(
+                        &wrk_report,
+                        &check_mk_report,
+                        &component,
+                        ReportType::Benchmark,
+                    );
                     let res = store_report.send_data(SendPurpose::Store).await;
                     info!("Store report: {:?}", res.unwrap().text().await);
                     // Store reports

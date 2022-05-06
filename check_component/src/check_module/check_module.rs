@@ -482,6 +482,8 @@ impl CheckComponent {
             self.list_gateways
                 .retain(|component| component.zone == *filter_zone);
         }
+        info!("Reloaded list node: {:?}", self.list_nodes);
+        info!("Reloaded list gateway: {:?}", self.list_gateways);
         Ok(())
     }
 

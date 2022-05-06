@@ -1,5 +1,6 @@
 use crate::check_module::check_module::{CheckComponent, ComponentInfo};
 use crate::server_config::AccessControl;
+use std::collections::VecDeque;
 
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -8,8 +9,10 @@ use serde_json::Value;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
 use warp::http::{HeaderMap, Method};
 
+use warp::reply::Json;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 pub const MAX_JSON_BODY_SIZE: u64 = 1024 * 1024;
@@ -18,6 +21,7 @@ pub const MAX_JSON_BODY_SIZE: u64 = 1024 * 1024;
 pub struct ServerBuilder {
     entry_point: String,
 }
+
 pub struct CheckComponentServer {
     entry_point: String,
     pub check_component_service: Arc<CheckComponent>,
@@ -28,11 +32,16 @@ pub struct DeployParam {
     pub id: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SimpleResponse {
+    success: bool,
+}
+
 impl CheckComponentServer {
     pub fn builder() -> ServerBuilder {
         ServerBuilder::default()
     }
-    pub async fn serve(&self, access_control: AccessControl) {
+    pub async fn serve(&self, access_control: AccessControl, sender: Sender<ComponentInfo>) {
         let allow_headers: Vec<String> = access_control.get_access_control_allow_headers();
         info!("allow_headers: {:?}", allow_headers);
         let cors = warp::cors()
@@ -49,7 +58,8 @@ impl CheckComponentServer {
             ]);
         info!("cors: {:?}", cors);
         let router = self
-            .create_get_status(self.check_component_service.clone())
+            .create_get_status(self.check_component_service.clone(), sender)
+            .await
             .with(&cors)
             .or(self.create_ping().with(&cors))
             .recover(handle_rejection);
@@ -58,10 +68,12 @@ impl CheckComponentServer {
         warp::serve(router).run(socket_addr).await;
     }
     /// Get status of component
-    fn create_get_status(
+    async fn create_get_status(
         &self,
         service: Arc<CheckComponent>,
+        sender: Sender<ComponentInfo>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        let sender_clone = sender.clone();
         warp::path!("get_status")
             .and(CheckComponentServer::log_headers())
             .and(warp::post())
@@ -70,9 +82,11 @@ impl CheckComponentServer {
                 info!("#### Received request body ####");
                 info!("{}", body);
                 let component_info: ComponentInfo = serde_json::from_value(body).unwrap();
-                let component_info_clone = component_info.clone();
-                let clone_service = service.clone();
-                async move { clone_service.get_components_status(&component_info).await }
+                let sender_another_clone = sender_clone.clone();
+                async move {
+                    let res = sender_another_clone.send(component_info).await;
+                    Self::simple_response(true).await
+                }
             })
     }
 
@@ -82,11 +96,14 @@ impl CheckComponentServer {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("ping")
             .and(warp::get())
-            .and_then(move || async move { Self::ping().await })
+            .and_then(move || async move {
+                info!("Receive ping request");
+                Self::simple_response(true).await
+            })
     }
-    pub(crate) async fn ping() -> Result<impl Reply, Rejection> {
-        info!("Receive ping request.");
-        Ok(warp::reply::reply())
+    pub(crate) async fn simple_response(success: bool) -> Result<impl Reply, Rejection> {
+        let res = SimpleResponse { success };
+        Ok(warp::reply::json(&res))
     }
 
     fn log_headers() -> impl Filter<Extract = (), Error = Infallible> + Copy {

@@ -2,8 +2,12 @@ use crate::{CONFIG, ZONE};
 use anyhow::Error;
 use log::{debug, info};
 use mbr_check_component::check_module::check_module::{
-    CheckComponent, CheckMkReport, ComponentInfo, ComponentType,
+    CheckComponent, CheckMkReport, ComponentInfo, ComponentType, WrkReport,
 };
+use mbr_check_component::check_module::store_report::{
+    ReportType, ReporterRole, SendPurpose, StoreReport,
+};
+use mbr_check_component::{LOCAL_IP, PORTAL_AUTHORIZATION};
 use mbr_stats::chain_adapter::ChainAdapter;
 use parity_scale_codec::Encode;
 use sp_keyring::AccountKeyring;
@@ -269,16 +273,30 @@ impl FishermanService {
                                 &component_info,
                             )
                         {
+                            // Store report to portal db
+                            let mut store_report = StoreReport::build(
+                                &*LOCAL_IP,
+                                ReporterRole::Fisherman,
+                                &*PORTAL_AUTHORIZATION,
+                                &self.check_component_service.domain,
+                            );
+                            store_report
+                                .set_report_type(&component_info, ReportType::ReportProvider);
+                            let res = store_report.send_data(SendPurpose::Store).await;
+                            info!("Store report: {:?}", res.unwrap().text().await);
+                            // End Store report to portal db
+
                             info!("Submit report: {:?}", component_info);
                             let provider_id: [u8; 36] =
                                 component_info.id.as_bytes().try_into().unwrap();
                             info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
 
-                            // Submit report
+                            // Submit report to chain
                             if let Err(e) = self
                                 .chain_adapter
                                 .submit_provider_report(provider_id, reason)
                                 .and_then(|_| {
+                                    // Remove component in list
                                     match component_info.component_type {
                                         ComponentType::Node => {
                                             self.check_component_service.list_nodes.retain(

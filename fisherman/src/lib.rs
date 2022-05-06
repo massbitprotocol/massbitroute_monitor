@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use mbr_check_component::check_module::check_module::Zone;
 use serde::Deserialize;
 use std::env;
-
+use std::str::FromStr;
 pub mod fisherman_service;
 
 #[derive(Deserialize, Debug)]
@@ -29,10 +29,10 @@ const CONFIG_FILE: &str = "config_fisherman.json";
 lazy_static! {
     pub static ref FISHERMAN_ENDPOINT: String =
         env::var("FISHERMAN_ENDPOINT").unwrap_or(String::from("0.0.0.0:4040"));
-    pub static ref ZONE: Zone =
-        env::var("ZONE").unwrap_or(String::from("GB")).to_uppercase().parse().unwrap_or_default();
-    // pub static ref CHECK_TASK_LIST_FISHERMAN: Vec<String> =
-    //     vec!["checking_chain_type".to_string(),];
+    pub static ref ZONE: Zone = {
+        let zone = &env::var("ZONE").unwrap().to_uppercase();
+        Zone::from_str(zone.as_str()).unwrap()
+    };
     pub static ref CONFIG: Config = get_config();
 }
 

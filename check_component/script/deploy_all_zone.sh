@@ -1,7 +1,7 @@
 #!/bin/bash
 cargo build --release
 #ZONES=( 'as' 'eu' 'na' 'sa' 'af' 'oc' )
-ZONES=( 'as')
+ZONES=( 'as' 'eu' 'na' )
 
 for ZN in "${ZONES[@]}"
 do
@@ -14,11 +14,10 @@ do
   rsync -avz ../../scripts/benchmark/wrk "mbr-verify-$ZN:~/wrk"
   rsync -avz ../.env "mbr-verify-$ZN:~/.env"
 
-#  echo "Update run script"
-#  rsync -avz run.sh "mbr-verify-$ZN:/opt/verification/run.sh"
   cat run.tpl | sed "s/\[\[ZONE\]\]/$ZN/g" > _run_$ZN.sh
   rsync -avz _run_$ZN.sh "mbr-verify-$ZN:~/run.sh"
   rm _run_$ZN.sh
+
   echo "Restart service"
   ssh "mbr-verify-$ZN" < restart_verify_service.sh
 done

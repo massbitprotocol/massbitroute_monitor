@@ -18,14 +18,15 @@ use reqwest::RequestBuilder;
 use std::time::Instant;
 use std::{thread, usize};
 
-use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG, LOCAL_IP, PORTAL_AUTHORIZATION};
-use warp::{Rejection, Reply};
-
 use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
 use crate::check_module::check_module::ComponentType::Gateway;
-use crate::check_module::store_report::{ReporterRole, StoreReport};
+use crate::check_module::store_report::ReportType::ReportProvider;
+use crate::check_module::store_report::{ReportType, ReporterRole, SendPurpose, StoreReport};
+use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG, LOCAL_IP, PORTAL_AUTHORIZATION};
+use std::str::FromStr;
 use strum_macros::EnumString;
-use wrap_wrk::{WrkBenchmark, WrkReport};
+use warp::{Rejection, Reply};
+pub use wrap_wrk::{WrkBenchmark, WrkReport};
 
 type BlockChainType = String;
 type UrlType = String;
@@ -33,7 +34,7 @@ type TaskType = String;
 type StepResult = HashMap<String, String>;
 type ComponentId = String;
 
-#[derive(Debug, PartialEq, Clone, Deserialize, Serialize, Hash, Eq, EnumString)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize, Hash, Eq)]
 pub enum Zone {
     // Asia
     AS,
@@ -49,6 +50,23 @@ pub enum Zone {
     OC,
     // Global
     GB,
+}
+
+impl FromStr for Zone {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Zone, Self::Err> {
+        match input {
+            "AS" => Ok(Zone::AS),
+            "EU" => Ok(Zone::EU),
+            "NA" => Ok(Zone::NA),
+            "SA" => Ok(Zone::SA),
+            "AS" => Ok(Zone::AF),
+            "NA" => Ok(Zone::OC),
+            "SA" => Ok(Zone::GB),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Default for Zone {
@@ -455,7 +473,9 @@ impl CheckComponent {
             self.list_gateways
                 .retain(|component| &component.status == status);
         }
-        //Filter zones
+
+        //Filter zone
+        info!("Zone:{:?}", filter_zone);
         if *filter_zone != Zone::GB {
             self.list_nodes
                 .retain(|component| component.zone == *filter_zone);
@@ -963,34 +983,6 @@ impl CheckComponent {
         Ok((check_mk_report, wrk_report))
     }
 
-    // Verification service
-    pub(crate) async fn get_components_status(
-        &self,
-        component: &ComponentInfo,
-    ) -> Result<impl Reply, Rejection> {
-        let res = self.get_report_component(component).await;
-        let (check_mk_report, wrk_report) = res.unwrap_or((
-            CheckMkReport::new_failed_report(format!(
-                "Cannot get component {:?} report",
-                component
-            )),
-            WrkReport::default(),
-        ));
-
-        // Store report to portal
-        let mut store_report = StoreReport::build(
-            &*LOCAL_IP,
-            ReporterRole::Verification,
-            &*PORTAL_AUTHORIZATION,
-            &self.domain,
-        );
-        store_report.set_report_data(&wrk_report, &check_mk_report, &component);
-        let res = store_report.send_data().await;
-        info!("Store report: {:?}", res.unwrap().text().await);
-
-        Ok(warp::reply::json(&check_mk_report))
-    }
-
     pub async fn run_benchmark(
         &self,
         response_time_threshold: f32,
@@ -1046,8 +1038,13 @@ impl CheckComponent {
                         &*PORTAL_AUTHORIZATION,
                         &self.domain,
                     );
-                    store_report.set_report_data(&wrk_report, &check_mk_report, &component);
-                    let res = store_report.send_data().await;
+                    store_report.set_report_data(
+                        &wrk_report,
+                        &check_mk_report,
+                        &component,
+                        ReportType::Benchmark,
+                    );
+                    let res = store_report.send_data(SendPurpose::Store).await;
                     info!("Store report: {:?}", res.unwrap().text().await);
                     // Store reports
                     reports.push((component, check_mk_report));

@@ -360,20 +360,22 @@ impl StatsBuilder {
         self.inner.mvp_url = path.clone();
         // RPSee client for subscribe new block
         let client = WsClientBuilder::default().build(&path).await;
-        info!("chain client: {:?}", client);
+        info!("Massbit chain path: {}, chain client: {:?}",path, client,);
 
         // substrate_api_client for send extrinsic and subscribe event
         //let (signer,seed) = Pair::from_phrase(self.inner.signer_phrase.as_str(),None).expect("Wrong signer-phrase");
         // Fixme: find Ferdie Pair from phrase
         let signer = AccountKeyring::Ferdie.pair();
-
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
+
+        let api = Api::new(ws_client.clone())
+            .map(|api| api.set_signer(signer))
+            .ok();
+        info!("api is none:{:?}",api.is_none());
         let chain_adapter = ChainAdapter {
             json_rpc_client: client.ok(),
             ws_rpc_client: Some(ws_client.clone()),
-            api: Api::new(ws_client.clone())
-                .map(|api| api.set_signer(signer))
-                .ok(),
+            api,
         };
         self.inner.chain_adapter = Arc::new(chain_adapter);
         self

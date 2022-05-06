@@ -1,12 +1,24 @@
+use anyhow::Error;
 use clap::{App, Arg};
+use futures_util::future::join;
 use logger::core::init_logger;
-use mbr_check_component::check_module::check_module::CheckComponent;
+use mbr_check_component::check_module::check_module::{
+    CheckComponent, CheckMkReport, ComponentInfo,
+};
+use std::sync::Arc;
+use std::thread;
 
-use log::info;
+use log::{debug, info, warn};
 use logger;
+use mbr_check_component::check_module::store_report::{
+    ReportType, ReporterRole, SendPurpose, StoreReport,
+};
 use mbr_check_component::server_builder::ServerBuilder;
 use mbr_check_component::server_config::AccessControl;
-use mbr_check_component::CHECK_COMPONENT_ENDPOINT;
+use mbr_check_component::{CHECK_COMPONENT_ENDPOINT, LOCAL_IP, PORTAL_AUTHORIZATION};
+use reqwest::Response;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
+use wrap_wrk::WrkReport;
 
 #[tokio::main]
 async fn main() {
@@ -62,10 +74,63 @@ async fn main() {
             .with_output_file(output.to_string())
             .build();
         log::debug!("check_component: {:?}", check_component);
+        // Create job queue
+        let (sender, mut receiver): (Sender<ComponentInfo>, Receiver<ComponentInfo>) =
+            channel(1024);
+
         let socket_addr = CHECK_COMPONENT_ENDPOINT.as_str();
+
         let server = ServerBuilder::default()
             .with_entry_point(socket_addr)
             .build(check_component);
+
+        let check_component = server.check_component_service.clone();
+
+        // Run thread verify
+        let task_job = tokio::spawn(async move {
+            info!("spawn thread!");
+            // Process each socket concurrently.
+            loop {
+                let component = receiver.recv().await;
+
+                if let Some(component) = component {
+                    info!("Verify component:{:?}", component);
+                    let res = check_component.get_report_component(&component).await;
+                    match res {
+                        Ok((check_mk_report, wrk_report)) => {
+                            // Send to store
+                            let mut store_report = StoreReport::build(
+                                &*LOCAL_IP,
+                                ReporterRole::Verification,
+                                &*PORTAL_AUTHORIZATION,
+                                &check_component.domain,
+                            );
+
+                            store_report.set_report_data(
+                                &wrk_report,
+                                &check_mk_report,
+                                &component,
+                                ReportType::Benchmark,
+                            );
+                            // Send report to verify
+                            let res = store_report.send_data(SendPurpose::Verify).await;
+                            match res {
+                                Ok(res) => {
+                                    info!("Send verify res: {:?}", res.text().await);
+                                }
+                                Err(err) => {
+                                    info!("Send verify error: {}", err);
+                                }
+                            }
+                        }
+                        Err(err) => {}
+                    }
+                } else {
+                    info!("RError:{:?}", component);
+                }
+            }
+            warn!("Job queue is dead!");
+        });
 
         let access_control = AccessControl::default();
 
@@ -76,7 +141,8 @@ async fn main() {
         //     .await;
 
         info!("Run service ");
-        server.serve(access_control).await;
+        let task_serve = server.serve(access_control, sender);
+        join(task_job, task_serve).await;
     }
 }
 fn create_check_component() -> App<'static> {

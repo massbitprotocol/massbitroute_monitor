@@ -347,7 +347,8 @@ _update_repos() {
 }
 
 _add_hosts() {
-	cat /etc/hosts >/tmp/hosts
+	sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
+	cat /etc/hosts.bk >/tmp/hosts
 	curl -s https://dapi.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
 	if [ -f "/tmp/hosts.1" ]; then
 		cat /tmp/hosts.1 >>/tmp/hosts

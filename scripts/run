@@ -184,11 +184,12 @@ _add_monitor_host() {
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="add_host"
 		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
-		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
-		if [ $st -ne 0 ]; then
-			sleep 1
-			st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
-		fi
+		echo curl -sSfL "$host&action=$action" -d $host_info
+		# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		# if [ $st -ne 0 ]; then
+		# 	sleep 1
+		# 	st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		# fi
 
 		touch /tmp/$hostname
 		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
@@ -199,11 +200,12 @@ _add_monitor_host() {
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="discover_services"
 		host_info='request={"hostname":"'$hostname'"}'
-		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
-		if [ $st -ne 0 ]; then
-			sleep 1
-			st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
-		fi
+		echo curl -sSfL "$host&action=$action" -d $host_info
+		# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		# if [ $st -ne 0 ]; then
+		# 	sleep 1
+		# 	st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		# fi
 		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
@@ -283,7 +285,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=gateway-$block-$net-$id
-			echo $0 _add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
+			_add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -302,7 +304,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=node-$block-$net-$id
-			echo $0 _add_monitor_host $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
+			_add_monitor_host $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1

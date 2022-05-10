@@ -179,6 +179,7 @@ _add_monitor_host() {
 	disc=$4
 	if [ -z "$disc" ]; then disc=0; fi
 
+	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	if [ ! -f "/tmp/$hostname" ]; then
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="add_host"
@@ -205,6 +206,7 @@ _add_monitor_host() {
 		fi
 		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
+	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 }
 
@@ -281,7 +283,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=gateway-$block-$net-$id
-			echo $0 _add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1
+			echo $0 _add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -300,7 +302,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=node-$block-$net-$id
-			echo $0 _add_monitor_host $_hostname $ip mbr-node-$block-$net 1
+			echo $0 _add_monitor_host $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -317,9 +319,11 @@ _add_monitors() {
 
 	rm ${tmp}*
 
-	#_monitor_activate
-
-	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	echo $0 _monitor_activate 1 >>${tmp}.run
+	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	cat ${tmp}.run | parallel -j$n
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 _del_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'

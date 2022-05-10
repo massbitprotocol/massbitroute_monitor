@@ -43,3 +43,38 @@ fn main() {
 
     //assert!(output.status.success());
 }
+
+#[test]
+fn run_dapi() {
+    let _res = init_logger(&String::from("CheckComponent"));
+    //println!("Log output: {}", res); // Print log output type
+
+    let thread = 20;
+    let connection = 20;
+    let duration = "15s";
+    let rate = 10;
+    // let dapi_url = "http://34.101.81.225:8545";
+    let dapi_url = "https://3751598a-e19f-43dd-89d6-de7e11962c21.eth-mainnet.massbitroute.dev/ChlnfnlnywZgHnwD92GNPg";
+    let token = "";
+    let host = "";
+    let script = "../scripts/benchmark/dapi.lua";
+    let wrk_path = "../scripts/benchmark/wrk";
+    let wrk_dir = "./";
+    let latency_threshold_ms = 500f32;
+    let mut wrk = WrkBenchmark::build(
+        thread,
+        connection,
+        duration.to_string(),
+        rate,
+        dapi_url.to_string(),
+        token.to_string(),
+        host.to_string(),
+        script.to_string(),
+        wrk_path.to_string(),
+        wrk_dir.to_string(),
+        latency_threshold_ms,
+    );
+    let report = wrk.run();
+
+    info!("report: {:?}", report)
+}

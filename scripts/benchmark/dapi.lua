@@ -11,17 +11,9 @@ end
 
 function request()
     local body =
-        '{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["0xde83cb", false]}'
+        '{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_blockNumber", "params": []}'
     local headers = {}
     headers["Content-Type"] = "application/json"
-    local token = wrk.thread:get("token")
-    local host = wrk.thread:get("host")
-    if token then
-        headers["X-Api-Key"] = token
-    end
-    if host then
-        headers["Host"] = host
-    end
 
     return wrk.format("POST", "/", headers, body)
 end

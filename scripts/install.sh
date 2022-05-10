@@ -1,9 +1,9 @@
 #!/bin/bash
 dir=/massbit/massbitroute/app/src/sites/services/monitor
 cd $dir
-wget https://download.checkmk.com/checkmk/2.0.0p17/check-mk-raw-2.0.0p17_0.focal_amd64.deb
+curl -kL https://download.checkmk.com/checkmk/2.0.0p17/check-mk-raw-2.0.0p17_0.focal_amd64.deb -o check-mk-raw-2.0.0p17_0.focal_amd64.deb
 dpkg -i check-mk-raw-2.0.0p17_0.focal_amd64.deb
-apt install -f
+apt-get install -f
 omd create mbr
 
 # mkdir -p etc/mkagent

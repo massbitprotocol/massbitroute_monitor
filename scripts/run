@@ -180,6 +180,7 @@ _add_monitor_host() {
 	if [ -z "$disc" ]; then disc=0; fi
 
 	if [ ! -f "/tmp/$hostname" ]; then
+		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="add_host"
 		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
 		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
@@ -189,9 +190,12 @@ _add_monitor_host() {
 		fi
 
 		touch /tmp/$hostname
+		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+
 	fi
 
 	if [ $disc -eq 1 ]; then
+		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="discover_services"
 		host_info='request={"hostname":"'$hostname'"}'
 		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
@@ -199,10 +203,11 @@ _add_monitor_host() {
 			sleep 1
 			st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 		fi
-
+		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 
 }
+
 _redis_monitor() {
 	/opt/omd/versions/2.0.0p18.cre/bin/redis-cli -s /omd/sites/mbr/tmp/run/redis $@
 }
@@ -263,7 +268,7 @@ _add_monitors() {
 
 	token_core_file=$SITE_ROOT/scripts/tokens_core.txt
 	cp $token_core_file ${token_file}.tmp
-	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp=$(mktemp)
 	token_gw=$(mktemp)
 	token_node=$(mktemp)
@@ -314,7 +319,7 @@ _add_monitors() {
 
 	_monitor_activate
 
-	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 _del_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
@@ -346,7 +351,7 @@ _update_repos() {
 	return $_st_repo
 }
 
-_add_hosts() {
+_add_host_file() {
 	if [ ! -f "/etc/hosts.bk" ]; then
 		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
 	fi
@@ -364,7 +369,7 @@ _update() {
 	_update_repos
 	_st_update=$?
 
-	_add_hosts
+	_add_host_file
 	return $_st_update
 }
 

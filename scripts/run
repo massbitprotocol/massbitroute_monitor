@@ -320,13 +320,13 @@ _add_monitors() {
 		bash $SITE_ROOT/scripts/server.sh _kill
 	fi
 
-	echo $0 _monitor_activate 1 >>${tmp}.run
 	cat ${tmp}.run
 	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
 
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	cat ${tmp}.run | parallel -j$(nproc)
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	_monitor_activate 1
 	rm ${tmp}*
 
 }

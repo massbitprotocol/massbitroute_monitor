@@ -15,12 +15,9 @@ async fn main() {
         .get_matches();
     if let Some(ref matches) = matches.subcommand_matches("update-stats") {
         let config_data = matches.value_of("config-data").unwrap_or("");
-        let prometheus_gateway_url = matches
+        let prometheus_url = matches
             .value_of("prometheus-gateway-url")
-            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_gw");
-        let prometheus_node_url = matches
-            .value_of("prometheus-node-url")
-            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_node");
+            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_");
         let mvp_url = matches
             .value_of("mvp-url")
             .unwrap_or("wss://dev.verification.massbit.io");
@@ -34,9 +31,7 @@ async fn main() {
         let mut component_stats = ComponentStats::builder()
             .with_config_uri(config_data.to_string())
             .await
-            .with_prometheus_gateway_url(prometheus_gateway_url.to_string())
-            .await
-            .with_prometheus_node_url(prometheus_node_url.to_string())
+            .with_prometheus_url(prometheus_url.to_string())
             .await
             .with_signer_phrase(signer_phrase.to_string())
             .with_mvp_url(mvp_url.to_string())

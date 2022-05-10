@@ -184,7 +184,7 @@ _add_monitor_host() {
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="add_host"
 		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
-		echo curl -sSfL "$host&action=$action" -d $host_info
+		echo "curl -sSfL \'$host&action=$action\' -d \'$host_info\'"
 		# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 		# if [ $st -ne 0 ]; then
 		# 	sleep 1
@@ -200,7 +200,7 @@ _add_monitor_host() {
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="discover_services"
 		host_info='request={"hostname":"'$hostname'"}'
-		echo curl -sSfL "$host&action=$action" -d $host_info
+		echo "curl -sSfL \'$host&action=$action\' -d \'$host_info\'"
 		# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 		# if [ $st -ne 0 ]; then
 		# 	sleep 1

@@ -270,8 +270,8 @@ _add_monitors() {
 	cp $token_core_file ${token_file}.tmp
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp=$(mktemp)
-	token_gw=$(mktemp)
-	token_node=$(mktemp)
+	# token_gw=$(mktemp)
+	# token_node=$(mktemp)
 	mk_reload=0
 
 	curl -sSfL https://api.$DOMAIN/deploy/info/gateway/listid -o ${tmp} >/dev/null

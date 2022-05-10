@@ -2,9 +2,7 @@ use std::collections::hash_map::Entry;
 use std::fmt::Formatter;
 // Massbit chain
 use codec::Decode;
-use jsonrpsee::core::client::{
-    Client as JsonRpcClient,
-};
+use jsonrpsee::core::client::Client as JsonRpcClient;
 
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -16,7 +14,9 @@ use std::fmt::Debug;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use substrate_api_client::rpc::WsRpcClient;
-use substrate_api_client::{compose_extrinsic, AccountId, Api, UncheckedExtrinsicV4, XtStatus};
+use substrate_api_client::{
+    compose_extrinsic, AccountId, Api, ApiResult, UncheckedExtrinsicV4, XtStatus,
+};
 use tokio::sync::RwLock;
 
 pub const MVP_EXTRINSIC_DAPI: &str = "Dapi";
@@ -112,6 +112,7 @@ impl ChainAdapter {
             let lock_projects_quota = projects_quota.read().await;
             projects_quota_clone = lock_projects_quota.0.clone();
         }
+
         for (project_id, request_number) in projects_request {
             if let Some(project_quota) = projects_quota_clone.get(&project_id) {
                 let quota = project_quota.quota.parse::<usize>()?;
@@ -137,33 +138,40 @@ impl ChainAdapter {
         let api = self.api.as_ref().unwrap();
         api.subscribe_events(events_in).unwrap();
         loop {
-            let event: ProjectRegisteredEventArgs = api
-                .wait_for_event(
-                    MVP_EXTRINSIC_DAPI,
-                    MVP_EVENT_PROJECT_REGISTERED,
-                    None,
-                    &events_out,
-                )
-                .unwrap();
-            info!("Got event: {:?}", event);
-            {
-                let mut projects_lock = projects.write().await;
-                match projects_lock.0.entry(event.project_id_to_string()) {
-                    Entry::Occupied(o) => {
-                        let project = o.into_mut();
-                        project.quota = event.quota.to_string();
+            let event: ApiResult<ProjectRegisteredEventArgs> = api.wait_for_event(
+                MVP_EXTRINSIC_DAPI,
+                MVP_EVENT_PROJECT_REGISTERED,
+                None,
+                &events_out,
+            );
+
+            match event {
+                Ok(event) => {
+                    info!("Got event: {:?}", event);
+                    {
+                        let mut projects_lock = projects.write().await;
+                        match projects_lock.0.entry(event.project_id_to_string()) {
+                            Entry::Occupied(o) => {
+                                let project = o.into_mut();
+                                project.quota = event.quota.to_string();
+                            }
+                            Entry::Vacant(v) => {
+                                let (blockchain, network) = event.get_blockchain_and_network();
+                                v.insert(Project {
+                                    blockchain,
+                                    network,
+                                    quota: event.quota.to_string(),
+                                    status: "staked".to_string(),
+                                });
+                            }
+                        };
+                        info!("projects quota update by event: {:?}", projects_lock);
                     }
-                    Entry::Vacant(v) => {
-                        let (blockchain, network) = event.get_blockchain_and_network();
-                        v.insert(Project {
-                            blockchain,
-                            network,
-                            quota: event.quota.to_string(),
-                            status: "staked".to_string(),
-                        });
-                    }
-                };
-                info!("projects quota update by event: {:?}", projects_lock);
+                }
+                Err(err) => {
+                    info!("wait_for_event error:{:?}", err);
+                    continue;
+                }
             }
         }
     }

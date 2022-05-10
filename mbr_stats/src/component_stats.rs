@@ -22,13 +22,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Api;
 
+use crate::SIGNER_DERIVE;
 use anyhow::Error;
+use sp_core::sr25519::Pair;
+use sp_core::Pair as PairTrait;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use tokio::sync::RwLock;
 use tokio::task;
 use tokio::time::{sleep, Duration};
+
 type TimeStamp = i64;
 
 const NUMBER_BLOCK_FOR_COUNTING: isize = 2;
@@ -396,14 +400,19 @@ impl StatsBuilder {
         let client = WsClientBuilder::default().build(&path).await;
         info!("Massbit chain path: {}, chain client: {:?}", path, client,);
 
-        // substrate_api_client for send extrinsic and subscribe event
-        //let (signer,seed) = Pair::from_phrase(self.inner.signer_phrase.as_str(),None).expect("Wrong signer-phrase");
-        // Fixme: find Ferdie Pair from phrase
-        let signer = AccountKeyring::Ferdie.pair();
+        let (derive_signer, _) =
+            Pair::from_string_with_seed(self.inner.signer_phrase.as_str(), None).unwrap();
+
+        // let signer = AccountKeyring::Ferdie.pair();
+        // info!(
+        //     "Derive signer: {}\nTest signer:{}",
+        //     derive_signer.public(),
+        //     signer.public()
+        // );
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
 
         let api = Api::new(ws_client.clone())
-            .map(|api| api.set_signer(signer))
+            .map(|api| api.set_signer(derive_signer))
             .ok();
         info!("api is none:{:?}", api.is_none());
         let chain_adapter = ChainAdapter {

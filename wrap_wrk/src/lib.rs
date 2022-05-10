@@ -187,7 +187,7 @@ impl WrkBenchmark {
         let re = Regex::new(
             r"Value   Percentile   TotalCount 1/\(1-Percentile\)\s+(?P<table>[\d.\sinf]+)#",
         )?;
-        let caps = re.captures(text).unwrap();
+        let caps = re.captures(text)?;
         let table = caps.name("table").unwrap().as_str();
         //info!("table:{}", table);
 

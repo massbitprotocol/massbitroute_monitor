@@ -61,7 +61,7 @@ _prepare() {
 	cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
 
 	apt update
-	apt install -y parallel python3 python3-pip
+	apt install -y parallel python3 python3-pip parallel
 	pip install --upgrade pip
 	pip install -r requirements.txt
 

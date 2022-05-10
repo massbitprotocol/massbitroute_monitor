@@ -180,7 +180,7 @@ _add_monitor_host() {
 	if [ -z "$disc" ]; then disc=0; fi
 
 	if [ ! -f "/tmp/$hostname" ]; then
-		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="add_host"
 		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
 		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
@@ -190,12 +190,12 @@ _add_monitor_host() {
 		fi
 
 		touch /tmp/$hostname
-		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 	fi
 
 	if [ $disc -eq 1 ]; then
-		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="discover_services"
 		host_info='request={"hostname":"'$hostname'"}'
 		st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
@@ -203,7 +203,7 @@ _add_monitor_host() {
 			sleep 1
 			st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 		fi
-		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 
 }
@@ -281,7 +281,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=gateway-$block-$net-$id
-			_add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1
+			echo $0_add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -300,7 +300,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=node-$block-$net-$id
-			_add_monitor_host $_hostname $ip mbr-node-$block-$net 1
+			echo $0 _add_monitor_host $_hostname $ip mbr-node-$block-$net 1
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -356,7 +356,7 @@ _add_host_file() {
 		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
 	fi
 	cat /etc/hosts.bk >/tmp/hosts
-	curl -s https://dapi.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
+	curl -s https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
 	if [ -f "/tmp/hosts.1" ]; then
 		cat /tmp/hosts.1 >>/tmp/hosts
 		cat /tmp/hosts >/etc/hosts

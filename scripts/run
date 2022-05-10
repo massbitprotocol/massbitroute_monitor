@@ -321,7 +321,7 @@ _add_monitors() {
 	fi
 
 	cat ${tmp}.run
-	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
+	#	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
 
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	cat ${tmp}.run | parallel -j$(nproc)

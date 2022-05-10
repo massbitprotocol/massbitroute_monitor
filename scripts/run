@@ -317,13 +317,15 @@ _add_monitors() {
 		bash $SITE_ROOT/scripts/server.sh _kill
 	fi
 
-	rm ${tmp}*
-
 	echo $0 _monitor_activate 1 >>${tmp}.run
+	cat ${tmp}.run
 	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
+
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	cat ${tmp}.run | parallel -j$n
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	rm ${tmp}*
+
 }
 _del_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'

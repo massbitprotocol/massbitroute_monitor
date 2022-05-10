@@ -285,7 +285,7 @@ _add_monitors() {
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
-			sleep 1
+			# sleep 1
 		done
 
 	fi
@@ -304,7 +304,7 @@ _add_monitors() {
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
-			sleep 1
+			# sleep 1
 		done
 
 	fi

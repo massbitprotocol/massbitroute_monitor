@@ -29,6 +29,6 @@ if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
 # $pip --upgrade pip
 # $pip -r requirements.txt
 
-echo "python3 $dir/server.py \
-python3 $dir/server_node_eth_mainnet.py \
-python3 $dir/server_gw_eth_mainnet.py" | parallel -j3
+for f in $dir/server.py $dir/server_node_eth_mainnet.py $dir/server_gw_eth_mainnet.py; do
+	echo python3 $f
+done | parallel -j3

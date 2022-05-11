@@ -297,7 +297,7 @@ _add_monitors() {
 	# token_gw=$(mktemp)
 	# token_node=$(mktemp)
 	mk_reload=0
-	_site=gateway_${_block}_${_net}
+	_site=gw_${_block}_${_net}
 	curl -sSfL https://api.$DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		echo >>${tmp}
@@ -410,7 +410,7 @@ _update() {
 
 _discover_host() {
 	#	_remove_hosts
-	_add_monitors
+	_add_monitors eth mainnet
 }
 _monitor() {
 

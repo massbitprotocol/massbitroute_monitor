@@ -279,9 +279,9 @@ _create_site() {
 _run_me() {
 	_site=$1
 	_f=$2
-	su - mbr -c "touch /omd/sites/$_site/etc/check_mk/main.mk"
+	su - $_site -c "touch /omd/sites/$_site/etc/check_mk/main.mk"
 	cat ${_f} | parallel -j$(nproc)
-	su - mbr -c "rm /omd/sites/$_site/etc/check_mk/main.mk"
+	su - $_site -c "rm /omd/sites/$_site/etc/check_mk/main.mk"
 }
 _add_monitors() {
 	_block=$1

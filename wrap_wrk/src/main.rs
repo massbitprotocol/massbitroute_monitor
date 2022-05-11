@@ -46,16 +46,20 @@ fn main() {
 
 #[test]
 fn run_dapi() {
-    let _res = init_logger(&String::from("CheckComponent"));
-    //println!("Log output: {}", res); // Print log output type
+    let total_request = 1000000;
+    let rate = 300;
+    let duration_sec = total_request / rate;
 
+    let _res = init_logger(&String::from("CheckComponent"));
+    info!("Estimate run time:{}s", duration_sec);
+    //println!("Log output: {}", res); // Print log output type
     let thread = 20;
     let connection = 20;
-    let duration = "15s";
-    let rate = 10;
+    let duration = format!("{}s", duration_sec);
+
     // let dapi_url = "http://34.101.81.225:8545";
-    let dapi_url = "https://3751598a-e19f-43dd-89d6-de7e11962c21.eth-mainnet.massbitroute.dev/ChlnfnlnywZgHnwD92GNPg";
-    let token = "";
+    let dapi_url = "https://5f74cc88-678a-4055-be16-7ec0d4abb835.eth-mainnet.massbitroute.dev";
+    let token = "EyVgEgXbd13oxVFHzeor7g";
     let host = "";
     let script = "../scripts/benchmark/dapi.lua";
     let wrk_path = "../scripts/benchmark/wrk";
@@ -64,7 +68,7 @@ fn run_dapi() {
     let mut wrk = WrkBenchmark::build(
         thread,
         connection,
-        duration.to_string(),
+        duration,
         rate,
         dapi_url.to_string(),
         token.to_string(),

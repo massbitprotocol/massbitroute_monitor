@@ -15,9 +15,7 @@ async fn main() {
         .get_matches();
     if let Some(ref matches) = matches.subcommand_matches("update-stats") {
         let config_data = matches.value_of("config-data").unwrap_or("");
-        let prometheus_url = matches
-            .value_of("prometheus-gateway-url")
-            .unwrap_or("https://stat.mbr.massbitroute.com/__internal_prometheus_");
+        let prometheus_url = matches.value_of("prometheus-url").unwrap();
         let mvp_url = matches
             .value_of("mvp-url")
             .unwrap_or("wss://dev.verification.massbit.io");
@@ -47,19 +45,11 @@ fn create_component_stats() -> Command<'static> {
     Command::new("update-stats")
         .about("get stats from prometheus server and update to chain")
         .arg(
-            Arg::new("prometheus-gateway-url")
-                .short('g')
-                .long("prometheus-gateway-url")
-                .value_name("prometheus-gateway-url")
-                .help("Input prometheus-gateway-url")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("prometheus-node-url")
-                .short('n')
-                .long("prometheus-node-url")
-                .value_name("prometheus-node-url")
-                .help("Input prometheus-node-url")
+            Arg::new("prometheus-url")
+                .short('p')
+                .long("prometheus-url")
+                .value_name("prometheus-url")
+                .help("Input prometheus-url")
                 .takes_value(true),
         )
         .arg(

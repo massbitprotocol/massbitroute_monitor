@@ -187,7 +187,9 @@ impl WrkBenchmark {
         let re = Regex::new(
             r"Value   Percentile   TotalCount 1/\(1-Percentile\)\s+(?P<table>[\d.\sinf]+)#",
         )?;
-        let caps = re.captures(text)?;
+        let caps = re
+            .captures(text)
+            .ok_or(Error::msg("Cannot capture latency table"))?;
         let table = caps.name("table").unwrap().as_str();
         //info!("table:{}", table);
 

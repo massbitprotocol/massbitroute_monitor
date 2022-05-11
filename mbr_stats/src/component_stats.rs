@@ -22,7 +22,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Api;
 
-use crate::SIGNER_DERIVE;
 use anyhow::Error;
 use sp_core::sr25519::Pair;
 use sp_core::Pair as PairTrait;
@@ -403,12 +402,6 @@ impl StatsBuilder {
         let (derive_signer, _) =
             Pair::from_string_with_seed(self.inner.signer_phrase.as_str(), None).unwrap();
 
-        // let signer = AccountKeyring::Ferdie.pair();
-        // info!(
-        //     "Derive signer: {}\nTest signer:{}",
-        //     derive_signer.public(),
-        //     signer.public()
-        // );
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
 
         let api = Api::new(ws_client.clone())

@@ -107,18 +107,16 @@ impl FishermanBuilder {
         // RPSee client for subscribe new block
         // let client = WsClientBuilder::default().build(&path).await;
         // println!("chain client: {:?}", client);
-
-        // substrate_api_client for send extrinsic and subscribe event
-        //let (signer,seed) = Pair::from_phrase(self.inner.signer_phrase.as_str(),None).expect("Wrong signer-phrase");
-        // Fixme: find Ferdie Pair from phrase
-        let signer = AccountKeyring::Ferdie.pair();
+        info!("signer_phrase:{}", self.inner.signer_phrase.as_str());
+        let (derive_signer, _) =
+            Pair::from_string_with_seed(self.inner.signer_phrase.as_str(), None).unwrap();
 
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
         let chain_adapter = ChainAdapter {
             json_rpc_client: None,
             ws_rpc_client: Some(ws_client.clone()),
             api: Api::new(ws_client.clone())
-                .map(|api| api.set_signer(signer))
+                .map(|api| api.set_signer(derive_signer))
                 .ok(),
         };
         self.inner.chain_adapter = Arc::new(chain_adapter);

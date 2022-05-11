@@ -31,7 +31,7 @@ _kill() {
 # if [ $# -eq 0 ]; then
 # $pip --upgrade pip
 # $pip -r requirements.txt
-if [ "$1" = "_kill"]; then
+if [ "$1" == "_kill"]; then
 	_kill
 	exit 0
 fi

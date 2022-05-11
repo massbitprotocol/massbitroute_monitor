@@ -197,20 +197,20 @@ _add_monitor_host() {
 		# fi
 
 		touch $_mark
-		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
-		if [ $disc -eq 1 ]; then
-			# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-			action="discover_services"
-			host_info='request={"hostname":"'$hostname'"}'
-			curl -sSfL "$host&action=$action" -d $host_info
-			# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
-			# if [ $st -ne 0 ]; then
-			# 	sleep 1
-			# 	st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
-			# fi
-			# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
-		fi
+	fi
+	if [ $disc -eq 1 ]; then
+		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+		action="discover_services"
+		host_info='request={"hostname":"'$hostname'"}'
+		curl -sSfL "$host&action=$action" -d $host_info
+		# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		# if [ $st -ne 0 ]; then
+		# 	sleep 1
+		# 	st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
+		# fi
+		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 

@@ -10,10 +10,10 @@ function init(args)
 end
 
 function request()
-    local body =
-        '{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_blockNumber", "params": []}'
+    local body ='{"jsonrpc": "2.0","method": "eth_blockNumber","params": [],"id": 1}'
     local headers = {}
     headers["Content-Type"] = "application/json"
+    local token = wrk.thread:get("token")
 
-    return wrk.format("POST", "/", headers, body)
+    return wrk.format("POST", "/"..token, headers, body)
 end

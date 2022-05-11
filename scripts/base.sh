@@ -68,6 +68,7 @@ _update_sources() {
 }
 _loop() {
 	t=$1
+	shift
 	while true; do
 		$0 $@
 		sleep $t

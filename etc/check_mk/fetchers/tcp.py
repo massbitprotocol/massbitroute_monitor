@@ -11,14 +11,21 @@ from typing import Any, Dict, Final, List, Mapping, Optional, TYPE_CHECKING, Tup
 from hashlib import md5, sha256
 import cmk.utils.debug
 from cmk.utils.type_defs import AgentRawData, HostAddress
-from cmk.utils.encryption import decrypt_aes_256_cbc_legacy, decrypt_aes_256_cbc_pbkdf2, OPENSSL_SALTED_MARKER
+from cmk.utils.encryption import (
+    decrypt_aes_256_cbc_legacy,
+    decrypt_aes_256_cbc_pbkdf2,
+    OPENSSL_SALTED_MARKER,
+)
+from cmk.utils.redis import get_redis_client
 
+if TYPE_CHECKING:
+    from cmk.utils.redis import RedisDecoded
 from . import MKFetcherError
 from ._base import verify_ipaddress
 from .agent import AgentFetcher, DefaultAgentFileCache
 from .type_defs import Mode
 
-from redis import StrictRedis
+# from redis import StrictRedis
 
 if TYPE_CHECKING:
     import hashlib
@@ -39,12 +46,16 @@ class TCPFetcher(AgentFetcher):
         super().__init__(file_cache, logging.getLogger("cmk.helper.tcp"))
         self.family: Final = socket.AddressFamily(family)
         # json has no builtin tuple, we have to convert
-        self.address: Final[Tuple[Optional[HostAddress], int]] = (address[0], address[1])
+        self.address: Final[Tuple[Optional[HostAddress], int]] = (
+            address[0],
+            address[1],
+        )
         self.hostname: str = hostname
         self.timeout: Final = timeout
         self.encryption_settings: Final = encryption_settings
         self.use_only_cache: Final = use_only_cache
         self._socket: Optional[socket.socket] = None
+        self._redis_client: Optional["RedisDecoded"] = None
 
     @classmethod
     def _from_json(cls, serialized: Dict[str, Any]) -> "TCPFetcher":
@@ -55,6 +66,11 @@ class TCPFetcher(AgentFetcher):
             **serialized,
         )
 
+    def _get_redis_client(self) -> "RedisDecoded":
+        if self._redis_client is None:
+            self._redis_client = get_redis_client()
+        return self._redis_client
+
     def to_json(self) -> Dict[str, Any]:
         return {
             "file_cache": self.file_cache.to_json(),
@@ -64,6 +80,7 @@ class TCPFetcher(AgentFetcher):
             "encryption_settings": self.encryption_settings,
             "use_only_cache": self.use_only_cache,
         }
+
     def open(self) -> None:
         self._logger.debug(
             "Connecting via Redis to %s:%d (%ss timeout)",
@@ -71,10 +88,12 @@ class TCPFetcher(AgentFetcher):
             self.address[1],
             self.timeout,
         )
-        self._redis = StrictRedis(unix_socket_path='/omd/sites/mbr/tmp/run/redis')
-        self._logger.debug(self._redis)
-        if self._redis is None:
-            self.opennew(self) 
+        # self._redis = StrictRedis(unix_socket_path="/omd/sites/mbr/tmp/run/redis")
+        _redis = self._get_redis_client()
+
+        self._logger.debug(_redis)
+        if _redis is None:
+            self.opennew(self)
 
     def opennew(self) -> None:
         verify_ipaddress(self.address[1])
@@ -98,28 +117,34 @@ class TCPFetcher(AgentFetcher):
             raise MKFetcherError("Communication failed: %s" % e)
 
     def close(self) -> None:
-        self._logger.debug("Closing TCP connection to %s:%d", self.address[0], self.address[1])
+        self._logger.debug(
+            "Closing TCP connection to %s:%d", self.address[0], self.address[1]
+        )
         if self._socket is not None:
             self._socket.close()
         self._socket = None
 
     def _fetch_from_io(self, mode: Mode) -> AgentRawData:
         if self.use_only_cache:
-            raise MKFetcherError("Got no data: No usable cache file present at %s" %
-                                 self.file_cache.base_path)
-        if self._redis is None and self._socket is None:
+            raise MKFetcherError(
+                "Got no data: No usable cache file present at %s"
+                % self.file_cache.base_path
+            )
+        _redis = self._get_redis_client()
+        if _redis is None and self._socket is None:
             raise MKFetcherError("Not connected")
 
         return self._validate_decrypted_data(self._decrypt(self._raw_data()))
 
     def _raw_data(self) -> AgentRawData:
         self._logger.debug("Reading data from redis")
-        redis_key = ':'.join(['check_mk_push_agent', 'data', self.hostname])
+        redis_key = ":".join(["check_mk_push_agent", "data", self.hostname])
         self._logger.debug(redis_key)
-        output = self._redis.get(redis_key)
+        _redis = self._get_redis_client()
+        output = _redis.get(redis_key)
         self._logger.debug(output)
         if output:
-            return output        
+            return output
         self._logger.debug("Reading data from agent")
         if not self._socket:
             return AgentRawData(b"")
@@ -148,13 +173,15 @@ class TCPFetcher(AgentFetcher):
             self._logger.debug("Output is not encrypted")
             if self.encryption_settings["use_regular"] == "enforce":
                 raise MKFetcherError(
-                    "Agent output is plaintext but encryption is enforced by configuration")
+                    "Agent output is plaintext but encryption is enforced by configuration"
+                )
             return output
 
         self._logger.debug("Output is encrypted")  # or corrupt
         if self.encryption_settings["use_regular"] == "disable":
             raise MKFetcherError(
-                "Agent output is encrypted but encryption is disabled by configuration")
+                "Agent output is encrypted but encryption is disabled by configuration"
+            )
 
         try:
             self._logger.debug("Try to decrypt output")
@@ -193,21 +220,24 @@ class TCPFetcher(AgentFetcher):
                 decrypt_aes_256_cbc_pbkdf2(
                     ciphertext=encrypted_pkg[salt_start:],
                     password=password,
-                ))
+                )
+            )
         if protocol == 2:
             return AgentRawData(
                 decrypt_aes_256_cbc_legacy(
                     ciphertext=encrypted_pkg,
                     password=password,
                     digest=sha256,
-                ))
+                )
+            )
         if protocol == 0:
             return AgentRawData(
                 decrypt_aes_256_cbc_legacy(
                     ciphertext=encrypted_pkg,
                     password=password,
                     digest=md5,
-                ))
+                )
+            )
         # Support encrypted agent data with "99" header.
         # This was not intended, but the Windows agent accidentally sent this header
         # instead of "00" up to 2.0.0p1, so we keep this for a while.
@@ -218,6 +248,7 @@ class TCPFetcher(AgentFetcher):
                     ciphertext=encrypted_pkg,
                     password=password,
                     digest=md5,
-                ))
+                )
+            )
 
         raise MKFetcherError(f"Unsupported protocol version: {protocol}")

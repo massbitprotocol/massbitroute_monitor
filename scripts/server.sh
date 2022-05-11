@@ -2,10 +2,9 @@
 # type=monitor
 # dir=/massbit/massbitroute/app/src/sites/services/$type/etc/mkagent/agents
 dir=$(dirname $(realpath $0))
-name=$1
 cd $dir
 
-export TOKEN_FILE=$dir/tokens${name}.txt
+export TOKEN_FILE=$dir/tokens.txt
 if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
 
 # _add() {
@@ -29,7 +28,7 @@ if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
 # if [ $# -eq 0 ]; then
 # $pip --upgrade pip
 # $pip -r requirements.txt
-python3 $dir/server${name}.py
-# else
-# 	$@
-# fi
+
+echo "python3 $dir/server.py \
+python3 $dir/server_node_eth_mainnet.py \
+python3 $dir/server_gw_eth_mainnet.py" | parallel -j3

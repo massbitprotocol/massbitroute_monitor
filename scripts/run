@@ -87,7 +87,8 @@ _reload() {
 	bash $SITE_ROOT/scripts/server.sh _kill
 	bash $SITE_ROOT/etc/mkagent/agents/push.sh _kill
 	$cmd _update
-	# $cmd update
+	$cmd update
+	$cmd start all
 }
 
 _install_repos() {

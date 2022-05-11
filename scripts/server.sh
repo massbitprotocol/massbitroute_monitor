@@ -2,10 +2,10 @@
 # type=monitor
 # dir=/massbit/massbitroute/app/src/sites/services/$type/etc/mkagent/agents
 dir=$(dirname $(realpath $0))
-
+name=$1
 cd $dir
 
-export TOKEN_FILE=$dir/tokens.txt
+export TOKEN_FILE=$dir/tokens${name}.txt
 if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
 
 _add() {
@@ -24,12 +24,12 @@ _add() {
 
 }
 _kill() {
-	pkill -f server.py
+	pkill -f server${name}.py
 }
 if [ $# -eq 0 ]; then
 	# $pip --upgrade pip
 	# $pip -r requirements.txt
-	python3 $dir/server.py
+	python3 $dir/server${name}.py
 else
 	$@
 fi

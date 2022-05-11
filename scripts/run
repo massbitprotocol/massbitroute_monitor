@@ -300,10 +300,10 @@ _add_monitors() {
 		done
 
 	fi
-	_run_me ${tmp}.run
-	rm ${tmp}*
+	# _run_me ${tmp}.run
+	# rm ${tmp}*
 
-	tmp=$(mktemp)
+	# tmp=$(mktemp)
 	curl -sSfL https://api.$DOMAIN/deploy/info/node/listid -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 

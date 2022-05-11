@@ -180,7 +180,6 @@ _add_monitor_host() {
 	group=$3
 	disc=$4
 	if [ -z "$disc" ]; then disc=0; fi
-
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	if [ ! -f "/tmp/$hostname" ]; then
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'

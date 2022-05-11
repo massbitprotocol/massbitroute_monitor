@@ -391,7 +391,7 @@ _update() {
 }
 
 _discover_host() {
-	_remove_hosts
+	#	_remove_hosts
 	_add_monitors
 }
 _monitor() {

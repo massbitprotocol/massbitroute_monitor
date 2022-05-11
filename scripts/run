@@ -161,30 +161,34 @@ _del_monitor_host() {
 
 }
 _monitor_activate() {
+	_site=$1
+	host="https://$MONITOR_DOMAIN/$_site/check_mk/webapi.py?$sec&$arg"
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	# sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
 	# arg="request_format=python&output_format=json"
 	# host="https://monitor.mbr.massbitroute.com/mbr/check_mk/webapi.py?$sec&$arg"
 
 	action="activate_changes"
-	host_info='request={"sites":["mbr"]}'
+	host_info='request={"sites":["'$_site'"]}'
 	curl -sSfL "$host&action=$action" -d $host_info | jq
 
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 
 _add_monitor_host() {
-	echo $@
-	hostname=$1
-	ip=$2
-	group=$3
-	disc=$4
+	_site=$1
+	hostname=$2
+	ip=$3
+	group=$4
+	disc=$5
+	host="https://$MONITOR_DOMAIN/$_site/check_mk/webapi.py?$sec&$arg"
 	if [ -z "$disc" ]; then disc=0; fi
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	if [ ! -f "/tmp/$hostname" ]; then
+	_mark=/tmp/${_site}_$hostname
+	if [ ! -f "$_mark" ]; then
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="add_host"
-		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
+		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'${_site}'","tag_agent":"cmk-agent"}}'
 		curl -sSfL "$host&action=$action" -d $host_info
 		# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 		# if [ $st -ne 0 ]; then
@@ -192,7 +196,7 @@ _add_monitor_host() {
 		# 	st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 		# fi
 
-		touch /tmp/$hostname
+		touch $_mark
 		# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 		if [ $disc -eq 1 ]; then
@@ -265,14 +269,23 @@ _remove_hosts() {
 	_monitor_activate
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
-
+_create_site() {
+	_site=$1
+	_pass=$2
+	omd create $_site
+	omd start $_site
+	su - $_site -c "htpasswd -b /omd/sites/$_site/etc/htpasswd cmkadmin $_pass"
+}
 _run_me() {
-	_f=$1
-	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	_site=$2
+	_f=$3
+	su - mbr -c "touch /omd/sites/$_site/etc/check_mk/main.mk"
 	cat ${_f} | parallel -j$(nproc)
-	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	su - mbr -c "rm /omd/sites/$_site/etc/check_mk/main.mk"
 }
 _add_monitors() {
+	_block=$1
+	_net=$2
 	# _add_core_monitors
 	token_file=$SITE_ROOT/scripts/tokens.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
@@ -284,8 +297,8 @@ _add_monitors() {
 	# token_gw=$(mktemp)
 	# token_node=$(mktemp)
 	mk_reload=0
-
-	curl -sSfL https://api.$DOMAIN/deploy/info/gateway/listid -o ${tmp} >/dev/null
+	_site=gateway_${_block}_${_net}
+	curl -sSfL https://api.$DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		echo >>${tmp}
 		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
@@ -293,7 +306,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=gateway-$block-$net-$id
-			echo $0 _add_monitor_host $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
+			echo $0 _add_monitor_host gateway_${block}_${net} $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -301,11 +314,14 @@ _add_monitors() {
 		done
 
 	fi
+	_run_me $_site ${tmp}.run
+	_monitor_activate $_site 1
 	# _run_me ${tmp}.run
-	# rm ${tmp}*
+	rm ${tmp}*
 
-	# tmp=$(mktemp)
-	curl -sSfL https://api.$DOMAIN/deploy/info/node/listid -o ${tmp} >/dev/null
+	_site=node_${_block}_${_net}
+	tmp=$(mktemp)
+	curl -sSfL https://api.$DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		echo >>${tmp}
 		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
@@ -313,7 +329,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=node-$block-$net-$id
-			echo $0 _add_monitor_host $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
+			echo $0 _add_monitor_host gateway_${block}_${net} $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -322,21 +338,22 @@ _add_monitors() {
 
 	fi
 
+	_run_me $_site ${tmp}.run
+	rm ${tmp}*
 	diff -s ${token_file}.tmp $token_file >/dev/null
 	if [ $? -ne 0 ]; then
 		mv ${token_file}.tmp $token_file
 		bash $SITE_ROOT/scripts/server.sh _kill
 	fi
 
-	_run_me ${tmp}.run
 	# cat ${tmp}.run
 	#	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
 
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	# cat ${tmp}.run | parallel -j$(nproc)
 	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
-	_monitor_activate 1
-	rm ${tmp}*
+	_monitor_activate $_site 1
+	# rm ${tmp}*
 
 }
 _del_monitors() {

@@ -66,6 +66,14 @@ _update_sources() {
 	done
 	return $_is_reload
 }
+_loop() {
+	t=$1
+	while true; do
+		$0 $@
+		sleep $t
+	done
+
+}
 loop() {
 	while true; do
 		$0 $@

@@ -28,6 +28,10 @@ if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
 # if [ $# -eq 0 ]; then
 # $pip --upgrade pip
 # $pip -r requirements.txt
+if [ "$1" = "_kill"]; then
+	_kill
+	exit 0
+fi
 
 for f in $dir/server.py $dir/server_node_eth_mainnet.py $dir/server_gw_eth_mainnet.py; do
 	echo python3 $f

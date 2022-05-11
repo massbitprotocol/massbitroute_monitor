@@ -277,8 +277,8 @@ _create_site() {
 	su - $_site -c "htpasswd -b /omd/sites/$_site/etc/htpasswd cmkadmin $_pass"
 }
 _run_me() {
-	_site=$2
-	_f=$3
+	_site=$1
+	_f=$2
 	su - mbr -c "touch /omd/sites/$_site/etc/check_mk/main.mk"
 	cat ${_f} | parallel -j$(nproc)
 	su - mbr -c "rm /omd/sites/$_site/etc/check_mk/main.mk"

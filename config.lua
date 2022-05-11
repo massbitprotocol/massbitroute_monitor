@@ -32,7 +32,7 @@ stopsignal=INT
 stdout_logfile=_SITE_ROOT_/logs/monitor_discover_dapi.log
 
 [program:monitor_discover_host]
-command=/bin/bash _SITE_ROOT_/scripts/run _timeout 300 _discover_host _SITE_ROOT_
+command=/bin/bash _SITE_ROOT_/scripts/run _loop 60 _discover_host _SITE_ROOT_
 autorestart=true
 redirect_stderr=true
 stopasgroup=true

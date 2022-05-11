@@ -21,14 +21,25 @@ stdout_logfile=_SITE_ROOT_/../mkagent/logs/monitor_client.log
     ]]
     },
     supervisor = [[
-[program:check_mk_dapi_collect]
+
+[program:monitor_discover_dapi]
 command=/bin/bash _SITE_ROOT_/scripts/checkmk/dapi loop _collect _SITE_ROOT_
 autorestart=true
 redirect_stderr=true
 stopasgroup=true
 killasgroup=true
 stopsignal=INT
-stdout_logfile=_SITE_ROOT_/logs/check_mk_dapi_collect.log
+stdout_logfile=_SITE_ROOT_/logs/monitor_discover_dapi.log
+
+[program:monitor_discover_host]
+command=/bin/bash _SITE_ROOT_/scripts/run _timeout 300 _discover_host _SITE_ROOT_
+autorestart=true
+redirect_stderr=true
+stopasgroup=true
+killasgroup=true
+stopsignal=INT
+stdout_logfile=_SITE_ROOT_/logs/monitor_discover_host.log
+
 
 [program:monitor_server]
 command=/bin/bash _SITE_ROOT_/scripts/server.sh

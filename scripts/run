@@ -390,6 +390,10 @@ _update() {
 	return $_st_update
 }
 
+_discover_host() {
+	_remove_hosts
+	_add_monitors
+}
 _monitor() {
 
 	_update
@@ -399,7 +403,7 @@ _monitor() {
 		$0 _reload
 	fi
 	# $0 _remove_hosts
-	$0 _add_monitors
+	#$0 _add_monitors
 	# $0 _add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
 	# $0 _monitor_activate
 	# $0 _refresh_monitors

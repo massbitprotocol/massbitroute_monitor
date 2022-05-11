@@ -289,6 +289,7 @@ _add_monitors() {
 
 	curl -sSfL https://api.$DOMAIN/deploy/info/gateway/listid -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
+		echo >>${tmp}
 		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
 			if [ -z "$id" ]; then continue; fi
 			if [ $status -ne 1 ]; then continue; fi
@@ -308,7 +309,7 @@ _add_monitors() {
 	# tmp=$(mktemp)
 	curl -sSfL https://api.$DOMAIN/deploy/info/node/listid -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
-
+		echo >>${tmp}
 		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
 			if [ -z "$id" ]; then continue; fi
 			if [ $status -ne 1 ]; then continue; fi

@@ -266,6 +266,12 @@ _remove_hosts() {
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 
+_run_me() {
+	_f=$1
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	cat ${_f} | parallel -j$(nproc)
+	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+}
 _add_monitors() {
 	# _add_core_monitors
 	token_file=$SITE_ROOT/scripts/tokens.txt
@@ -294,6 +300,7 @@ _add_monitors() {
 		done
 
 	fi
+	_run_me ${tmp}.run
 	rm ${tmp}*
 
 	tmp=$(mktemp)
@@ -320,12 +327,13 @@ _add_monitors() {
 		bash $SITE_ROOT/scripts/server.sh _kill
 	fi
 
-	cat ${tmp}.run
+	_run_me ${tmp}.run
+	# cat ${tmp}.run
 	#	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
 
-	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	cat ${tmp}.run | parallel -j$(nproc)
-	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	# cat ${tmp}.run | parallel -j$(nproc)
+	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	_monitor_activate 1
 	rm ${tmp}*
 

@@ -306,7 +306,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=gateway-$block-$net-$id
-			echo $0 _add_monitor_host gateway_${block}_${net} $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
+			echo $0 _add_monitor_host $_site $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -329,7 +329,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=node-$block-$net-$id
-			echo $0 _add_monitor_host gateway_${block}_${net} $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
+			echo $0 _add_monitor_host $_site $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1

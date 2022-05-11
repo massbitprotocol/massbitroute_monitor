@@ -47,7 +47,7 @@ def load_tokens():
             yield token, hostname
 
 
-@app.route("/push/<token_arg>", methods=["POST"])
+@app.route("/push_gw_eth_mainnet/<token_arg>", methods=["POST"])
 def push(token_arg):
     """Push check_mk_agent data."""
 

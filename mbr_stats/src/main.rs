@@ -2,9 +2,13 @@ use clap::{Arg, Command};
 use log::info;
 use logger::core::init_logger;
 use mbr_stats::component_stats::ComponentStats;
+use mbr_stats::SIGNER_PHRASE;
 
 #[tokio::main]
 async fn main() {
+    // Load env file
+    dotenv::dotenv().ok();
+
     info!("Start mbr stats");
     init_logger(&String::from("ComponentStats"));
 
@@ -22,16 +26,13 @@ async fn main() {
         let list_project_url = matches
             .value_of("list-project-url")
             .unwrap_or("https://portal.massbitroute.dev/mbr/d-apis/project/list/verify");
-        let signer_phrase = matches
-            .value_of("signer-phrase")
-            .unwrap_or("bottom drive obey lake curtain smoke basket hold race lonely fit walk"); //Alice
 
         let mut component_stats = ComponentStats::builder()
             .with_config_uri(config_data.to_string())
             .await
+            .with_signer_phrase(SIGNER_PHRASE.to_string())
             .with_prometheus_url(prometheus_url.to_string())
             .await
-            .with_signer_phrase(signer_phrase.to_string())
             .with_mvp_url(mvp_url.to_string())
             .await
             .with_list_project_url(list_project_url.to_string())

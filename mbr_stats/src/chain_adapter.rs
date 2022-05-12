@@ -4,6 +4,8 @@ use std::fmt::Formatter;
 use codec::Decode;
 use jsonrpsee::core::client::Client as JsonRpcClient;
 
+use anyhow::anyhow;
+use jsonrpsee::http_client::transport::Error;
 use log::info;
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::Pair as _;
@@ -91,7 +93,10 @@ impl ChainAdapter {
             usage
         );
 
-        info!("[+] Composed Extrinsic:\n {:?}\n", xt);
+        info!(
+            "[+] Composed Extrinsic DAPI:{},PROJECT_USAGE:{}, id:{:?}, usage:{}\n: {:?}\n",
+            MVP_EXTRINSIC_DAPI, MVP_EXTRINSIC_SUBMIT_PROJECT_USAGE, id, usage, xt
+        );
 
         // send and watch extrinsic until InBlock
         let tx_hash = self
@@ -133,10 +138,16 @@ impl ChainAdapter {
         Ok(())
     }
 
-    pub async fn subscribe_event_update_quota(&self, projects: Arc<RwLock<Projects>>) {
+    pub async fn subscribe_event_update_quota(
+        &self,
+        projects: Arc<RwLock<Projects>>,
+    ) -> Result<(), anyhow::Error> {
         let (events_in, events_out) = channel();
-        let api = self.api.as_ref().unwrap();
-        api.subscribe_events(events_in).unwrap();
+        let api = self
+            .api
+            .as_ref()
+            .ok_or(anyhow::Error::msg("Error: api is none"))?;
+        api.subscribe_events(events_in)?;
         loop {
             let event: ApiResult<ProjectRegisteredEventArgs> = api.wait_for_event(
                 MVP_EXTRINSIC_DAPI,
@@ -174,6 +185,7 @@ impl ChainAdapter {
                 }
             }
         }
+        Ok(())
     }
 }
 

@@ -16,5 +16,5 @@
   "node_response_time_threshold_ms": 2000,
   "gateway_response_time_threshold_ms": 2000,
   "accepted_low_latency_percent": 0.90,
-  "skip_benchmark": false
+  "skip_benchmark": true
 }

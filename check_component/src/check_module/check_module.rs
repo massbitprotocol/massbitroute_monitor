@@ -133,7 +133,7 @@ impl ComponentInfo {
         format!("https://{}", self.ip)
     }
 
-    fn get_host_header(&self, domain: &String) -> String {
+    pub fn get_host_header(&self, domain: &String) -> String {
         match self.component_type {
             ComponentType::Node => {
                 format!("{}.node.mbr.{}", self.id, domain)

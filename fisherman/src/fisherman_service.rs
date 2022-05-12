@@ -19,6 +19,7 @@ use std::time::Duration;
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Pair;
 use substrate_api_client::{compose_extrinsic, Api, UncheckedExtrinsicV4, XtStatus};
+use tokio::sync::RwLock;
 
 pub trait SubmitProviderReport {
     fn submit_provider_report(
@@ -107,7 +108,6 @@ impl FishermanBuilder {
         // RPSee client for subscribe new block
         // let client = WsClientBuilder::default().build(&path).await;
         // println!("chain client: {:?}", client);
-        info!("signer_phrase:{}", self.inner.signer_phrase.as_str());
         let (derive_signer, _) =
             Pair::from_string_with_seed(self.inner.signer_phrase.as_str(), None).unwrap();
 
@@ -152,6 +152,16 @@ impl FishermanService {
         FishermanBuilder::default()
     }
 
+    pub async fn get_provider_list_from_portal(&mut self) -> Vec<ComponentInfo> {
+        self.check_component_service
+            .reload_components_list(Some(&CONFIG.checking_component_status), &ZONE)
+            .await;
+        // List node and gateway
+        let mut list_providers = self.check_component_service.list_nodes.clone();
+        list_providers.extend(self.check_component_service.list_gateways.clone());
+        list_providers
+    }
+
     fn is_history_continuous_fail_reach_limit(
         reports_history: &VecDeque<HashMap<ComponentInfo, ComponentReport>>,
         component: &ComponentInfo,
@@ -168,14 +178,31 @@ impl FishermanService {
                 break;
             }
         }
-        println!("Number continuous-fails of id {}: {}", component.id, count);
+        info!("Number continuous-fails of id {}: {}", component.id, count);
         match component.component_type {
             ComponentType::Node => count >= CONFIG.node_response_failed_number,
             ComponentType::Gateway => count >= CONFIG.gateway_response_failed_number,
             ComponentType::DApi => false,
         }
     }
-
+    // pub async fn check_ping_pong(&mut self, list_providers: Arc<RwLock<Vec<ComponentInfo>>>) {
+    //     info!(
+    //         "Test ping pong, list provider: {:#?}",
+    //         list_providers.read().await
+    //     );
+    // }
+    pub async fn check_logic(&mut self, list_providers: Arc<RwLock<Vec<ComponentInfo>>>) {
+        debug!(
+            "Test logic, list provider: {:#?}",
+            list_providers.read().await
+        );
+    }
+    pub async fn check_benchmark(&mut self, list_providers: Arc<RwLock<Vec<ComponentInfo>>>) {
+        debug!(
+            "Test benchmark, list provider: {:#?}",
+            list_providers.read().await
+        );
+    }
     pub async fn loop_check_component(mut self) {
         let number_of_sample = self.number_of_sample;
         info!("number_of_sample:{}", number_of_sample);

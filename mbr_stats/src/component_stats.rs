@@ -1,30 +1,34 @@
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use crate::chain_adapter::{ChainAdapter, Projects};
 
-use jsonrpsee::core::client::{
-    Subscription, SubscriptionClientT,
-};
+use jsonrpsee::core::client::{Subscription, SubscriptionClientT};
 
+use jsonrpsee::rpc_params;
 use jsonrpsee::ws_client::WsClientBuilder;
-use jsonrpsee::{rpc_params};
-use log::{info};
-use prometheus_http_query::aggregations::{sum};
+use log::info;
+use prometheus_http_query::aggregations::sum;
 
 use prometheus_http_query::{Aggregate, Client as PrometheusClient, InstantVector, Selector};
 use regex::Regex;
-use serde_json::{Value};
-
+use serde_json::Value;
 
 use sp_keyring::AccountKeyring;
 use std::convert::TryInto;
-use std::fmt::Formatter;
+use std::fmt::{format, Formatter};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Api;
 
+use anyhow::Error;
+use sp_core::sr25519::Pair;
+use sp_core::Pair as PairTrait;
+use std::str::FromStr;
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, EnumString};
 use tokio::sync::RwLock;
 use tokio::task;
 use tokio::time::{sleep, Duration};
@@ -33,10 +37,32 @@ type TimeStamp = i64;
 
 const NUMBER_BLOCK_FOR_COUNTING: isize = 2;
 const DATA_NAME: &str = "nginx_vts_filter_requests_total";
-const PROJECT_FILTER: &str = ".*::proj::api_method";
+// const PROJECT_FILTER: &str = ".*::proj::api_method";
+const PROJECT_FILTER: &str = ".*::project::.*";
 const PROJECT_FILTER_PROJECT_ID_REGEX: &str =
-    r"[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}";
+    r"::project::([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})";
 const UPDATE_PROJECT_QUOTA_INTERVAL: u64 = 10; //sec
+
+#[derive(EnumString, EnumIter, Eq, Hash, PartialEq, Debug, Clone)]
+pub enum ChainId {
+    #[strum(serialize = "snake_case")]
+    EthMainnet,
+    #[strum(serialize = "snake_case")]
+    DotMainnet,
+}
+
+impl ChainId {
+    pub fn to_string_prometheus(&self) -> String {
+        match self {
+            ChainId::EthMainnet => "eth-mainnet".to_string(),
+            ChainId::DotMainnet => "dot-mainnet".to_string(),
+        }
+    }
+    pub fn from_string(chain: &String, network: &String) -> Result<Self, Error> {
+        let chain_id = format!("{}_{}", chain, network);
+        Ok(ChainId::from_str(chain_id.as_str())?)
+    }
+}
 
 #[derive(Debug)]
 pub enum ComponentType {
@@ -62,8 +88,8 @@ pub struct ComponentStats {
     pub signer_phrase: String,
 
     // For collecting data
-    pub gateway_adapter: Arc<DataCollectionAdapter>,
-    pub node_adapter: Arc<DataCollectionAdapter>,
+    pub gateway_adapters: HashMap<ChainId, Arc<DataCollectionAdapter>>,
+    pub node_adapters: HashMap<ChainId, Arc<DataCollectionAdapter>>,
     // Projects data
     pub list_project_url: String,
     pub projects: Arc<RwLock<Projects>>,
@@ -109,8 +135,8 @@ impl Default for StatsBuilder {
                 prometheus_node_url: "".to_string(),
                 mvp_url: "".to_string(),
                 signer_phrase: "".to_string(),
-                gateway_adapter: Default::default(),
-                node_adapter: Default::default(),
+                gateway_adapters: Default::default(),
+                node_adapters: Default::default(),
                 list_project_url: "".to_string(),
                 projects: Default::default(),
                 chain_adapter: Default::default(),
@@ -148,7 +174,7 @@ impl ComponentStats {
         let re = Regex::new(PROJECT_FILTER_PROJECT_ID_REGEX).unwrap();
         let project_id = re
             .captures(filter)
-            .and_then(|id| id.get(0).and_then(|id| Some(id.as_str().to_string())));
+            .and_then(|id| id.get(1).and_then(|id| Some(id.as_str().to_string())));
         //info!("filter: {}, project_id:{:?}",filter, project_id);
         project_id
     }
@@ -159,6 +185,7 @@ impl ComponentStats {
         filter_value: &str,
         data_name: &str,
         time: TimeStamp,
+        chain_id: &ChainId,
     ) -> anyhow::Result<HashMap<String, usize>> {
         let q: InstantVector = Selector::new()
             .metric(data_name)
@@ -167,7 +194,9 @@ impl ComponentStats {
             .try_into()?;
         let q = sum(q, Some(Aggregate::By(&["filter"])));
         let response = self
-            .gateway_adapter
+            .gateway_adapters
+            .get(chain_id)
+            .unwrap()
             .client
             .as_ref()
             .ok_or(anyhow::Error::msg("None client"))?
@@ -175,19 +204,28 @@ impl ComponentStats {
             .await?;
 
         let res = if let Some(instant) = response.as_instant() {
-            Ok(instant
-                .iter()
-                .filter_map(|iv| {
-                    iv.metric().get("filter").and_then(|filter| {
+            Ok({
+                let mut projects: HashMap<String, usize> = HashMap::new();
+                for iv in instant.iter() {
+                    if let Some(filter) = iv.metric().get("filter") {
                         let value = iv.sample().value() as usize;
-                        // Fixme: get project ID in the filter string
-                        let project = ComponentStats::capture_project_id(filter.as_str())
-                            .and_then(|project_id| Some((project_id.to_string(), value)));
-                        info!("project: {:?}", project);
-                        project
-                    })
-                })
-                .collect::<HashMap<String, usize>>())
+                        if let Some(project_id) =
+                            ComponentStats::capture_project_id(filter.as_str())
+                        {
+                            let values = match projects.entry(project_id) {
+                                Entry::Occupied(o) => {
+                                    let mut tmp = o.into_mut();
+                                    *tmp += value;
+                                }
+                                Entry::Vacant(v) => {
+                                    v.insert(value);
+                                }
+                            };
+                        };
+                    };
+                }
+                projects
+            })
         } else {
             Err(anyhow::Error::msg("Cannot parse response"))
         };
@@ -220,52 +258,56 @@ impl ComponentStats {
         let mut last_count_block: isize = -1;
 
         loop {
-            let res = subscribe.next().await;
-            if let Some(Ok(res)) = res {
-                info!("received {:?}", res);
-                if let Some(block_number) = res.get("number") {
-                    let block_number = isize::from_str_radix(
-                        block_number.as_str().unwrap().trim_start_matches("0x"),
-                        16,
-                    )?;
-                    info!("block_number {:?}", block_number);
-                    if last_count_block == -1 {
-                        last_count_block = block_number;
-                        continue;
-                    } else {
-                        if block_number - last_count_block >= NUMBER_BLOCK_FOR_COUNTING {
-                            // Set new count block
-                            let current_count_block = last_count_block + NUMBER_BLOCK_FOR_COUNTING;
-                            // Fixme: need decode block for getting timestamp. For now use system time.
-                            let current_count_block_timestamp =
-                                (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
-                                    as TimeStamp;
+            for chain_id in ChainId::iter() {
+                let res = subscribe.next().await;
+                if let Some(Ok(res)) = res {
+                    info!("received {:?}", res);
+                    if let Some(block_number) = res.get("number") {
+                        let block_number = isize::from_str_radix(
+                            block_number.as_str().unwrap().trim_start_matches("0x"),
+                            16,
+                        )?;
+                        info!("block_number {:?}", block_number);
+                        if last_count_block == -1 {
+                            last_count_block = block_number;
+                            continue;
+                        } else {
+                            if block_number - last_count_block >= NUMBER_BLOCK_FOR_COUNTING {
+                                // Set new count block
+                                let current_count_block =
+                                    last_count_block + NUMBER_BLOCK_FOR_COUNTING;
+                                // Fixme: need decode block for getting timestamp. For now use system time.
+                                let current_count_block_timestamp =
+                                    (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
+                                        as TimeStamp;
 
-                            // Get request number
-                            match self
-                                .get_request_number(
-                                    "filter",
-                                    PROJECT_FILTER,
-                                    DATA_NAME,
-                                    current_count_block_timestamp,
-                                )
-                                .await
-                            {
-                                Ok(projects_request) => {
-                                    info!("projects_request: {:?}", projects_request);
-                                    let project_quota = self.projects.clone();
-                                    if let Err(e) = self
-                                        .chain_adapter
-                                        .submit_projects_usage(project_quota, projects_request)
-                                        .await
-                                    {
-                                        info!("Submit projects usage error: {:?}", e)
+                                // Get request number
+                                match self
+                                    .get_request_number(
+                                        "filter",
+                                        PROJECT_FILTER,
+                                        DATA_NAME,
+                                        current_count_block_timestamp,
+                                        &chain_id,
+                                    )
+                                    .await
+                                {
+                                    Ok(projects_request) => {
+                                        info!("projects_request: {:?}", projects_request);
+                                        let project_quota = self.projects.clone();
+                                        if let Err(e) = self
+                                            .chain_adapter
+                                            .submit_projects_usage(project_quota, projects_request)
+                                            .await
+                                        {
+                                            info!("Submit projects usage error: {:?}", e)
+                                        }
                                     }
-                                }
 
-                                Err(e) => info!("get_request_number error: {}", e),
+                                    Err(e) => info!("get_request_number error: {}", e),
+                                }
+                                last_count_block = current_count_block;
                             }
-                            last_count_block = current_count_block;
                         }
                     }
                 }
@@ -297,9 +339,13 @@ impl ComponentStats {
         // Update quota list
         task::spawn(async move {
             info!("Subscribe_event");
-            chain_adapter
-                .subscribe_event_update_quota(projects.clone())
-                .await;
+            loop {
+                let res = chain_adapter
+                    .subscribe_event_update_quota(projects.clone())
+                    .await;
+
+                info!("Re-subscribe event, res: {:?}", res);
+            }
         });
 
         // subscribe finalized header
@@ -325,34 +371,40 @@ impl StatsBuilder {
         // todo!()
         None
     }
-    async fn get_prometheus_client(&self, url: &String) -> anyhow::Result<PrometheusClient> {
+    async fn get_prometheus_client(url: &String) -> anyhow::Result<PrometheusClient> {
         let client = PrometheusClient::try_from(url.as_str())
             .map_err(|err| anyhow::Error::msg(format!("{:?}", err)));
         client
     }
 
-    pub async fn with_prometheus_gateway_url(mut self, path: String) -> StatsBuilder {
-        self.inner.prometheus_gateway_url = path;
+    pub async fn with_prometheus_url(mut self, path: String) -> StatsBuilder {
+        self.inner.prometheus_gateway_url = format!("{}gw", path);
+        self.inner.prometheus_node_url = format!("{}node", path);
+        // Create adapters for prometheus
+        for component_type in vec!["node", "gw"] {
+            let adapters = match component_type {
+                "node" => &mut self.inner.node_adapters,
+                _ => &mut self.inner.gateway_adapters,
+            };
 
-        self.inner.gateway_adapter = Arc::new(DataCollectionAdapter {
-            //data: Default::default(),
-            client: self
-                .get_prometheus_client(&self.inner.prometheus_gateway_url.to_string())
-                .await
-                .ok(),
-        });
-        self
-    }
+            for chain_id in ChainId::iter() {
+                adapters.insert(
+                    chain_id.clone(),
+                    Arc::new(DataCollectionAdapter {
+                        //data: Default::default(),
+                        client: Self::get_prometheus_client(&format!(
+                            "{}{}_{}",
+                            path,
+                            component_type,
+                            chain_id.to_string_prometheus(),
+                        ))
+                        .await
+                        .ok(),
+                    }),
+                );
+            }
+        }
 
-    pub async fn with_prometheus_node_url(mut self, path: String) -> StatsBuilder {
-        self.inner.prometheus_node_url = path;
-
-        self.inner.node_adapter = Arc::new(DataCollectionAdapter {
-            client: self
-                .get_prometheus_client(&self.inner.prometheus_node_url.to_string())
-                .await
-                .ok(),
-        });
         self
     }
 
@@ -360,18 +412,22 @@ impl StatsBuilder {
         self.inner.mvp_url = path.clone();
         // RPSee client for subscribe new block
         let client = WsClientBuilder::default().build(&path).await;
-        info!("Massbit chain path: {}, chain client: {:?}",path, client,);
+        info!("Massbit chain path: {}, chain client: {:?}", path, client,);
 
-        // substrate_api_client for send extrinsic and subscribe event
-        //let (signer,seed) = Pair::from_phrase(self.inner.signer_phrase.as_str(),None).expect("Wrong signer-phrase");
-        // Fixme: find Ferdie Pair from phrase
-        let signer = AccountKeyring::Ferdie.pair();
+        let (derive_signer, _) =
+            Pair::from_string_with_seed(self.inner.signer_phrase.as_str(), None).unwrap();
+        // info!(
+        //     "derive_signer phrase:{:?}",
+        //     self.inner.signer_phrase.as_str()
+        // );
+        info!("derive_signer address:{:?}", derive_signer.public());
+
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
 
         let api = Api::new(ws_client.clone())
-            .map(|api| api.set_signer(signer))
+            .map(|api| api.set_signer(derive_signer))
             .ok();
-        info!("api is none:{:?}",api.is_none());
+        info!("api is none:{:?}", api.is_none());
         let chain_adapter = ChainAdapter {
             json_rpc_client: client.ok(),
             ws_rpc_client: Some(ws_client.clone()),

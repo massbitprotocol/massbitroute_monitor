@@ -3,6 +3,7 @@ use dotenv;
 use logger;
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::CheckComponent;
+use mbr_check_component::SIGNER_PHRASE;
 use mbr_fisherman::fisherman_service::FishermanService;
 use mbr_fisherman::FISHERMAN_ENDPOINT;
 use mbr_fisherman::{CONFIG, ZONE};
@@ -42,12 +43,8 @@ async fn main() {
         let mvp_url = matches
             .value_of("mvp-url")
             .unwrap_or("wss://dev.verification.massbit.io");
-        let signer_phrase = matches
-            .value_of("signer-phrase")
-            .unwrap_or("bottom drive obey lake curtain smoke basket hold race lonely fit walk"); //Alice
         let domain = matches.value_of("domain").unwrap_or("massbitroute.dev");
         let no_report_mode = matches.is_present("no-report-mode");
-
         let mut check_component = CheckComponent::builder()
             .with_list_node_id_file(list_node_id_file.to_string(), Some("staked".to_string()))
             .await
@@ -78,7 +75,7 @@ async fn main() {
             .with_sample_interval_ms(CONFIG.sample_interval_ms)
             .with_entry_point(socket_addr.to_string())
             .with_check_component_service(check_component)
-            .with_signer_phrase(signer_phrase.to_string())
+            .with_signer_phrase(SIGNER_PHRASE.to_string())
             .with_mvp_url(mvp_url.to_string())
             .await
             .with_no_report(no_report_mode)
@@ -141,13 +138,6 @@ fn create_run_fisherman() -> Command<'static> {
                 .long("base-endpoint")
                 .value_name("base-endpoint")
                 .help("Input base-endpoint file")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("signer-phrase")
-                .long("signer-phrase")
-                .value_name("signer-phrase")
-                .help("Input signer-phrase")
                 .takes_value(true),
         )
         .arg(

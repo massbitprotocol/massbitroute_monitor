@@ -1,12 +1,25 @@
 use clap::{Arg, Command};
 use dotenv;
+use log::{debug, info};
 use logger;
 use logger::core::init_logger;
-use mbr_check_component::check_module::check_module::CheckComponent;
+use mbr_check_component::check_module::check_module::{CheckComponent, ComponentInfo};
 use mbr_check_component::SIGNER_PHRASE;
-use mbr_fisherman::fisherman_service::FishermanService;
+use mbr_fisherman::check_ping_pong_service::CheckPingPong;
+use mbr_fisherman::fisherman_service::{FishermanService, SubmitProviderReport};
 use mbr_fisherman::FISHERMAN_ENDPOINT;
 use mbr_fisherman::{CONFIG, ZONE};
+use mbr_stats::chain_adapter::Projects;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::RwLock;
+use tokio::task;
+use tokio::time::sleep;
+
+const CHECK_PING_PONG_INTERVAL: u64 = 5;
+const CHECK_LOGIC_INTERVAL: u64 = 2;
+const CHECK_BENCHMARK_INTERVAL: u64 = 3;
+const UPDATE_PROVIDER_LIST_INTERVAL: u64 = 5;
 
 #[tokio::main]
 async fn main() {
@@ -60,17 +73,8 @@ async fn main() {
             .build();
         log::debug!("check_component: {:?}", check_component);
         let socket_addr = FISHERMAN_ENDPOINT.as_str();
-        // let fisherman_service = FishermanService {
-        //     number_of_sample: *NUMBER_OF_SAMPLES,
-        //     sample_interval_ms: *SAMPLE_INTERVAL_MS,
-        //     entry_point: socket_addr.to_string(),
-        //     check_component_service: Arc::new(check_component),
-        //     mvp_url: "".to_string(),
-        //     signer_phrase: "".to_string(),
-        //     chain_adapter: Arc::new(Default::default())
-        // };
 
-        let fisherman_service = FishermanService::builder()
+        let mut fisherman_service_org = FishermanService::builder()
             .with_number_of_sample(CONFIG.number_of_samples)
             .with_sample_interval_ms(CONFIG.sample_interval_ms)
             .with_entry_point(socket_addr.to_string())
@@ -81,12 +85,82 @@ async fn main() {
             .with_no_report(no_report_mode)
             .build();
 
+        let list_providers_org = Arc::new(RwLock::new(
+            fisherman_service_org.get_provider_list_from_portal().await,
+        ));
         // Check component
-        fisherman_service.loop_check_component().await;
+        //fisherman_service.loop_check_component().await;
+        let mut fisherman_service = fisherman_service_org.clone();
+        let list_providers = list_providers_org.clone();
 
-        // info!("Run service");
-        // let access_control = AccessControl::default();
-        // server.serve(access_control).await;
+        // test ping pong
+        task::spawn(async move {
+            loop {
+                let list_providers_clone = list_providers.clone();
+                // Get list bad component
+                let res = FishermanService::check_ping_pong(
+                    list_providers_clone,
+                    fisherman_service.check_component_service.domain.clone(),
+                )
+                .await;
+                match res {
+                    Ok(res) => {
+                        if !res.is_empty() {
+                            info!("Remove by ping pong check: {:?}", res);
+                            let mut list_providers_lock = list_providers.write().await;
+                            for bad_component in res.iter() {
+                                list_providers_lock.retain(|component| res.contains_key(component));
+                            }
+                            // Todo: summit report
+                        }
+                    }
+                    Err(err) => {
+                        info!("check_ping_pong error: {}", err);
+                    }
+                }
+
+                sleep(Duration::from_secs(CHECK_PING_PONG_INTERVAL)).await;
+            }
+        });
+
+        let mut fisherman_service = fisherman_service_org.clone();
+        let list_providers = list_providers_org.clone();
+        // test logic
+        task::spawn(async move {
+            loop {
+                let list_providers_clone = list_providers.clone();
+                let res = fisherman_service.check_logic(list_providers_clone).await;
+
+                sleep(Duration::from_secs(CHECK_LOGIC_INTERVAL)).await;
+            }
+        });
+
+        // let mut fisherman_service = fisherman_service_org.clone();
+        // let list_providers = list_providers_org.clone();
+        // // test benchmark
+        // task::spawn(async move {
+        //     loop {
+        //         let list_providers_clone = list_providers.clone();
+        //         let res = fisherman_service
+        //             .check_benchmark(list_providers_clone)
+        //             .await;
+        //
+        //         sleep(Duration::from_secs(CHECK_BENCHMARK_INTERVAL)).await;
+        //     }
+        // });
+        // Update node/gw list
+        loop {
+            sleep(Duration::from_secs(UPDATE_PROVIDER_LIST_INTERVAL)).await;
+            let new_list_providers = fisherman_service_org.get_provider_list_from_portal().await;
+            {
+                let mut list_providers_lock = list_providers_org.write().await;
+                *list_providers_lock = new_list_providers;
+            }
+            debug!(
+                "Update list provider: {:#?}",
+                list_providers_org.read().await
+            );
+        }
     }
 }
 fn create_run_fisherman() -> Command<'static> {

@@ -3,6 +3,7 @@ use mbr_check_component::check_module::check_module::Zone;
 use serde::Deserialize;
 use std::env;
 use std::str::FromStr;
+pub mod check_ping_pong_service;
 pub mod fisherman_service;
 
 #[derive(Deserialize, Debug)]

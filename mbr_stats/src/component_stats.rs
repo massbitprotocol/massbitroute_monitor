@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use crate::chain_adapter::{ChainAdapter, Projects};
@@ -203,18 +204,28 @@ impl ComponentStats {
             .await?;
 
         let res = if let Some(instant) = response.as_instant() {
-            Ok(instant
-                .iter()
-                .filter_map(|iv| {
-                    iv.metric().get("filter").and_then(|filter| {
+            Ok({
+                let mut projects: HashMap<String, usize> = HashMap::new();
+                for iv in instant.iter() {
+                    if let Some(filter) = iv.metric().get("filter") {
                         let value = iv.sample().value() as usize;
-                        let project = ComponentStats::capture_project_id(filter.as_str())
-                            .and_then(|project_id| Some((project_id.to_string(), value)));
-                        info!("project: {:?}", project);
-                        project
-                    })
-                })
-                .collect::<HashMap<String, usize>>())
+                        if let Some(project_id) =
+                            ComponentStats::capture_project_id(filter.as_str())
+                        {
+                            let values = match projects.entry(project_id) {
+                                Entry::Occupied(o) => {
+                                    let mut tmp = o.into_mut();
+                                    *tmp += value;
+                                }
+                                Entry::Vacant(v) => {
+                                    v.insert(value);
+                                }
+                            };
+                        };
+                    };
+                }
+                projects
+            })
         } else {
             Err(anyhow::Error::msg("Cannot parse response"))
         };
@@ -328,9 +339,13 @@ impl ComponentStats {
         // Update quota list
         task::spawn(async move {
             info!("Subscribe_event");
-            chain_adapter
-                .subscribe_event_update_quota(projects.clone())
-                .await;
+            loop {
+                let res = chain_adapter
+                    .subscribe_event_update_quota(projects.clone())
+                    .await;
+
+                info!("Re-subscribe event, res: {:?}", res);
+            }
         });
 
         // subscribe finalized header
@@ -401,6 +416,11 @@ impl StatsBuilder {
 
         let (derive_signer, _) =
             Pair::from_string_with_seed(self.inner.signer_phrase.as_str(), None).unwrap();
+        // info!(
+        //     "derive_signer phrase:{:?}",
+        //     self.inner.signer_phrase.as_str()
+        // );
+        info!("derive_signer address:{:?}", derive_signer.public());
 
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
 

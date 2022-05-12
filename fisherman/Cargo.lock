@@ -1834,6 +1834,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "dotenv",
  "futures",
  "futures-util",
  "handlebars",

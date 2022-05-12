@@ -253,14 +253,14 @@ _remove_monitors() {
 	tmp2=$(mktemp)
 	tmp=$(mktemp)
 	_type=gateway
-	_site=${_type}_${_block}_${_net}
+	_site=gw_${_block}_${_net}
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
 		echo $0 _del_monitor_host $_site $h >>$tmp
 	done
 	_type=node
-	_site=${_type}_${_block}_${_net}
+	_site=node_${_block}_${_net}
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do

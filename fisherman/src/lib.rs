@@ -32,6 +32,7 @@ pub struct Config {
     pub ping_success_ratio_threshold: f32,
     pub ping_sample_number: u64,
     pub ping_request_response: String,
+    pub ping_timeout_ms: u64,
 
     pub check_ping_pong_interval: u64,
     pub check_logic_interval: u64,

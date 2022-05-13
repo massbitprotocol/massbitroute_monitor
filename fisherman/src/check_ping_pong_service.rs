@@ -9,6 +9,7 @@ use reqwest::Client;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::sync::RwLock;
 
@@ -33,12 +34,19 @@ impl CheckPingPong for FishermanService {
         {
             list_providers_clone = (*list_providers.read().await).clone();
         }
-        let mut result: Arc<RwLock<HashMap<ComponentInfo, f32>>> =
-            Arc::new(RwLock::new(HashMap::new()));
+        // init new count hashmap
+        let result = list_providers_clone
+            .iter()
+            .map(|component| (component.clone(), 0f32))
+            .collect();
+        let mut result: Arc<RwLock<HashMap<ComponentInfo, f32>>> = Arc::new(RwLock::new(result));
 
         // Parallel call
-        let client = Client::new();
-        for i in 1..CONFIG.ping_sample_number {
+        //let client = Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_millis(CONFIG.ping_timeout_ms))
+            .build()?;
+        for i in 0..CONFIG.ping_sample_number {
             let bodies = stream::iter(list_providers_clone.clone())
                 .map(|component| {
                     let mut url = format!("http://{}/ping", component.ip);
@@ -66,8 +74,8 @@ impl CheckPingPong for FishermanService {
                                 *result.write().await.entry(component).or_insert(1f32) += 1f32;
                             }
                         }
-                        Ok(Err(e)) => debug!("Got a reqwest::Error: {}", e),
-                        Err(e) => debug!("Got a tokio::JoinError: {}", e),
+                        Ok(Err(e)) => info!("Got a reqwest::Error: {}", e),
+                        Err(e) => info!("Got a tokio::JoinError: {}", e),
                     }
                 })
                 .await;

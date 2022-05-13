@@ -1,4 +1,5 @@
 use crate::fisherman_service::FishermanService;
+use crate::{Config, CONFIG};
 use anyhow::{Error, Result};
 use futures::{stream, StreamExt};
 use futures_util::TryStreamExt;
@@ -10,11 +11,6 @@ use std::default::Default;
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::sync::RwLock;
-
-const PING_PARALLEL_REQUESTS: usize = 10;
-const PING_SUCCESS_RATIO_THRESHOLD: f32 = 0.95;
-const PING_SAMPLE_NUMBER: usize = 100;
-const RESPONSE_PING_REQUEST: &str = "pong";
 
 type SuccessRate = f32;
 
@@ -42,7 +38,7 @@ impl CheckPingPong for FishermanService {
 
         // Parallel call
         let client = Client::new();
-        for i in 1..PING_SAMPLE_NUMBER {
+        for i in 1..CONFIG.ping_sample_number {
             let bodies = stream::iter(list_providers_clone.clone())
                 .map(|component| {
                     let mut url = format!("http://{}/ping", component.ip);
@@ -60,13 +56,13 @@ impl CheckPingPong for FishermanService {
                         resp
                     })
                 })
-                .buffer_unordered(PING_PARALLEL_REQUESTS);
+                .buffer_unordered(CONFIG.ping_parallel_requests);
             bodies
                 .for_each(|b| async {
                     match b {
                         Ok(Ok((component, resp))) => {
                             //debug!("Ping {} result: {}", component.id, resp);
-                            if resp == RESPONSE_PING_REQUEST {
+                            if resp == CONFIG.ping_request_response {
                                 *result.write().await.entry(component).or_insert(1f32) += 1f32;
                             }
                         }
@@ -81,13 +77,14 @@ impl CheckPingPong for FishermanService {
             .await
             .iter()
             .filter_map(|(component, sum_success)| {
-                let success_rate = sum_success / (PING_SAMPLE_NUMBER as f32);
+                let success_rate = sum_success / (CONFIG.ping_sample_number as f32);
                 info!(
-                    "component: {}, success rate: {}%",
+                    "component: {} {:?}, success rate: {}%",
                     component.id,
+                    component.component_type,
                     success_rate * 100f32
                 );
-                if success_rate < PING_SUCCESS_RATIO_THRESHOLD {
+                if success_rate < CONFIG.ping_success_ratio_threshold {
                     Some((component.clone(), success_rate))
                 } else {
                     None

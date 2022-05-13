@@ -15,5 +15,15 @@
   "mvp_extrinsic_submit_provider_report": "report_provider_offence",
   "mvp_extrinsic_dapi": "Dapi",
   "mvp_extrinsic_submit_project_usage": "submit_project_usage",
-  "mvp_event_project_registered": "ProjectRegistered"
+  "mvp_event_project_registered": "ProjectRegistered",
+
+  "ping_parallel_requests": 10,
+  "ping_success_ratio_threshold": 0.95,
+  "ping_sample_number": 100,
+  "ping_request_response": "pong",
+
+  "check_ping_pong_interval": 2,
+  "check_logic_interval": 2,
+  "check_benchmark_interval": 3,
+  "update_provider_list_interval": 5
 }

@@ -31,6 +31,7 @@ pub trait SubmitProviderReport {
 
 #[derive(Clone, Debug, Encode)]
 pub enum ProviderReportReason {
+    // {requests: u64, successRate: u32, averageLatency: u32}
     BadPerformance(u64, u32, u32),
     OutOfSync,
 }

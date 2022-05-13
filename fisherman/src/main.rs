@@ -1,3 +1,4 @@
+use anyhow::Error;
 use clap::{Arg, Command};
 use dotenv;
 use log::{debug, info};
@@ -6,20 +7,18 @@ use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::{CheckComponent, ComponentInfo};
 use mbr_check_component::SIGNER_PHRASE;
 use mbr_fisherman::check_ping_pong_service::CheckPingPong;
-use mbr_fisherman::fisherman_service::{FishermanService, SubmitProviderReport};
+use mbr_fisherman::fisherman_service::{
+    FishermanService, ProviderReportReason, SubmitProviderReport,
+};
 use mbr_fisherman::FISHERMAN_ENDPOINT;
 use mbr_fisherman::{CONFIG, ZONE};
 use mbr_stats::chain_adapter::Projects;
+use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::task;
 use tokio::time::sleep;
-
-const CHECK_PING_PONG_INTERVAL: u64 = 5;
-const CHECK_LOGIC_INTERVAL: u64 = 2;
-const CHECK_BENCHMARK_INTERVAL: u64 = 3;
-const UPDATE_PROVIDER_LIST_INTERVAL: u64 = 5;
 
 #[tokio::main]
 async fn main() {
@@ -103,23 +102,56 @@ async fn main() {
                     fisherman_service.check_component_service.domain.clone(),
                 )
                 .await;
+
                 match res {
                     Ok(res) => {
                         if !res.is_empty() {
-                            info!("Remove by ping pong check: {:?}", res);
-                            let mut list_providers_lock = list_providers.write().await;
-                            for bad_component in res.iter() {
-                                list_providers_lock.retain(|component| res.contains_key(component));
+                            // Fixme: add action for report false case
+                            info!("Bad providers are detected by ping pong check: {:?}", res);
+
+                            // Report bad component
+                            if !fisherman_service.is_no_report {
+                                for (bad_component, success_rate) in res.iter() {
+                                    let provider_id: [u8; 36] =
+                                        bad_component.id.as_bytes().try_into().unwrap();
+                                    let report_res =
+                                        fisherman_service.chain_adapter.submit_provider_report(
+                                            provider_id,
+                                            ProviderReportReason::BadPerformance(
+                                                CONFIG.ping_sample_number,
+                                                ((success_rate * 100f32) as u32),
+                                                0,
+                                            ),
+                                        );
+                                    match report_res {
+                                        Ok(_) => {
+                                            info!(
+                                                "Success report {:?} {}",
+                                                bad_component.component_type, bad_component.id
+                                            );
+                                        }
+                                        Err(err) => {
+                                            info!(
+                                                "Fail report {:?} {}, error: {}",
+                                                bad_component.component_type, bad_component.id, err
+                                            );
+                                        }
+                                    }
+                                }
                             }
-                            // Todo: summit report
+                            // Remove from list
+                            {
+                                let mut list_providers_lock = list_providers.write().await;
+                                list_providers_lock
+                                    .retain(|component| !res.contains_key(component));
+                            }
                         }
                     }
                     Err(err) => {
                         info!("check_ping_pong error: {}", err);
                     }
                 }
-
-                sleep(Duration::from_secs(CHECK_PING_PONG_INTERVAL)).await;
+                sleep(Duration::from_secs(CONFIG.check_ping_pong_interval)).await;
             }
         });
 
@@ -131,7 +163,7 @@ async fn main() {
                 let list_providers_clone = list_providers.clone();
                 let res = fisherman_service.check_logic(list_providers_clone).await;
 
-                sleep(Duration::from_secs(CHECK_LOGIC_INTERVAL)).await;
+                sleep(Duration::from_secs(CONFIG.check_logic_interval)).await;
             }
         });
 
@@ -145,12 +177,12 @@ async fn main() {
         //             .check_benchmark(list_providers_clone)
         //             .await;
         //
-        //         sleep(Duration::from_secs(CHECK_BENCHMARK_INTERVAL)).await;
+        //         sleep(Duration::from_secs(CONFIG.check_benchmark_interval)).await;
         //     }
         // });
         // Update node/gw list
         loop {
-            sleep(Duration::from_secs(UPDATE_PROVIDER_LIST_INTERVAL)).await;
+            sleep(Duration::from_secs(CONFIG.update_provider_list_interval)).await;
             let new_list_providers = fisherman_service_org.get_provider_list_from_portal().await;
             {
                 let mut list_providers_lock = list_providers_org.write().await;

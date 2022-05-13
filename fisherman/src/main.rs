@@ -14,6 +14,7 @@ use mbr_fisherman::FISHERMAN_ENDPOINT;
 use mbr_fisherman::{CONFIG, ZONE};
 use mbr_stats::chain_adapter::Projects;
 use std::convert::TryInto;
+use std::fs::read;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -151,6 +152,10 @@ async fn main() {
                         info!("check_ping_pong error: {}", err);
                     }
                 }
+                info!(
+                    "check ping pong list_providers: {:?}",
+                    list_providers.read().await
+                );
                 sleep(Duration::from_secs(CONFIG.check_ping_pong_interval)).await;
             }
         });
@@ -188,8 +193,8 @@ async fn main() {
                 let mut list_providers_lock = list_providers_org.write().await;
                 *list_providers_lock = new_list_providers;
             }
-            debug!(
-                "Update list provider: {:#?}",
+            info!(
+                "Update list provider: {:?}",
                 list_providers_org.read().await
             );
         }

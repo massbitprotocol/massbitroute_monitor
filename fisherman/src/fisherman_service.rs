@@ -46,9 +46,13 @@ impl SubmitProviderReport for ChainAdapter {
         let api = self.api.as_ref().unwrap().clone();
 
         info!(
-            "[+] Composed Extrinsic report provider {:?} with reason {:?}",
-            provider_id, &reason
+            "[+] Composed Extrinsic report provider {:?} with reason {:?}, nonce: {:?} {:?}",
+            provider_id,
+            &reason,
+            api.get_nonce(),
+            api.get_nonce()
         );
+
         // the names are given as strings
         #[allow(clippy::redundant_clone)]
         let xt: UncheckedExtrinsicV4<_> = compose_extrinsic!(
@@ -111,6 +115,7 @@ impl FishermanBuilder {
         // println!("chain client: {:?}", client);
         let (derive_signer, _) =
             Pair::from_string_with_seed(self.inner.signer_phrase.as_str(), None).unwrap();
+        // info!("signer_phrase:{}", self.inner.signer_phrase.as_str());
 
         let ws_client = WsRpcClient::new(&self.inner.mvp_url);
         let chain_adapter = ChainAdapter {

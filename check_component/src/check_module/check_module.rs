@@ -475,7 +475,7 @@ impl CheckComponent {
         }
 
         //Filter zone
-        info!("Zone:{:?}", filter_zone);
+        //info!("Zone:{:?}", filter_zone);
         if *filter_zone != Zone::GB {
             self.list_nodes
                 .retain(|component| component.zone == *filter_zone);

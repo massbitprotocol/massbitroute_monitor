@@ -14,7 +14,6 @@ pub trait CheckDataCorrectness {
     async fn check_data(
         &self,
         list_providers: Arc<RwLock<Vec<ComponentInfo>>>,
-        domain: String,
     ) -> Result<HashMap<ComponentInfo, ComponentReport>, Error>;
 }
 
@@ -23,15 +22,20 @@ impl CheckDataCorrectness for FishermanService {
     async fn check_data(
         &self,
         list_providers: Arc<RwLock<Vec<ComponentInfo>>>,
-        domain: String,
     ) -> Result<HashMap<ComponentInfo, ComponentReport>, Error> {
-        let mut average_reports: HashMap<ComponentInfo, ComponentReport> = HashMap::new();
+        // Copy list provider
+        let mut list_providers_clone;
+        {
+            list_providers_clone = (*list_providers.read().await).clone();
+        }
+
+        let mut bad_components: HashMap<ComponentInfo, ComponentReport> = HashMap::new();
         let mut collect_reports: HashMap<ComponentInfo, Vec<CheckMkReport>> = HashMap::new();
         for n in 0..CONFIG.number_of_samples {
             info!("Run {} times", n + 1);
             if let Ok(reports) = self
                 .check_component_service
-                .check_components(&CONFIG.check_task_list_fisherman)
+                .check_components(&CONFIG.check_task_list_fisherman, &list_providers_clone)
                 .await
             {
                 debug!("reports:{:?}", reports);
@@ -55,11 +59,11 @@ impl CheckDataCorrectness for FishermanService {
         // Calculate average report
         for (component, reports) in collect_reports.iter() {
             info!("component:{:?}", component.id);
-            average_reports.insert(component.clone(), ComponentReport::from(reports));
+            bad_components.insert(component.clone(), ComponentReport::from(reports));
         }
 
         // Display report for debug
-        for (component, report) in average_reports.iter() {
+        for (component, report) in bad_components.iter() {
             info!("id: {}, type: {:?}, chain {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
                     component.id,
                     component.component_type,
@@ -70,6 +74,8 @@ impl CheckDataCorrectness for FishermanService {
                     report.is_healthy(&component.component_type)
                 );
         }
-        Ok(average_reports)
+        // Filter bad component only
+        bad_components.retain(|component, report| !report.is_healthy(&component.component_type));
+        Ok(bad_components)
     }
 }

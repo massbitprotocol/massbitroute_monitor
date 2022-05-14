@@ -1,4 +1,4 @@
-use crate::fisherman_service::FishermanService;
+use crate::fisherman_service::{ComponentReport, FishermanService};
 use crate::{Config, CONFIG};
 use anyhow::{Error, Result};
 use futures::{stream, StreamExt};
@@ -20,7 +20,7 @@ pub trait CheckPingPong {
     async fn check_ping_pong(
         list_providers: Arc<RwLock<Vec<ComponentInfo>>>,
         domain: String,
-    ) -> Result<HashMap<ComponentInfo, SuccessRate>>;
+    ) -> Result<HashMap<ComponentInfo, ComponentReport>>;
 }
 
 #[async_trait::async_trait]
@@ -28,7 +28,7 @@ impl CheckPingPong for FishermanService {
     async fn check_ping_pong(
         list_providers: Arc<RwLock<Vec<ComponentInfo>>>,
         domain: String,
-    ) -> Result<HashMap<ComponentInfo, SuccessRate>> {
+    ) -> Result<HashMap<ComponentInfo, ComponentReport>> {
         // Copy list provider
         let mut list_providers_clone;
         {
@@ -93,7 +93,14 @@ impl CheckPingPong for FishermanService {
                     success_rate * 100f32
                 );
                 if success_rate < CONFIG.ping_success_ratio_threshold {
-                    Some((component.clone(), success_rate))
+                    Some((
+                        component.clone(),
+                        ComponentReport {
+                            request_number: CONFIG.ping_sample_number,
+                            success_number: *sum_success as u64,
+                            response_time_ms: None,
+                        },
+                    ))
                 } else {
                     None
                 }

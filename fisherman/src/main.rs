@@ -7,10 +7,11 @@ use logger;
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::{CheckComponent, ComponentInfo};
 use mbr_check_component::SIGNER_PHRASE;
-use mbr_fisherman::check_ping_pong_service::CheckPingPong;
+use mbr_fisherman::data_check::CheckDataCorrectness;
 use mbr_fisherman::fisherman_service::{
     FishermanService, ProviderReportReason, SubmitProviderReport,
 };
+use mbr_fisherman::ping_pong::CheckPingPong;
 use mbr_fisherman::FISHERMAN_ENDPOINT;
 use mbr_fisherman::{CONFIG, ZONE};
 use mbr_stats::chain_adapter::Projects;
@@ -130,12 +131,32 @@ async fn main() {
 
         let mut fisherman_service = fisherman_service_org.clone();
         let list_providers = list_providers_org.clone();
-        // test logic
+        // Check data correctness
         task::spawn(async move {
             loop {
                 let list_providers_clone = list_providers.clone();
-                let res = fisherman_service.check_logic(list_providers_clone).await;
+                // Get list bad component
+                let bad_components = fisherman_service.check_data(list_providers_clone).await;
 
+                match bad_components {
+                    Ok(bad_components) => {
+                        // Submit_reports bad components, get success report list
+                        let bad_components = fisherman_service.submit_reports(&bad_components);
+                        // Remove from list
+                        {
+                            let mut list_providers_lock = list_providers.write().await;
+                            list_providers_lock
+                                .retain(|component| !bad_components.contains(component));
+                        }
+                    }
+                    Err(err) => {
+                        info!("check_ping_pong error: {}", err);
+                    }
+                }
+                info!(
+                    "check data correctness list_providers: {:?}",
+                    list_providers.read().await
+                );
                 sleep(Duration::from_secs(CONFIG.check_logic_interval)).await;
             }
         });

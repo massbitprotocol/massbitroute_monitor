@@ -3,6 +3,7 @@ use mbr_check_component::check_module::check_module::Zone;
 use serde::Deserialize;
 use std::env;
 use std::str::FromStr;
+pub mod check_ping_pong_service;
 pub mod fisherman_service;
 
 #[derive(Deserialize, Debug)]
@@ -19,11 +20,23 @@ pub struct Config {
     pub reports_history_queue_length_max: usize,
     pub check_task_list_fisherman: Vec<String>,
     pub checking_component_status: String,
+
     // for submit report
     pub mvp_extrinsic_submit_provider_report: String,
     pub mvp_extrinsic_dapi: String,
     pub mvp_extrinsic_submit_project_usage: String,
     pub mvp_event_project_registered: String,
+
+    // for ping pong check
+    pub ping_parallel_requests: usize,
+    pub ping_success_ratio_threshold: f32,
+    pub ping_sample_number: u64,
+    pub ping_request_response: String,
+
+    pub check_ping_pong_interval: u64,
+    pub check_logic_interval: u64,
+    pub check_benchmark_interval: u64,
+    pub update_provider_list_interval: u64,
 }
 const CONFIG_FILE: &str = "config_fisherman.json";
 lazy_static! {

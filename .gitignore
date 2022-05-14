@@ -66,6 +66,15 @@ scripts/single-node-test/hosts/
 scripts/single-node-test/DAPI_URL
 scripts/single-node-test/.env
 scripts/single-node-test/.env
-check_component/.env
+
 fisherman/.env
+fisherman/.env-dev
+fisherman/.env-net
+
 mbr_stats/.env
+mbr_stats/.env-dev
+mbr_stats/.env-net
+
+check_component/.env
+check_component/.env-dev
+check_component/.env-net

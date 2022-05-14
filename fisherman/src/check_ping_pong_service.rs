@@ -13,7 +13,7 @@ use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::sync::RwLock;
 
-type SuccessRate = f32;
+pub type SuccessRate = f32;
 
 #[async_trait::async_trait]
 pub trait CheckPingPong {

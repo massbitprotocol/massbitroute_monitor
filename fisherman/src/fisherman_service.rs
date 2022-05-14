@@ -1,3 +1,4 @@
+use crate::check_ping_pong_service::SuccessRate;
 use crate::{CONFIG, ZONE};
 use anyhow::Error;
 use log::{debug, info};
@@ -156,6 +157,51 @@ impl FishermanBuilder {
 impl FishermanService {
     pub fn builder() -> FishermanBuilder {
         FishermanBuilder::default()
+    }
+
+    pub fn submit_reports(
+        &self,
+        bad_components: &HashMap<ComponentInfo, SuccessRate>,
+    ) -> Vec<ComponentInfo> {
+        let mut res = Vec::new();
+        if !bad_components.is_empty() {
+            // Fixme: add action for report false case
+            info!(
+                "Bad providers are detected by ping pong check: {:?}",
+                bad_components
+            );
+
+            // Report bad component
+            if !self.is_no_report {
+                for (bad_component, success_rate) in bad_components.iter() {
+                    let provider_id: [u8; 36] = bad_component.id.as_bytes().try_into().unwrap();
+                    let report_res = self.chain_adapter.submit_provider_report(
+                        provider_id,
+                        ProviderReportReason::BadPerformance(
+                            CONFIG.ping_sample_number,
+                            ((success_rate * 100f32) as u32),
+                            0,
+                        ),
+                    );
+                    match report_res {
+                        Ok(_) => {
+                            info!(
+                                "Success report {:?} {}",
+                                bad_component.component_type, bad_component.id
+                            );
+                            res.push(bad_component.clone());
+                        }
+                        Err(err) => {
+                            info!(
+                                "Fail report {:?} {}, error: {}",
+                                bad_component.component_type, bad_component.id, err
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        res
     }
 
     pub async fn get_provider_list_from_portal(&mut self) -> Vec<ComponentInfo> {

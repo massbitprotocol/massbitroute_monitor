@@ -12,12 +12,12 @@ _install() {
 
 _add() {
 	_name=$1
-	omd create _name
+	omd create $_name
 
 	# mkdir -p etc/mkagent
 	# git clone http://mbr_gateway:6a796299bb72357770735a79019612af228586e7@git.massbitroute.com/massbitroute/mkagent.git  etc/mkagent
 	# ln -sf /massbit/massbitroute/app/src/sites/services/monitor/etc/mkagent/agents/main.mk /opt/omd/sites/mbr/etc/check_mk/main.mk
 	omd start $_name
-	su - mbr -c 'htpasswd etc/htpasswd cmkadmin'
+	su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd cmkadmin"
 }
 $@

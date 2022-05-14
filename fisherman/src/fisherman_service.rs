@@ -1,4 +1,4 @@
-use crate::check_ping_pong_service::SuccessRate;
+use crate::ping_pong::SuccessRate;
 use crate::{CONFIG, ZONE};
 use anyhow::Error;
 use log::{debug, info};
@@ -418,9 +418,9 @@ impl FishermanService {
 
 #[derive(Clone, Debug, Default)]
 pub struct ComponentReport {
-    request_number: u64,
-    success_number: u64,
-    response_time_ms: Option<u32>,
+    pub request_number: u64,
+    pub success_number: u64,
+    pub response_time_ms: Option<u32>,
 }
 
 impl ComponentReport {

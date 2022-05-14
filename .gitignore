@@ -69,3 +69,7 @@ scripts/single-node-test/.env
 check_component/.env
 fisherman/.env
 mbr_stats/.env
+/etc/mkagent/
+/data/
+/src/
+/.rustup/

@@ -204,7 +204,7 @@ _add_monitor_host() {
 	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 	# fi
-	sleep 1
+
 	if [ $disc -eq 1 ]; then
 		# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		action="discover_services"
@@ -293,7 +293,7 @@ _run_me() {
 	_f=$2
 	su - $_site -c "touch /omd/sites/$_site/etc/check_mk/main.mk"
 	cat ${_f}
-	#	bash ${_f}
+	bash ${_f}
 	#cat ${_f} | parallel -j$(nproc)
 	su - $_site -c "rm /omd/sites/$_site/etc/check_mk/main.mk"
 }

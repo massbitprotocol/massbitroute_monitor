@@ -404,6 +404,7 @@ _add_host_file() {
 		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
 	fi
 	cat /etc/hosts.bk >/tmp/hosts
+	echo curl -s https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
 	curl -s https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
 	if [ -f "/tmp/hosts.1" ]; then
 		cat /tmp/hosts.1 >>/tmp/hosts

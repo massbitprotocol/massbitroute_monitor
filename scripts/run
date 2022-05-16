@@ -3,7 +3,8 @@ TYPE="monitor"
 GRAFANA_VERSION=v8.2.1
 PROMETHEUS_VERSION=v2.30.3
 
-SITE_ROOT=$(realpath $(dirname $(realpath $0))/..)
+script=$(realpath $0)
+SITE_ROOT=$(realpath $(dirname $script)/..)
 export HOME=$SITE_ROOT
 cd $SITE_ROOT
 
@@ -258,14 +259,14 @@ _remove_monitors() {
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
-		echo $0 _del_monitor_host $_site $h >>$tmp
+		echo $script _del_monitor_host $_site $h >>$tmp
 	done
 	_type=node
 	_site=node_${_block}_${_net}
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
-		echo $0 _del_monitor_host $_site $h >>$tmp
+		echo $script _del_monitor_host $_site $h >>$tmp
 	done
 	# type=dapi
 	# curl -sk https://$PORTAL_DOMAIN/deploy/info/$type/listid | awk -v type=$type '{print type"-"$3"-"$4"-"$1}' | sort >$tmp1
@@ -318,7 +319,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=gateway-$block-$net-$id
-			echo $0 _add_monitor_host $_site $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
+			echo $script _add_monitor_host $_site $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -342,7 +343,7 @@ _add_monitors() {
 			if [ $status -ne 1 ]; then continue; fi
 			if [ $approved -ne 1 ]; then continue; fi
 			_hostname=node-$block-$net-$id
-			echo $0 _add_monitor_host $_site $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
+			echo $script _add_monitor_host $_site $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 			echo $_access_token $_hostname >>${token_file}.tmp
 			mk_reload=1
@@ -432,7 +433,7 @@ _monitor() {
 	is_reload=$?
 
 	if [ $is_reload -ne 0 ]; then
-		$0 _reload
+		$script _reload
 	fi
 	# $0 _remove_hosts
 	#$0 _add_monitors

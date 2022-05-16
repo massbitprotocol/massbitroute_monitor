@@ -309,6 +309,7 @@ _add_monitors() {
 	# token_node=$(mktemp)
 	mk_reload=0
 	_site=gw_${_block}_${_net}
+	echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp}
 	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		echo >>${tmp}
@@ -332,6 +333,7 @@ _add_monitors() {
 
 	_site=node_${_block}_${_net}
 	tmp=$(mktemp)
+	echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp}
 	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		echo >>${tmp}

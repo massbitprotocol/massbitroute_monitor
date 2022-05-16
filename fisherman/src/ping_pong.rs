@@ -5,6 +5,10 @@ use futures::{stream, StreamExt};
 use futures_util::TryStreamExt;
 use log::{debug, info};
 use mbr_check_component::check_module::check_module::ComponentInfo;
+use mbr_check_component::check_module::store_report::{
+    ReportType, ReporterRole, SendPurpose, StoreReport,
+};
+use mbr_check_component::{LOCAL_IP, PORTAL_AUTHORIZATION};
 use reqwest::Client;
 use std::collections::HashMap;
 use std::default::Default;
@@ -18,6 +22,7 @@ pub type SuccessRate = f32;
 #[async_trait::async_trait]
 pub trait CheckPingPong {
     async fn check_ping_pong(
+        &self,
         list_providers: Arc<RwLock<Vec<ComponentInfo>>>,
         domain: String,
     ) -> Result<HashMap<ComponentInfo, ComponentReport>>;
@@ -26,6 +31,7 @@ pub trait CheckPingPong {
 #[async_trait::async_trait]
 impl CheckPingPong for FishermanService {
     async fn check_ping_pong(
+        &self,
         list_providers: Arc<RwLock<Vec<ComponentInfo>>>,
         domain: String,
     ) -> Result<HashMap<ComponentInfo, ComponentReport>> {
@@ -93,14 +99,13 @@ impl CheckPingPong for FishermanService {
                     success_rate * 100f32
                 );
                 if success_rate < CONFIG.ping_success_ratio_threshold {
-                    Some((
-                        component.clone(),
-                        ComponentReport {
-                            request_number: CONFIG.ping_sample_number,
-                            success_number: *sum_success as u64,
-                            response_time_ms: None,
-                        },
-                    ))
+                    let component_report = ComponentReport {
+                        request_number: CONFIG.ping_sample_number,
+                        success_number: *sum_success as u64,
+                        response_time_ms: None,
+                    };
+
+                    Some((component.clone(), component_report))
                 } else {
                     None
                 }

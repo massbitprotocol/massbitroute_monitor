@@ -160,7 +160,7 @@ impl FishermanService {
         FishermanBuilder::default()
     }
 
-    pub fn submit_reports(
+    pub async fn submit_reports(
         &self,
         bad_components: &HashMap<ComponentInfo, ComponentReport>,
     ) -> Vec<ComponentInfo> {
@@ -188,6 +188,21 @@ impl FishermanService {
                                 bad_component.component_type, bad_component.id
                             );
                             res.push(bad_component.clone());
+
+                            // Store report to portal
+                            let mut store_report = StoreReport::build(
+                                &*LOCAL_IP,
+                                ReporterRole::Fisherman,
+                                &*PORTAL_AUTHORIZATION,
+                                &self.check_component_service.domain,
+                            );
+                            store_report.set_report_data_for_report(
+                                report.success_number,
+                                report.request_number,
+                                &bad_component,
+                            );
+                            let res = store_report.send_data(SendPurpose::Store).await;
+                            info!("Store report: {:?}", res.unwrap().text().await);
                         }
                         Err(err) => {
                             info!(

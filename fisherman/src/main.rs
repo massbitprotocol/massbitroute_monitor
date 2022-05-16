@@ -100,16 +100,18 @@ async fn main() {
             loop {
                 let list_providers_clone = list_providers.clone();
                 // Get list bad component
-                let bad_components = FishermanService::check_ping_pong(
-                    list_providers_clone,
-                    fisherman_service.check_component_service.domain.clone(),
-                )
-                .await;
+                let bad_components = fisherman_service
+                    .check_ping_pong(
+                        list_providers_clone,
+                        fisherman_service.check_component_service.domain.clone(),
+                    )
+                    .await;
 
                 match bad_components {
                     Ok(bad_components) => {
                         // Submit_reports bad components, get success report list
-                        let bad_components = fisherman_service.submit_reports(&bad_components);
+                        let bad_components =
+                            fisherman_service.submit_reports(&bad_components).await;
                         // Remove from list
                         {
                             let mut list_providers_lock = list_providers.write().await;
@@ -141,7 +143,8 @@ async fn main() {
                 match bad_components {
                     Ok(bad_components) => {
                         // Submit_reports bad components, get success report list
-                        let bad_components = fisherman_service.submit_reports(&bad_components);
+                        let bad_components =
+                            fisherman_service.submit_reports(&bad_components).await;
                         // Remove from list
                         {
                             let mut list_providers_lock = list_providers.write().await;

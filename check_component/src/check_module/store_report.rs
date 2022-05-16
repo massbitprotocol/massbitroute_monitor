@@ -89,6 +89,19 @@ impl StoreReport {
         self.provider_type = component.component_type.clone();
     }
 
+    // Short store before report
+    pub fn set_report_data_for_report(
+        &mut self,
+        request_number: u64,
+        success_number: u64,
+        component: &ComponentInfo,
+    ) {
+        self.report_type = ReportType::ReportProvider;
+        self.total_req = request_number as usize;
+        self.non_2xx_3xx_req = success_number as usize;
+        self.provider_id = component.id.clone();
+        self.provider_type = component.component_type.clone();
+    }
     pub fn set_report_data(
         &mut self,
         wrk_report: &WrkReport,

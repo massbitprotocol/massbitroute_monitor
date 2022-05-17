@@ -342,7 +342,7 @@ _add_monitors() {
 	# _run_me ${tmp}.run
 	rm ${tmp}*
 
-	_site=node_${_block}_${_net}
+	_site=node-${_block}-${_net}
 	tmp=$(mktemp)
 	# echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp}
 	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp} >/dev/null

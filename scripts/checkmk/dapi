@@ -1,4 +1,5 @@
 #!/bin/bash
+exit 0
 _env() {
 	if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
 	check_http="/opt/omd/versions/$CHECK_MK_VERSION/lib/nagios/plugins/check_http"

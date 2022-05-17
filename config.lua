@@ -42,7 +42,7 @@ stdout_logfile=_SITE_ROOT_/logs/monitor_discover_host.log
 
 
 [program:monitor_server]
-command=/bin/bash _SITE_ROOT_/scripts/server.sh
+command=/bin/bash _SITE_ROOT_/scripts/server.sh _SITE_ROOT_
 autorestart=true
 redirect_stderr=true
 stopasgroup=true

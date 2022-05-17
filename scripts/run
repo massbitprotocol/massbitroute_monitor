@@ -301,6 +301,11 @@ _add_monitors() {
 	_block=$1
 	_net=$2
 	# _add_core_monitors
+	# script_run=$SITE_ROOT/scripts/_run_me.sh
+	script_run_gateway=$SITE_ROOT/scripts/_run_me_gateway.sh
+	script_run_node=$SITE_ROOT/scripts/_run_me_node.sh
+	>$script_run_gateway
+	>$script_run_node
 	token_file=$SITE_ROOT/scripts/tokens.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
@@ -312,7 +317,7 @@ _add_monitors() {
 	# token_node=$(mktemp)
 	mk_reload=0
 	_site=gw_${_block}_${_net}
-	echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp}
+	# echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp}
 	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		echo >>${tmp}
@@ -329,14 +334,15 @@ _add_monitors() {
 		done
 
 	fi
-	_run_me $_site ${tmp}.run
-	_monitor_activate $_site 1
+	mv ${tmp}.run $script_run_gateway
+	# _run_me $_site ${tmp}.run
+	# _monitor_activate $_site 1
 	# _run_me ${tmp}.run
 	rm ${tmp}*
 
 	_site=node_${_block}_${_net}
 	tmp=$(mktemp)
-	echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp}
+	# echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp}
 	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
 		echo >>${tmp}
@@ -353,8 +359,8 @@ _add_monitors() {
 		done
 
 	fi
-
-	_run_me $_site ${tmp}.run
+	mv ${tmp}.run $script_run_node
+	# _run_me $_site ${tmp}.run
 	rm ${tmp}*
 	diff -s ${token_file}.tmp $token_file >/dev/null
 	if [ $? -ne 0 ]; then
@@ -368,7 +374,7 @@ _add_monitors() {
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	# cat ${tmp}.run | parallel -j$(nproc)
 	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
-	_monitor_activate $_site 1
+	# _monitor_activate $_site 1
 	# rm ${tmp}*
 
 }

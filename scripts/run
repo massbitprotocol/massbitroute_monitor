@@ -168,14 +168,14 @@ _del_monitor_host() {
 }
 _monitor_activate() {
 	_site=$1
-	host="https://$MONITOR_DOMAIN/$_site/check_mk/webapi.py?$sec&$arg"
+	host="https://${_site}.$MONITOR_DOMAIN/$_site/check_mk/webapi.py?$sec&$arg"
 	su - $_site -c "touch /omd/sites/$_site/etc/check_mk/main.mk"
 	# sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
 	# arg="request_format=python&output_format=json"
 	# host="https://monitor.mbr.massbitroute.com/mbr/check_mk/webapi.py?$sec&$arg"
 
 	action="activate_changes"
-	host_info='request={"sites":["'$_site'"]}'
+	host_info='request={"sites":["mbr"]}'
 	curl -sSfL "$host&action=$action" -d $host_info | jq
 
 	su - $_site -c "rm /omd/sites/$_site/etc/check_mk/main.mk"
@@ -194,7 +194,7 @@ _add_monitor_host() {
 	# if [ ! -f "$_mark" ]; then
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	action="add_host"
-	host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'mbr'","tag_agent":"cmk-agent"}}'
+	host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
 	curl -sSfL "$host&action=$action" -d $host_info
 	# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 	# if [ $st -ne 0 ]; then

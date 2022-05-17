@@ -22,7 +22,8 @@ if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
 # 	fi
 
 # }
-list="$dir/server.py $dir/server_node_eth_mainnet.py $dir/server_gw_eth_mainnet.py"
+list="$dir/server.py"
+# list="$dir/server.py $dir/server_node_eth_mainnet.py $dir/server_gw_eth_mainnet.py"
 _kill() {
 	for f in $list; do
 		pkill -f $f
@@ -36,6 +37,6 @@ if [ "$1" == "_kill" ]; then
 	exit 0
 fi
 
-for f in $list; do
-	echo python3 $f
-done | parallel -j3
+# for f in $list; do
+python3 $f
+# done | parallel -j3

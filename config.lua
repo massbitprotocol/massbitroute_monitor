@@ -20,8 +20,7 @@ stopsignal=INT
 stdout_logfile=_SITE_ROOT_/../mkagent/logs/monitor_client.log
     ]]
     },
-    supervisor = [[
-
+    supervisor_tmp = [[
 [program:monitor_discover_dapi]
 command=/bin/bash _SITE_ROOT_/scripts/checkmk/dapi loop _collect _SITE_ROOT_
 autorestart=true
@@ -31,14 +30,25 @@ killasgroup=true
 stopsignal=INT
 stdout_logfile=_SITE_ROOT_/logs/monitor_discover_dapi.log
 
-[program:monitor_discover_host]
-command=/bin/bash _SITE_ROOT_/scripts/run _loop 60 _discover_host _SITE_ROOT_
+]],
+    supervisor = [[
+[program:monitor_discover_gateway]
+command=/bin/bash _SITE_ROOT_/scripts/run _loop 60 _discover_host gateway
 autorestart=true
 redirect_stderr=true
 stopasgroup=true
 killasgroup=true
 stopsignal=INT
-stdout_logfile=_SITE_ROOT_/logs/monitor_discover_host.log
+stdout_logfile=_SITE_ROOT_/logs/monitor_discover_gateway.log
+
+[program:monitor_discover_node]
+command=/bin/bash _SITE_ROOT_/scripts/run _loop 60 _discover_host node
+autorestart=true
+redirect_stderr=true
+stopasgroup=true
+killasgroup=true
+stopsignal=INT
+stdout_logfile=_SITE_ROOT_/logs/monitor_discover_node.log
 
 
 [program:monitor_server]
@@ -49,6 +59,7 @@ stopasgroup=true
 killasgroup=true
 stopsignal=INT
 stdout_logfile=_SITE_ROOT_/logs/monitor_server.log
+
     ]]
 }
 return _config

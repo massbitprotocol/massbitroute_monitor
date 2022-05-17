@@ -437,8 +437,9 @@ _update() {
 }
 
 _discover_host() {
-	#	_remove_hosts
-	_add_monitors eth mainnet
+	_type=$1
+	cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
+	_monitor_activate ${_type}-eth-mainnet
 }
 _monitor() {
 

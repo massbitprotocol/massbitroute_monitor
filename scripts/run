@@ -308,10 +308,10 @@ _add_monitors() {
 	script_run_node=$SITE_ROOT/scripts/_run_me_node.sh
 	>$script_run_gateway
 	>$script_run_node
-	token_file=$SITE_ROOT/scripts/tokens.txt
+	token_file=$SITE_ROOT/data/tokens.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
-	token_core_file=$SITE_ROOT/scripts/tokens_core.txt
+	token_core_file=$SITE_ROOT/data/tokens_core.txt
 	cp $token_core_file ${token_file}.tmp
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp=$(mktemp)
@@ -367,6 +367,11 @@ _add_monitors() {
 	diff -s ${token_file}.tmp $token_file >/dev/null
 	if [ $? -ne 0 ]; then
 		mv ${token_file}.tmp $token_file
+		cd $SITE_ROOT/data
+		_git_config
+		git add .
+		git commit -m update
+		git push
 		bash $SITE_ROOT/scripts/server.sh _kill
 	fi
 

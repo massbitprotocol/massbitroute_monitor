@@ -304,8 +304,8 @@ _add_monitors() {
 	_net=$2
 	# _add_core_monitors
 	# script_run=$SITE_ROOT/scripts/_run_me.sh
-	script_run_gateway=$SITE_ROOT/scripts/_run_me_gateway.sh
-	script_run_node=$SITE_ROOT/scripts/_run_me_node.sh
+	script_run_gateway=$SITE_ROOT/data/_run_me_gateway.sh
+	script_run_node=$SITE_ROOT/data/_run_me_node.sh
 	>$script_run_gateway
 	>$script_run_node
 	token_file=$SITE_ROOT/data/tokens.txt

@@ -446,10 +446,16 @@ _update() {
 
 _discover_host() {
 	_type=$1
-	if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
+	if [ \( "${_type}" == "node" -o "${_type}" == "gateway" \) ]; then
+		if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
+			cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
+			_monitor_activate ${_type}-eth-mainnet
+		fi
+	else
 		cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
-		_monitor_activate ${_type}-eth-mainnet
+		_monitor_activate ${_type}
 	fi
+
 }
 _monitor() {
 

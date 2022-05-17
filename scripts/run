@@ -373,9 +373,7 @@ _add_monitors() {
 
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	# cat ${tmp}.run | parallel -j$(nproc)
-	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	# _monitor_activate $_site 1
-	# rm ${tmp}*
 
 }
 _del_monitors() {

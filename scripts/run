@@ -367,11 +367,11 @@ _add_monitors() {
 	diff -s ${token_file}.tmp $token_file >/dev/null
 	if [ $? -ne 0 ]; then
 		mv ${token_file}.tmp $token_file
-		cd $SITE_ROOT/data
-		_git_config
-		git add .
-		git commit -m update
-		git push
+		# cd $SITE_ROOT/data
+		# _git_config
+		# git add .
+		# git commit -m update
+		# git push
 		bash $SITE_ROOT/scripts/server.sh _kill
 	fi
 

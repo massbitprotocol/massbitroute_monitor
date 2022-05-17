@@ -83,14 +83,8 @@ impl StoreReport {
         }
     }
 
-    pub fn set_report_type(&mut self, component: &ComponentInfo, report_type: ReportType) {
-        self.report_type = report_type;
-        self.provider_id = component.id.clone();
-        self.provider_type = component.component_type.clone();
-    }
-
     // Short store before report
-    pub fn set_report_data_for_report(
+    pub fn set_report_data_minimun(
         &mut self,
         request_number: u64,
         success_number: u64,
@@ -101,8 +95,12 @@ impl StoreReport {
         self.non_2xx_3xx_req = success_number as usize;
         self.provider_id = component.id.clone();
         self.provider_type = component.component_type.clone();
+        self.report_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
     }
-    pub fn set_report_data(
+    pub fn set_report_data_detail(
         &mut self,
         wrk_report: &WrkReport,
         check_mk_report: &CheckMkReport,
@@ -116,7 +114,6 @@ impl StoreReport {
         self.percent_low_latency = wrk_report.percent_low_latency;
         self.total_duration = wrk_report.total_duration.as_millis() as f32;
         self.total_read_byte = wrk_report.total_read.as_u64();
-        if wrk_report.timestamp == 0 {}
         self.report_time = if wrk_report.timestamp == 0 {
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)

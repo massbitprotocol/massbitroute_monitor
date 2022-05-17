@@ -170,8 +170,9 @@ impl FishermanService {
             info!("Bad providers are detected: {:?}", bad_components);
 
             // Report bad component
-            if !self.is_no_report {
-                for (bad_component, report) in bad_components.iter() {
+
+            for (bad_component, report) in bad_components.iter() {
+                if !self.is_no_report {
                     let provider_id: [u8; 36] = bad_component.id.as_bytes().try_into().unwrap();
                     let report_res = self.chain_adapter.submit_provider_report(
                         provider_id,
@@ -188,21 +189,6 @@ impl FishermanService {
                                 bad_component.component_type, bad_component.id
                             );
                             res.push(bad_component.clone());
-
-                            // Store report to portal
-                            let mut store_report = StoreReport::build(
-                                &*LOCAL_IP,
-                                ReporterRole::Fisherman,
-                                &*PORTAL_AUTHORIZATION,
-                                &self.check_component_service.domain,
-                            );
-                            store_report.set_report_data_for_report(
-                                report.success_number,
-                                report.request_number,
-                                &bad_component,
-                            );
-                            let res = store_report.send_data(SendPurpose::Store).await;
-                            info!("Store report: {:?}", res.unwrap().text().await);
                         }
                         Err(err) => {
                             info!(
@@ -212,6 +198,21 @@ impl FishermanService {
                         }
                     }
                 }
+
+                // Store report to portal
+                let mut store_report = StoreReport::build(
+                    &*LOCAL_IP,
+                    ReporterRole::Fisherman,
+                    &*PORTAL_AUTHORIZATION,
+                    &self.check_component_service.domain,
+                );
+                store_report.set_report_data_minimun(
+                    report.request_number,
+                    report.success_number,
+                    &bad_component,
+                );
+                let res = store_report.send_data(SendPurpose::Store).await;
+                info!("Store report: {:?}", res.unwrap().text().await);
             }
         }
         res
@@ -250,12 +251,7 @@ impl FishermanService {
             ComponentType::DApi => false,
         }
     }
-    // pub async fn check_ping_pong(&mut self, list_providers: Arc<RwLock<Vec<ComponentInfo>>>) {
-    //     info!(
-    //         "Test ping pong, list provider: {:#?}",
-    //         list_providers.read().await
-    //     );
-    // }
+
     pub async fn check_logic(&mut self, list_providers: Arc<RwLock<Vec<ComponentInfo>>>) {
         debug!(
             "Test logic, list provider: {:#?}",
@@ -268,167 +264,6 @@ impl FishermanService {
             list_providers.read().await
         );
     }
-    // pub async fn loop_check_component(mut self) {
-    //     let number_of_sample = self.number_of_sample;
-    //     info!("number_of_sample:{}", number_of_sample);
-    //     let sample_interval_ms = self.sample_interval_ms;
-    //     info!("sample_interval_ms:{}", sample_interval_ms);
-    //     let mut reports_history: VecDeque<HashMap<ComponentInfo, ComponentReport>> =
-    //         VecDeque::new();
-    //
-    //     info!("Run check component");
-    //     loop {
-    //         // Load new nodes/gateways list
-    //         if let Err(e) = self
-    //             .check_component_service
-    //             .reload_components_list(Some(&CONFIG.checking_component_status), &ZONE)
-    //             .await
-    //         {
-    //             info!("reload_components_list error: {:?}", e);
-    //             tokio::time::sleep(Duration::from_millis(CONFIG.delay_between_check_loop_ms)).await;
-    //             continue;
-    //         };
-    //         info!(
-    //             "Reload list node: {:?}",
-    //             self.check_component_service.list_nodes
-    //         );
-    //         info!(
-    //             "Reload list gateway: {:?}",
-    //             self.check_component_service.list_gateways
-    //         );
-    //
-    //         let average_reports = self.check_data();
-    //
-    //         // let mut average_reports: HashMap<ComponentInfo, ComponentReport> = HashMap::new();
-    //         // let mut collect_reports: HashMap<ComponentInfo, Vec<CheckMkReport>> = HashMap::new();
-    //         // for n in 0..number_of_sample {
-    //         //     info!("Run {} times", n + 1);
-    //         //     if let Ok(reports) = self
-    //         //         .check_component_service
-    //         //         .check_components(&CONFIG.check_task_list_fisherman)
-    //         //         .await
-    //         //     {
-    //         //         debug!("reports:{:?}", reports);
-    //         //         for (component, report) in reports {
-    //         //             // with each component collect reports in to vector
-    //         //             match collect_reports.entry(component) {
-    //         //                 Entry::Occupied(o) => {
-    //         //                     o.into_mut().push(report);
-    //         //                 }
-    //         //                 Entry::Vacant(v) => {
-    //         //                     v.insert(vec![report]);
-    //         //                 }
-    //         //             }
-    //         //         }
-    //         //     };
-    //         //
-    //         //     tokio::time::sleep(Duration::from_millis(sample_interval_ms)).await;
-    //         // }
-    //         //
-    //         // debug!("collect_reports: {:?}", collect_reports);
-    //         // // Calculate average report
-    //         // for (component, reports) in collect_reports.iter() {
-    //         //     info!("component:{:?}", component.id);
-    //         //     average_reports.insert(component.clone(), ComponentReport::from(reports));
-    //         // }
-    //         //
-    //         // // Display report for debug
-    //         // for (component, report) in average_reports.iter() {
-    //         //     info!("id: {}, type: {:?}, chain {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
-    //         //         component.id,
-    //         //         component.component_type,
-    //         //         component.blockchain,
-    //         //         report.request_number,
-    //         //         report.success_number,
-    //         //         report.response_time_ms,
-    //         //         report.is_healthy(&component.component_type)
-    //         //     );
-    //         // }
-    //
-    //         if !self.is_no_report {
-    //             // Check and send report
-    //             for (component_info, report) in average_reports.iter() {
-    //                 let reason = if !report.is_healthy(&component_info.component_type) {
-    //                     Some(ProviderReportReason::BadPerformance(
-    //                         report.request_number,
-    //                         report.get_success_percent(),
-    //                         report.response_time_ms.unwrap_or_default(),
-    //                     ))
-    //                 } else {
-    //                     None
-    //                 };
-    //                 // Check for healthy and submit report
-    //                 if let Some(reason) = reason {
-    //                     if component_info.status == "staked"
-    //                         && Self::is_history_continuous_fail_reach_limit(
-    //                             &reports_history,
-    //                             &component_info,
-    //                         )
-    //                     {
-    //                         // Store report to portal db
-    //                         let mut store_report = StoreReport::build(
-    //                             &*LOCAL_IP,
-    //                             ReporterRole::Fisherman,
-    //                             &*PORTAL_AUTHORIZATION,
-    //                             &self.check_component_service.domain,
-    //                         );
-    //                         store_report
-    //                             .set_report_type(&component_info, ReportType::ReportProvider);
-    //                         let res = store_report.send_data(SendPurpose::Store).await;
-    //                         info!("Store report: {:?}", res.unwrap().text().await);
-    //                         // End Store report to portal db
-    //
-    //                         info!("Submit report: {:?}", component_info);
-    //                         let provider_id: [u8; 36] =
-    //                             component_info.id.as_bytes().try_into().unwrap();
-    //                         info!("provider_id: {:?}", String::from_utf8_lossy(&provider_id));
-    //
-    //                         // Submit report to chain
-    //                         if let Err(e) = self
-    //                             .chain_adapter
-    //                             .submit_provider_report(provider_id, reason)
-    //                             .and_then(|_| {
-    //                                 // Remove component in list
-    //                                 match component_info.component_type {
-    //                                     ComponentType::Node => {
-    //                                         self.check_component_service.list_nodes.retain(
-    //                                             |component| *component.id != component_info.id,
-    //                                         );
-    //                                     }
-    //                                     ComponentType::Gateway => {
-    //                                         self.check_component_service.list_gateways.retain(
-    //                                             |component| *component.id != component_info.id,
-    //                                         );
-    //                                     }
-    //                                     _ => {}
-    //                                 }
-    //                                 info!(
-    //                                     "list_nodes:{:?}",
-    //                                     self.check_component_service.list_nodes
-    //                                 );
-    //                                 info!(
-    //                                     "list_gateways:{:?}",
-    //                                     self.check_component_service.list_gateways
-    //                                 );
-    //                                 Ok(())
-    //                             })
-    //                         {
-    //                             info!("submit_provider_report error:{:?}", e);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //
-    //         // Store to history
-    //         reports_history.push_back(average_reports);
-    //         while reports_history.len() > CONFIG.reports_history_queue_length_max {
-    //             reports_history.pop_front();
-    //         }
-    //
-    //         tokio::time::sleep(Duration::from_millis(CONFIG.delay_between_check_loop_ms)).await;
-    //     }
-    // }
 }
 
 #[derive(Clone, Debug, Default)]

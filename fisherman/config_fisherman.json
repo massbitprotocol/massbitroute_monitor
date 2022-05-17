@@ -18,7 +18,7 @@
   "mvp_event_project_registered": "ProjectRegistered",
 
   "ping_parallel_requests": 10,
-  "ping_success_ratio_threshold": 0.95,
+  "ping_success_ratio_threshold": 0.50,
   "ping_sample_number": 25,
   "ping_request_response": "pong",
   "ping_timeout_ms": 100,

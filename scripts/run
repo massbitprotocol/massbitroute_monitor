@@ -144,12 +144,14 @@ _install() {
 	_supervisor
 }
 _del_monitor_host() {
-	hostname=$1
+	_site=$1
+	hostname=$2
+	host="https://$MONITOR_DOMAIN/$_site/check_mk/webapi.py?$sec&$arg"
 	# sec="_username=automation&_secret=158a0dba-50e4-446d-a6c7-b4018a4191b3"
 	# arg="request_format=python&output_format=json"
 	# host="https://monitor.mbr.massbitroute.com/mbr/check_mk/webapi.py?$sec&$arg"
 
-	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	action="delete_host"
 	host_info='request={"hostname":"'$hostname'"}'
 	curl -sSfL "$host&action=$action" -d $host_info | jq
@@ -157,7 +159,7 @@ _del_monitor_host() {
 	# action="activate_changes"
 	# host_info='request={"sites":["mbr"]}'
 	# curl -sSfL "$host&action=$action" -d $host_info | jq
-	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 }
 _monitor_activate() {
@@ -243,21 +245,26 @@ _refresh_monitors() {
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 
-_remove_hosts() {
-	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+_remove_monitors() {
+	_block=$1
+	_net=$2
+	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp1=$(mktemp)
 	tmp2=$(mktemp)
+	tmp=$(mktemp)
 	_type=gateway
+	_site=gw_${_block}_${_net}
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
-	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
+	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
-		_del_monitor_host $h
+		echo $0 _del_monitor_host $_site $h >>$tmp
 	done
 	_type=node
+	_site=node_${_block}_${_net}
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
-	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
+	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
-		_del_monitor_host $h
+		echo $0 _del_monitor_host $_site $h >>$tmp
 	done
 	# type=dapi
 	# curl -sk https://$PORTAL_DOMAIN/deploy/info/$type/listid | awk -v type=$type '{print type"-"$3"-"$4"-"$1}' | sort >$tmp1
@@ -265,9 +272,11 @@ _remove_hosts() {
 	# comm -23 $tmp2 $tmp1 | while read h; do
 	# 	$0 _del_monitor_host $h
 	# done
-	rm $tmp1 $tmp2
-	_monitor_activate
-	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+
+	_run_me $_site ${tmp}
+	_monitor_activate $_site
+	rm $tmp1 $tmp2 $tmp
+	# su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 _create_site() {
 	_site=$1

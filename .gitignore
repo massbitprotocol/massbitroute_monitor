@@ -74,6 +74,10 @@ fisherman/.env-net
 mbr_stats/.env
 mbr_stats/.env-dev
 mbr_stats/.env-net
+/etc/mkagent/
+/data/
+/src/
+/.rustup/
 
 check_component/.env
 check_component/.env-dev

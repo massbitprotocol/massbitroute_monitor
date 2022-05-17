@@ -11,7 +11,7 @@ fi
 cargo build --release
 
 #ZONES=( 'as' 'na' 'eu' )
-ZONES=( 'as' 'eu' )
+ZONES=( 'as' 'eu' 'na' 'sa' 'oc' )
 
 for ZN in "${ZONES[@]}"
 do

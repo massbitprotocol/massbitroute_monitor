@@ -1,3 +1,4 @@
 7cbfa295f98110e3178a751228d9e46101e6038b mbr-monitor-node-eth-mainnet-1
 e8f3a0516891d993101e09b1e08c51997bcb31b3 mbr-monitor-gw-eth-mainnet-1
 b67802bb2d9805a46b5ba99b4aa197c8fbd94928 mbr-monitor-internal-1
+6a9d42575e0adb149c244a36e917bfff013fbb29 mbr-git-1

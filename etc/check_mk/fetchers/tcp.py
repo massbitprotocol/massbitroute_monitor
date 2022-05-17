@@ -16,16 +16,17 @@ from cmk.utils.encryption import (
     decrypt_aes_256_cbc_pbkdf2,
     OPENSSL_SALTED_MARKER,
 )
-from cmk.utils.redis import get_redis_client
 
-if TYPE_CHECKING:
-    from cmk.utils.redis import RedisDecoded
+# from cmk.utils.redis import get_redis_client
+
+# if TYPE_CHECKING:
+#     from cmk.utils.redis import RedisDecoded
 from . import MKFetcherError
 from ._base import verify_ipaddress
 from .agent import AgentFetcher, DefaultAgentFileCache
 from .type_defs import Mode
 
-# from redis import StrictRedis
+from redis import StrictRedis
 
 if TYPE_CHECKING:
     import hashlib
@@ -55,7 +56,7 @@ class TCPFetcher(AgentFetcher):
         self.encryption_settings: Final = encryption_settings
         self.use_only_cache: Final = use_only_cache
         self._socket: Optional[socket.socket] = None
-        self._redis_client: Optional["RedisDecoded"] = None
+        # self._redis_client: Optional["RedisDecoded"] = None
 
     @classmethod
     def _from_json(cls, serialized: Dict[str, Any]) -> "TCPFetcher":
@@ -66,10 +67,10 @@ class TCPFetcher(AgentFetcher):
             **serialized,
         )
 
-    def _get_redis_client(self) -> "RedisDecoded":
-        if self._redis_client is None:
-            self._redis_client = get_redis_client()
-        return self._redis_client
+    # def _get_redis_client(self) -> "RedisDecoded":
+    #     if self._redis_client is None:
+    #         self._redis_client = get_redis_client()
+    #     return self._redis_client
 
     def to_json(self) -> Dict[str, Any]:
         return {
@@ -88,11 +89,11 @@ class TCPFetcher(AgentFetcher):
             self.address[1],
             self.timeout,
         )
-        # self._redis = StrictRedis(unix_socket_path="/omd/sites/mbr/tmp/run/redis")
-        _redis = self._get_redis_client()
+        self._redis = StrictRedis(unix_socket_path="/omd/sites/mbr/tmp/run/redis")
+        # _redis = self._get_redis_client()
 
-        self._logger.debug(_redis)
-        if _redis is None:
+        self._logger.debug(self._redis)
+        if self._redis is None:
             self.opennew(self)
 
     def opennew(self) -> None:
@@ -130,8 +131,9 @@ class TCPFetcher(AgentFetcher):
                 "Got no data: No usable cache file present at %s"
                 % self.file_cache.base_path
             )
-        _redis = self._get_redis_client()
-        if _redis is None and self._socket is None:
+        # _redis = self._get_redis_client()
+        # if _redis is None and self._socket is None:
+        if self._redis is None and self._socket is None:
             raise MKFetcherError("Not connected")
 
         return self._validate_decrypted_data(self._decrypt(self._raw_data()))
@@ -140,8 +142,9 @@ class TCPFetcher(AgentFetcher):
         self._logger.debug("Reading data from redis")
         redis_key = ":".join(["check_mk_push_agent", "data", self.hostname])
         self._logger.debug(redis_key)
-        _redis = self._get_redis_client()
-        output = _redis.get(redis_key)
+        # _redis = self._get_redis_client()
+        # output = _redis.get(redis_key)
+        output = self._redis.get(redis_key)
         self._logger.debug(output)
         if output:
             return output

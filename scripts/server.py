@@ -58,7 +58,7 @@ def push(token_arg):
         abort(404)
     hostname = tokens[token]
 
-    if len(token_r) == 2:
+    if len(token_r) >= 2:
         token_i = token_r[1]
         hostname = ":".join([hostname, token_i])
 

@@ -434,6 +434,7 @@ impl CheckComponent {
             .build()
             .unwrap()
             .get(url)
+            .header("Authorization", PORTAL_AUTHORIZATION.as_str())
             .send()
             .await?
             .text()
@@ -454,6 +455,7 @@ impl CheckComponent {
             .build()
             .unwrap()
             .get(url)
+            .header("Authorization", PORTAL_AUTHORIZATION.as_str())
             .send()
             .await?
             .text()
@@ -1036,7 +1038,7 @@ impl CheckComponent {
                         &*PORTAL_AUTHORIZATION,
                         &self.domain,
                     );
-                    store_report.set_report_data(
+                    store_report.set_report_data_detail(
                         &wrk_report,
                         &check_mk_report,
                         &component,

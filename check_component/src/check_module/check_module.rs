@@ -475,7 +475,7 @@ impl CheckComponent {
         }
 
         //Filter zone
-        info!("Zone:{:?}", filter_zone);
+        //info!("Zone:{:?}", filter_zone);
         if *filter_zone != Zone::GB {
             self.list_nodes
                 .retain(|component| component.zone == *filter_zone);
@@ -1019,14 +1019,12 @@ impl CheckComponent {
     pub async fn check_components(
         &self,
         tasks: &Vec<TaskType>,
+        components: &Vec<ComponentInfo>,
     ) -> Result<Vec<(ComponentInfo, CheckMkReport)>, anyhow::Error> {
         // Call node
         //http://cf242b49-907f-49ce-8621-4b7655be6bb8.node.mbr.massbitroute.com
         //header 'x-api-key: vnihqf14qk5km71aatvfr7c3djiej9l6mppd5k20uhs62p0b1cm79bfkmcubal9ug44e8cu2c74m29jpusokv6ft6r01o5bnv5v4gb8='
         // Check node
-        let mut components = Vec::new();
-        components.extend(self.list_nodes.clone());
-        components.extend(self.list_gateways.clone());
         let mut reports = Vec::new();
         for component in components {
             match self.get_report_component(&component).await {
@@ -1047,7 +1045,7 @@ impl CheckComponent {
                     let res = store_report.send_data(SendPurpose::Store).await;
                     info!("Store report: {:?}", res.unwrap().text().await);
                     // Store reports
-                    reports.push((component, check_mk_report));
+                    reports.push((component.clone(), check_mk_report));
                 }
                 Err(e) => {
                     info!(

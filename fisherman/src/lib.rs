@@ -3,8 +3,9 @@ use mbr_check_component::check_module::check_module::Zone;
 use serde::Deserialize;
 use std::env;
 use std::str::FromStr;
-pub mod check_ping_pong_service;
+pub mod data_check;
 pub mod fisherman_service;
+pub mod ping_pong;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
@@ -32,6 +33,7 @@ pub struct Config {
     pub ping_success_ratio_threshold: f32,
     pub ping_sample_number: u64,
     pub ping_request_response: String,
+    pub ping_timeout_ms: u64,
 
     pub check_ping_pong_interval: u64,
     pub check_logic_interval: u64,

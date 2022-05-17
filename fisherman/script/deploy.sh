@@ -1,7 +1,17 @@
 #!/bin/bash
+#if [ -z "$1" ]
+#  then
+#    echo "No environment is supply"
+#    echo "Current env: $ENV"
+#    echo 'Change env to dev try `. ./change_env.sh dev`'
+#    echo 'To deploy try `bash deploy.sh $ENV`'
+#    exit 1
+#fi
+
 cargo build --release
 
-ZONES=( 'as' 'na' 'eu' )
+#ZONES=( 'as')
+ZONES=( 'as' 'eu' 'na' 'sa' 'oc' )
 
 for ZN in "${ZONES[@]}"
 do
@@ -16,7 +26,7 @@ do
   rsync -avz ../.env "mbr-verify-$ZN:~/.env"
 
   #Update run.sh later
-  cat run.tpl | sed "s/\[\[ZONE\]\]/$ZN/g" > _run_$ZN.sh
+  cat run.tpl | sed "s/\[\[ZONE\]\]/$ZN/g" | sed "s/\[\[ENV\]\]/$ENV/g" > _run_$ZN.sh
   rsync -avz _run_$ZN.sh "mbr-verify-$ZN:~/run.sh"
   rm _run_$ZN.sh
 

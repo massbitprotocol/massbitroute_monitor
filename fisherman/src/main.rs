@@ -1,19 +1,22 @@
 use anyhow::Error;
 use clap::{Arg, Command};
 use dotenv;
+use futures_util::future::err;
 use log::{debug, info};
 use logger;
 use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::{CheckComponent, ComponentInfo};
 use mbr_check_component::SIGNER_PHRASE;
-use mbr_fisherman::check_ping_pong_service::CheckPingPong;
+use mbr_fisherman::data_check::CheckDataCorrectness;
 use mbr_fisherman::fisherman_service::{
     FishermanService, ProviderReportReason, SubmitProviderReport,
 };
+use mbr_fisherman::ping_pong::CheckPingPong;
 use mbr_fisherman::FISHERMAN_ENDPOINT;
 use mbr_fisherman::{CONFIG, ZONE};
 use mbr_stats::chain_adapter::Projects;
 use std::convert::TryInto;
+use std::fs::read;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -97,72 +100,66 @@ async fn main() {
             loop {
                 let list_providers_clone = list_providers.clone();
                 // Get list bad component
-                let res = FishermanService::check_ping_pong(
-                    list_providers_clone,
-                    fisherman_service.check_component_service.domain.clone(),
-                )
-                .await;
+                let bad_components = fisherman_service
+                    .check_ping_pong(
+                        list_providers_clone,
+                        fisherman_service.check_component_service.domain.clone(),
+                    )
+                    .await;
 
-                match res {
-                    Ok(res) => {
-                        if !res.is_empty() {
-                            // Fixme: add action for report false case
-                            info!("Bad providers are detected by ping pong check: {:?}", res);
-
-                            // Report bad component
-                            if !fisherman_service.is_no_report {
-                                for (bad_component, success_rate) in res.iter() {
-                                    let provider_id: [u8; 36] =
-                                        bad_component.id.as_bytes().try_into().unwrap();
-                                    let report_res =
-                                        fisherman_service.chain_adapter.submit_provider_report(
-                                            provider_id,
-                                            ProviderReportReason::BadPerformance(
-                                                CONFIG.ping_sample_number,
-                                                ((success_rate * 100f32) as u32),
-                                                0,
-                                            ),
-                                        );
-                                    match report_res {
-                                        Ok(_) => {
-                                            info!(
-                                                "Success report {:?} {}",
-                                                bad_component.component_type, bad_component.id
-                                            );
-                                        }
-                                        Err(err) => {
-                                            info!(
-                                                "Fail report {:?} {}, error: {}",
-                                                bad_component.component_type, bad_component.id, err
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            // Remove from list
-                            {
-                                let mut list_providers_lock = list_providers.write().await;
-                                list_providers_lock
-                                    .retain(|component| !res.contains_key(component));
-                            }
+                match bad_components {
+                    Ok(bad_components) => {
+                        // Submit_reports bad components, get success report list
+                        let bad_components =
+                            fisherman_service.submit_reports(&bad_components).await;
+                        // Remove from list
+                        {
+                            let mut list_providers_lock = list_providers.write().await;
+                            list_providers_lock
+                                .retain(|component| !bad_components.contains(component));
                         }
                     }
                     Err(err) => {
                         info!("check_ping_pong error: {}", err);
                     }
                 }
+                info!(
+                    "check ping pong list_providers: {:?}",
+                    list_providers.read().await
+                );
                 sleep(Duration::from_secs(CONFIG.check_ping_pong_interval)).await;
             }
         });
 
         let mut fisherman_service = fisherman_service_org.clone();
         let list_providers = list_providers_org.clone();
-        // test logic
+        // Check data correctness
         task::spawn(async move {
             loop {
                 let list_providers_clone = list_providers.clone();
-                let res = fisherman_service.check_logic(list_providers_clone).await;
+                // Get list bad component
+                let bad_components = fisherman_service.check_data(list_providers_clone).await;
 
+                match bad_components {
+                    Ok(bad_components) => {
+                        // Submit_reports bad components, get success report list
+                        let bad_components =
+                            fisherman_service.submit_reports(&bad_components).await;
+                        // Remove from list
+                        {
+                            let mut list_providers_lock = list_providers.write().await;
+                            list_providers_lock
+                                .retain(|component| !bad_components.contains(component));
+                        }
+                    }
+                    Err(err) => {
+                        info!("check_ping_pong error: {}", err);
+                    }
+                }
+                info!(
+                    "check data correctness list_providers: {:?}",
+                    list_providers.read().await
+                );
                 sleep(Duration::from_secs(CONFIG.check_logic_interval)).await;
             }
         });
@@ -180,6 +177,7 @@ async fn main() {
         //         sleep(Duration::from_secs(CONFIG.check_benchmark_interval)).await;
         //     }
         // });
+
         // Update node/gw list
         loop {
             sleep(Duration::from_secs(CONFIG.update_provider_list_interval)).await;
@@ -188,8 +186,8 @@ async fn main() {
                 let mut list_providers_lock = list_providers_org.write().await;
                 *list_providers_lock = new_list_providers;
             }
-            debug!(
-                "Update list provider: {:#?}",
+            info!(
+                "Update list provider: {:?}",
                 list_providers_org.read().await
             );
         }

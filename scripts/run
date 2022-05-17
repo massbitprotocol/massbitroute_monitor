@@ -306,12 +306,20 @@ _add_monitors() {
 	# script_run=$SITE_ROOT/scripts/_run_me.sh
 	script_run_gateway=$SITE_ROOT/data/_run_me_gateway.sh
 	script_run_node=$SITE_ROOT/data/_run_me_node.sh
+	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
 	>$script_run_gateway
 	>$script_run_node
 	token_file=$SITE_ROOT/data/tokens.txt
+	token_core_file=$SITE_ROOT/data/tokens_core.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
-	token_core_file=$SITE_ROOT/data/tokens_core.txt
+	tmp=$(mktemp)
+	cat $token_core_file | cut -d' ' -f2- | while read opt; do
+		echo $script _add_monitor_host internal $opt 1 >>${tmp}
+	done
+	mv $tmp $script_run_internal
+	rm $tmp
+
 	cp $token_core_file ${token_file}.tmp
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp=$(mktemp)

@@ -38,5 +38,5 @@ if [ "$1" == "_kill" ]; then
 fi
 
 # for f in $list; do
-python3 $f
+python3 $list
 # done | parallel -j3

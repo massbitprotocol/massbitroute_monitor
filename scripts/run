@@ -194,7 +194,7 @@ _add_monitor_host() {
 	# if [ ! -f "$_mark" ]; then
 	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	action="add_host"
-	host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'${_site}'","tag_agent":"cmk-agent"}}'
+	host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'mbr'","tag_agent":"cmk-agent"}}'
 	curl -sSfL "$host&action=$action" -d $host_info
 	# st=$(curl -sSfL "$host&action=$action" -d $host_info | jq .result_code)
 	# if [ $st -ne 0 ]; then
@@ -258,14 +258,14 @@ _remove_monitors() {
 	tmp2=$(mktemp)
 	tmp=$(mktemp)
 	_type=gateway
-	_site=gw_${_block}_${_net}
+	_site=${_type}-${_block}-${_net}
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^gateway/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do
 		echo $script _del_monitor_host $_site $h >>$tmp
 	done
 	_type=node
-	_site=node_${_block}_${_net}
+	_site=${_type}-${_block}-${_net}
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >$tmp1
 	su - ${_site} -c 'lq "GET hosts\nColumns: name"' | awk '/^node/' | sort >$tmp2
 	comm -23 $tmp2 $tmp1 | while read h; do

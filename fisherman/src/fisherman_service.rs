@@ -206,7 +206,7 @@ impl FishermanService {
                     &*PORTAL_AUTHORIZATION,
                     &self.check_component_service.domain,
                 );
-                store_report.set_report_data_minimun(
+                store_report.set_report_data_short(
                     report.request_number,
                     report.success_number,
                     &bad_component,

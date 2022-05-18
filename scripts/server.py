@@ -43,7 +43,7 @@ def load_tokens():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            token, hostname = line.split()
+            token, hostname, _ignore = line.split()
             yield token, hostname
 
 

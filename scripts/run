@@ -256,7 +256,7 @@ _remove_monitors() {
 	_block=$1
 	_net=$2
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	_remove_monitors_type gateway eth mainnet
+	_remove_monitors_type gateway $_block $_net
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 

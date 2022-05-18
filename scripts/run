@@ -300,8 +300,8 @@ _add_monitors_type() {
 	_site=${_type}-${_block}-${_net}
 	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/listid-${_block}-${_net} -o ${tmp} >/dev/null
 	if [ $? -eq 0 ]; then
-		_listid=$SITE_ROOT/data/${_type}_listid
-		_dirty=$SITE_ROOT/data/${_type}_dirty
+		_listid=$SITE_ROOT/data/${_site}_listid
+		_dirty=$SITE_ROOT/data/${_site}_dirty
 		if [ ! -f "$_listid" ]; then
 			touch $_listid
 		fi

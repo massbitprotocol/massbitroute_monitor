@@ -1,11 +1,7 @@
 #!/bin/bash
-_kill() {
-	for f in $list; do
-		pkill -f $f
-	done
-}
+
 if [ "$1" == "_kill" ]; then
-	_kill
+	pkill -f server.py
 	exit 0
 fi
 

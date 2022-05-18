@@ -442,6 +442,7 @@ _discover_host() {
 				cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
 				su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 				_monitor_activate ${_type}-eth-mainnet
+				echo 0 >$SITE_ROOT/data/${_type}_dirty
 			fi
 		fi
 

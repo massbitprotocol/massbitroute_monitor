@@ -336,6 +336,11 @@ _add_monitors() {
 	cp $token_core_file ${token_file}.tmp
 
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
+	if [ "$_types" == "internal" ]; then
+		_add_monitors_internal
+		return
+	fi
+
 	if [ -z "$_types" ]; then _types="gateway"; fi
 	_blocks=$(cat $SITE_ROOT/vars/MONITOR_BLOCKCHAINS)
 	if [ -z "$_blocks" ]; then _blocks="eth"; fi

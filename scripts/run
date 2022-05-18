@@ -404,9 +404,19 @@ _discover_host() {
 				if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
 					su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 					cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
-					_monitor_activate ${_type}-eth-mainnet
-					su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+					if [ -z "$_types" ]; then _types="gateway"; fi
+					_blocks=$(cat $SITE_ROOT/vars/MONITOR_BLOCKCHAINS)
+					if [ -z "$_blocks" ]; then _blocks="eth"; fi
+					_nets=$(cat $SITE_ROOT/vars/MONITOR_NETWORKS)
+					if [ -z "$_nets" ]; then _nets="mainnet"; fi
+					for _block in $_blocks; do
+						for _net in $_nets; do
+							_monitor_activate ${_type}-${_block}-${_net}
 
+						done
+					done
+
+					su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 					echo 0 >$SITE_ROOT/data/${_type}_dirty
 				fi
 			fi
@@ -415,7 +425,7 @@ _discover_host() {
 
 			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 			cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
-			_monitor_activate ${_type}-eth-mainnet
+			_monitor_activate ${_type}
 			su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 		fi

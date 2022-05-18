@@ -299,98 +299,6 @@ _run_me() {
 	#cat ${_f} | parallel -j$(nproc)
 	su - $_site -c "rm /omd/sites/$_site/etc/check_mk/main.mk"
 }
-_add_monitors() {
-	_block=$1
-	_net=$2
-	# _add_core_monitors
-	# script_run=$SITE_ROOT/scripts/_run_me.sh
-	script_run_gateway=$SITE_ROOT/data/_run_me_gateway.sh
-	script_run_node=$SITE_ROOT/data/_run_me_node.sh
-	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
-	>$script_run_gateway
-	>$script_run_node
-	token_file=$SITE_ROOT/data/tokens.txt
-	token_core_file=$SITE_ROOT/data/tokens_core.txt
-	if [ ! -f "$token_file" ]; then touch $token_file; fi
-
-	tmp=$(mktemp)
-	cat $token_core_file | cut -d' ' -f2- | while read opt; do
-		echo $script _add_monitor_host internal $opt 1 >>${tmp}
-	done
-	mv $tmp $script_run_internal
-	rm $tmp
-
-	cp $token_core_file ${token_file}.tmp
-	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	tmp=$(mktemp)
-	# token_gw=$(mktemp)
-	# token_node=$(mktemp)
-	mk_reload=0
-	_site=gateway-${_block}-${_net}
-	# echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp}
-	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp} >/dev/null
-	if [ $? -eq 0 ]; then
-		echo >>${tmp}
-		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
-			if [ -z "$id" ]; then continue; fi
-			if [ $status -ne 1 ]; then continue; fi
-			if [ $approved -ne 1 ]; then continue; fi
-			_hostname=gateway-$block-$net-$id
-			echo $script _add_monitor_host $_site $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
-			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
-			echo $_access_token $_hostname >>${token_file}.tmp
-			mk_reload=1
-			# sleep 1
-		done
-
-	fi
-	mv ${tmp}.run $script_run_gateway
-	# _run_me $_site ${tmp}.run
-	# _monitor_activate $_site 1
-	# _run_me ${tmp}.run
-	rm ${tmp}*
-
-	_site=node-${_block}-${_net}
-	tmp=$(mktemp)
-	# echo curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp}
-	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp} >/dev/null
-	if [ $? -eq 0 ]; then
-		echo >>${tmp}
-		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
-			if [ -z "$id" ]; then continue; fi
-			if [ $status -ne 1 ]; then continue; fi
-			if [ $approved -ne 1 ]; then continue; fi
-			_hostname=node-$block-$net-$id
-			echo $script _add_monitor_host $_site $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
-			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
-			echo $_access_token $_hostname >>${token_file}.tmp
-			mk_reload=1
-			# sleep 1
-		done
-
-	fi
-	mv ${tmp}.run $script_run_node
-	# _run_me $_site ${tmp}.run
-	rm ${tmp}*
-	diff -s ${token_file}.tmp $token_file >/dev/null
-	if [ $? -ne 0 ]; then
-		mv ${token_file}.tmp $token_file
-		# cd $SITE_ROOT/data
-		# _git_config
-		# git add .
-		# git commit -m update
-		# git push
-		bash $SITE_ROOT/scripts/server.sh _kill
-	fi
-
-	# cat ${tmp}.run
-	#	n=$(wc -l ${tmp}.run | cut -d' ' -f1)
-
-	# su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	# cat ${tmp}.run | parallel -j$(nproc)
-	# _monitor_activate $_site 1
-
-}
 _del_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	tmp=$(mktemp)
@@ -411,6 +319,73 @@ _del_monitors() {
 	rm $tmp
 	#_monitor_activate
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+}
+
+_add_monitors() {
+	_block=$1
+	_net=$2
+	script_run_gateway=$SITE_ROOT/data/_run_me_gateway.sh
+	script_run_node=$SITE_ROOT/data/_run_me_node.sh
+	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
+	>$script_run_gateway
+	>$script_run_node
+	token_file=$SITE_ROOT/data/tokens.txt
+	token_core_file=$SITE_ROOT/data/tokens_core.txt
+	if [ ! -f "$token_file" ]; then touch $token_file; fi
+
+	tmp=$(mktemp)
+	cat $token_core_file | cut -d' ' -f2- | while read opt; do
+		echo $script _add_monitor_host internal $opt 1 >>${tmp}
+	done
+	mv $tmp $script_run_internal
+	rm $tmp
+
+	cp $token_core_file ${token_file}.tmp
+	tmp=$(mktemp)
+	mk_reload=0
+	_site=gateway-${_block}-${_net}
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/gateway/listid-${_block}-${_net} -o ${tmp} >/dev/null
+	if [ $? -eq 0 ]; then
+		echo >>${tmp}
+		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
+			if [ -z "$id" ]; then continue; fi
+			if [ $status -ne 1 ]; then continue; fi
+			if [ $approved -ne 1 ]; then continue; fi
+			_hostname=gateway-$block-$net-$id
+			echo $script _add_monitor_host $_site $_hostname $ip mbr-gateway-$block-$net 1 >>${tmp}.run
+			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
+			echo $_access_token $_hostname >>${token_file}.tmp
+			mk_reload=1
+		done
+
+	fi
+	mv ${tmp}.run $script_run_gateway
+	rm ${tmp}*
+
+	_site=node-${_block}-${_net}
+	tmp=$(mktemp)
+	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/node/listid-${_block}-${_net} -o ${tmp} >/dev/null
+	if [ $? -eq 0 ]; then
+		echo >>${tmp}
+		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
+			if [ -z "$id" ]; then continue; fi
+			if [ $status -ne 1 ]; then continue; fi
+			if [ $approved -ne 1 ]; then continue; fi
+			_hostname=node-$block-$net-$id
+			echo $script _add_monitor_host $_site $_hostname $ip mbr-node-$block-$net 1 1 >>${tmp}.run
+			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
+			echo $_access_token $_hostname >>${token_file}.tmp
+			mk_reload=1
+		done
+
+	fi
+	mv ${tmp}.run $script_run_node
+	rm ${tmp}*
+	diff -s ${token_file}.tmp $token_file >/dev/null
+	if [ $? -ne 0 ]; then
+		mv ${token_file}.tmp $token_file
+		bash $SITE_ROOT/scripts/server.sh _kill
+	fi
 }
 
 _update_repos() {
@@ -448,11 +423,15 @@ _discover_host() {
 	_type=$1
 	if [ \( "${_type}" == "node" -o "${_type}" == "gateway" \) ]; then
 		if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
+			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 			cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
+			su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 			_monitor_activate ${_type}-eth-mainnet
 		fi
-	else
+		els
+		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
+		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 		_monitor_activate ${_type}
 	fi
 

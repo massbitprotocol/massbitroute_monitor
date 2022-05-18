@@ -245,13 +245,11 @@ _remove_monitors_type() {
 	_net=$3
 	_site=${_type}-${_block}-${_net}
 	tmp=$(mktemp)
-	su - mbr -c "touch /omd/sites/mbr/etc/check_mk/main.mk"
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >${tmp}.1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk "/^${_type}/" | sort >${tmp}.2
 	comm -23 ${tmp}.2 ${tmp}.1 | while read h; do
 		$script _remove_monitor_host $_site $h
 	done
-	su - mbr -c "rm /omd/sites/mbr/etc/check_mk/main.mk"
 	rm ${tmp}*
 }
 _remove_monitors() {

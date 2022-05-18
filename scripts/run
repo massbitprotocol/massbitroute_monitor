@@ -257,7 +257,9 @@ _remove_monitors() {
 	_block=$1
 	_net=$2
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	_remove_monitors_type gateway $_block $_net
+	for _type in gateway node; do
+		_remove_monitors_type $_type $_block $_net
+	done
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 

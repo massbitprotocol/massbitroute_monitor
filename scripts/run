@@ -295,6 +295,7 @@ _add_monitors_type() {
 	_token_file=$4
 	_run_file=$5
 	tmp=$(mktemp)
+	cat ${_token_file}
 	# mk_reload=0
 	_site=${_type}-${_block}-${_net}
 	curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/listid-${_block}-${_net} -o ${tmp} >/dev/null
@@ -317,6 +318,7 @@ _add_monitors_type() {
 				echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
 				_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 				echo $_access_token $_hostname $ip >>${_token_file}
+				cat ${_token_file}
 
 			done
 

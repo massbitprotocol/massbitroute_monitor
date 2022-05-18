@@ -293,6 +293,7 @@ _add_monitors_type() {
 	_block=$2
 	_net=$3
 	_token_file=$4
+	if [ ! -f "$_token_file" ]; then touch $_token_file; fi
 	_run_file=$5
 	tmp=$(mktemp)
 	cat ${_token_file}

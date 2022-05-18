@@ -358,6 +358,8 @@ _add_monitors() {
 		done
 	done
 
+	cat ${token_file}.tmp
+	cat $token_file
 	diff -s ${token_file}.tmp $token_file >/dev/null
 	if [ $? -ne 0 ]; then
 		mv ${token_file}.tmp $token_file

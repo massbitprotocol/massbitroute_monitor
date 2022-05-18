@@ -32,24 +32,14 @@ stdout_logfile=_SITE_ROOT_/logs/monitor_discover_dapi.log
 
 ]],
     supervisor = [[
-[program:monitor_discover_gateway]
-command=/bin/bash _SITE_ROOT_/scripts/run _loop 60 _discover_host gateway
+[program:monitor_discover_host]
+command=/bin/bash _SITE_ROOT_/scripts/run _loop 60 _discover_host
 autorestart=true
 redirect_stderr=true
 stopasgroup=true
 killasgroup=true
 stopsignal=INT
-stdout_logfile=_SITE_ROOT_/logs/monitor_discover_gateway.log
-
-[program:monitor_discover_node]
-command=/bin/bash _SITE_ROOT_/scripts/run _loop 60 _discover_host node
-autorestart=true
-redirect_stderr=true
-stopasgroup=true
-killasgroup=true
-stopsignal=INT
-stdout_logfile=_SITE_ROOT_/logs/monitor_discover_node.log
-
+stdout_logfile=_SITE_ROOT_/logs/monitor_discover_host.log
 
 [program:monitor_server]
 command=/bin/bash _SITE_ROOT_/scripts/server.sh _SITE_ROOT_

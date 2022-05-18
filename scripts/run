@@ -395,29 +395,31 @@ _update() {
 }
 
 _discover_host() {
-	_type=$1
-	if [ \( "${_type}" == "node" -o "${_type}" == "gateway" \) ]; then
-		dirty=$(cat $SITE_ROOT/data/${_type}_dirty)
-		if [ -z $dirty ]; then dirty=0; fi
-		if [ $dirty -eq 1 ]; then
-			if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
-				su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-				cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
-				_monitor_activate ${_type}-eth-mainnet
-				su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
+	for _type in $_types; do
+		if [ \( "${_type}" == "node" -o "${_type}" == "gateway" \) ]; then
+			dirty=$(cat $SITE_ROOT/data/${_type}_dirty)
+			if [ -z $dirty ]; then dirty=0; fi
+			if [ $dirty -eq 1 ]; then
+				if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
+					su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+					cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
+					_monitor_activate ${_type}-eth-mainnet
+					su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
-				echo 0 >$SITE_ROOT/data/${_type}_dirty
+					echo 0 >$SITE_ROOT/data/${_type}_dirty
+				fi
 			fi
+
+		else
+
+			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+			cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
+			_monitor_activate ${_type}-eth-mainnet
+			su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+
 		fi
-
-	else
-
-		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-		cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
-		_monitor_activate ${_type}-eth-mainnet
-		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
-
-	fi
+	done
 
 }
 

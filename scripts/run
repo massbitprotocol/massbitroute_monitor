@@ -409,8 +409,7 @@ _discover_host() {
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	for _type in $_types; do
 		if [ \( "${_type}" == "node" -o "${_type}" == "gateway" \) ]; then
-			dirty=1
-			#$(cat $SITE_ROOT/data/${_type}_dirty)
+			dirty=$(cat $SITE_ROOT/data/${_type}_dirty)
 			if [ -z $dirty ]; then dirty=0; fi
 			if [ $dirty -eq 1 ]; then
 				if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then

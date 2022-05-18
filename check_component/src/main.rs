@@ -106,7 +106,7 @@ async fn main() {
                                 &check_component.domain,
                             );
 
-                            store_report.set_report_data(
+                            store_report.set_report_data_detail(
                                 &wrk_report,
                                 &check_mk_report,
                                 &component,

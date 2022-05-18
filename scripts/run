@@ -251,7 +251,7 @@ _remove_monitors_type() {
 	comm -23 ${tmp}.2 ${tmp}.1 | while read h; do
 		$script _remove_monitor_host $_site $h
 	done
-	su - mbr -c " /omd/sites/mbr/etc/check_mk/main.mk"
+	su - mbr -c "rm /omd/sites/mbr/etc/check_mk/main.mk"
 	rm ${tmp}*
 }
 _remove_monitors() {

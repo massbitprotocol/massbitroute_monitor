@@ -61,9 +61,9 @@ impl FromStr for Zone {
             "EU" => Ok(Zone::EU),
             "NA" => Ok(Zone::NA),
             "SA" => Ok(Zone::SA),
-            "AS" => Ok(Zone::AF),
-            "NA" => Ok(Zone::OC),
-            "SA" => Ok(Zone::GB),
+            "AF" => Ok(Zone::AF),
+            "OC" => Ok(Zone::OC),
+            "GB" => Ok(Zone::GB),
             _ => Err(()),
         }
     }

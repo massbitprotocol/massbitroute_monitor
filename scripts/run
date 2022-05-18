@@ -407,7 +407,11 @@ _update() {
 }
 
 _discover_host() {
-	_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
+	_dirty=$1
+	if [ -z "$_dirty" ]; then
+		_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
+	fi
+
 	if [ -z "$_dirty" ]; then _dirty=0; fi
 	if [ $_dirty -ne 1 ]; then return; fi
 

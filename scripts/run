@@ -459,7 +459,7 @@ _monitor() {
 	if [ $is_reload -ne 0 ]; then
 		$script _reload
 	fi
-	#$0 _add_monitors
+	$0 _add_monitors
 }
 
 _run() {

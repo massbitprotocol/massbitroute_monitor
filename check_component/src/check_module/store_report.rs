@@ -84,7 +84,7 @@ impl StoreReport {
     }
 
     // Short store before report
-    pub fn set_report_data_minimun(
+    pub fn set_report_data_short(
         &mut self,
         request_number: u64,
         success_number: u64,

@@ -291,5 +291,84 @@
 
       ]
     }
+  ],
+
+  "checking_through_path": [
+    {
+      "blockchain": "eth",
+      "component": "node",
+      "check_steps": [
+        {
+          "action":{
+            "action_type": "call_list_gateway",
+            "request_type":"POST",
+            "header":{"content-type":"application/json","host": "{{GATEWAY_ID}}.gw.mbr.{{DOMAIN}}"},
+            "time_out":5,
+            "return_fields":{"result":"result"}
+          },
+          "return_name":"checkCallSync",
+          "failed_case": {
+            "critical": true,
+            "message": "cannot get call check_node_url",
+            "conclude": "Critical"
+          }
+        },
+        {
+          "action":{
+            "action_type":"compare",
+            "operator_items": {
+              "operator_type": "eq",
+              "params": ["checkCallSync_result","#false"]
+            }
+          },
+          "return_name":"compareBaseAndCheckCall",
+          "failed_case": {
+            "critical": true,
+            "message": "check node is difference from base_node",
+            "conclude": "Critical"
+          }
+        }
+
+      ]
+    },
+    {
+      "blockchain": "dot",
+      "component": "node",
+      "check_steps": [
+        {
+          "action":{
+            "action_type": "call",
+            "is_base_node": false,
+            "request_type":"POST",
+            "header":{"content-type":"application/json"},
+            "body":"{ \"jsonrpc\": \"2.0\",  \"method\": \"chain_getBlock\", \"params\": [\"0xc0096358534ec8d21d01d34b836eed476a1c343f8724fa2153dc0725ad797a90\"],\"id\": 1}",
+            "time_out":5,
+            "return_fields":{ "blockNumber":"result/block/header/number"}
+          },
+          "return_name":"checkCallSync",
+          "failed_case": {
+            "critical": true,
+            "message": "cannot get call check_node_url",
+            "conclude": "Critical"
+          }
+        },
+        {
+          "action":{
+            "action_type":"compare",
+            "operator_items": {
+              "operator_type": "eq",
+              "params": ["checkCallSync_blockNumber","#0x1"]
+            }
+          },
+          "return_name":"compareBaseAndCheckCall",
+          "failed_case": {
+            "critical": true,
+            "message": "check node return is difference from expect",
+            "conclude": "Critical"
+          }
+        }
+
+      ]
+    }
   ]
 }

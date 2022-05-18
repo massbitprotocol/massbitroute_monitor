@@ -368,6 +368,8 @@ _add_monitors() {
 		echo cat $token_file
 		cat $token_file
 		bash $SITE_ROOT/scripts/server.sh _kill
+		echo cat $token_file
+		cat $token_file
 	fi
 }
 

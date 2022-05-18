@@ -321,6 +321,28 @@ _del_monitors() {
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 }
 
+_add_monitors_internal() {
+	_type=internal
+	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
+	token_core_file=$SITE_ROOT/data/tokens_core.txt
+	_listid=$SITE_ROOT/data/${_type}_listid
+	_dirty=$SITE_ROOT/data/${_type}_dirty
+	if [ ! -f "$_listid" ]; then
+		touch $_listid
+	fi
+	diff -s $token_core_file $_listid >/dev/null
+	if [ $? -ne 0 ]; then
+		echo 1 >$_dirty
+		cp $token_core_file $_listid
+
+		tmp=$(mktemp)
+		cat $token_core_file | cut -d' ' -f2- | while read opt; do
+			echo $script _add_monitor_host internal $opt 1 >>${tmp}
+		done
+		mv $tmp $script_run_internal
+	fi
+}
+
 _add_monitors_type() {
 	_type=$1
 	_block=$2
@@ -366,21 +388,15 @@ _add_monitors() {
 	_net=$2
 	script_run_gateway=$SITE_ROOT/data/_run_me_gateway.sh
 	script_run_node=$SITE_ROOT/data/_run_me_node.sh
-	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
+
 	>$script_run_gateway
 	>$script_run_node
 	token_file=$SITE_ROOT/data/tokens.txt
 	token_core_file=$SITE_ROOT/data/tokens_core.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
-	tmp=$(mktemp)
-	cat $token_core_file | cut -d' ' -f2- | while read opt; do
-		echo $script _add_monitor_host internal $opt 1 >>${tmp}
-	done
-	mv $tmp $script_run_internal
-	rm $tmp
-
 	cp $token_core_file ${token_file}.tmp
+	_add_monitors_internal
 	_add_monitors_type gateway $_block $_net ${token_file}.tmp $script_run_gateway
 	_add_monitors_type node $_block $_net ${token_file}.tmp $script_run_node
 

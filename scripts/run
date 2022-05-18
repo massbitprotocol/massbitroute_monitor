@@ -251,6 +251,7 @@ _remove_monitors_type() {
 		$script _remove_monitor_host $_site $h
 	done
 	rm ${tmp}*
+	_monitor_activate ${_site}
 }
 _remove_monitors() {
 	_block=$1
@@ -409,12 +410,7 @@ _monitor() {
 	if [ $is_reload -ne 0 ]; then
 		$script _reload
 	fi
-	# $0 _remove_hosts
 	$0 _add_monitors eth mainnet
-	# $0 _add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
-	# $0 _monitor_activate
-	# $0 _refresh_monitors
-	# $cmd start all
 }
 
 _run() {

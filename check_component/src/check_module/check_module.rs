@@ -337,7 +337,7 @@ impl CheckMkReport {
             message.push_str(
                 format!(
                     "False because percent low latency request is too low: {}% (required percent {}%). ",
-                    wrk_report.percent_low_latency*100, accepted_percent_low_latency*100
+                    wrk_report.percent_low_latency*100f32, accepted_percent_low_latency*100f32
                 )
                 .as_str(),
             );

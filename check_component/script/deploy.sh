@@ -21,3 +21,5 @@ do
   echo "Restart service"
   ssh "mbr-verify-$ZN" < restart_verify_service.sh
 done
+
+bash status.sh

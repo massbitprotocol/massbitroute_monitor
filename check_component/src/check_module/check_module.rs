@@ -326,7 +326,7 @@ impl CheckMkReport {
         let success_percent = wrk_report.get_success_percent().unwrap();
         message.push_str(
             format!(
-                "Percent of request that latency lower than {}ms: {}%, average latency: {}ms, Success_percent: {}%.",
+                "Percent of requests that latency lower than {}ms: {}%, average latency: {}ms, request success percent: {}%.",
                 response_time_threshold_ms, wrk_report.percent_low_latency*100f32, latency, success_percent
             )
             .as_str(),
@@ -347,7 +347,7 @@ impl CheckMkReport {
             status = CheckMkStatus::Critical as u8;
             message.push_str(
                 format!(
-                    "False because of success percent is too low: {}% (required percent {}%). ",
+                    "False because of request success percent is too low: {}% (required percent {}%). ",
                     success_percent, success_percent_threshold
                 )
                 .as_str(),

@@ -3,6 +3,7 @@ use bytesize::ByteSize;
 use log::{debug, info};
 use regex::Regex;
 use std::io::stdout;
+use std::path::Component;
 use std::process::Command;
 use std::str::FromStr;
 use std::time::Duration;
@@ -43,7 +44,7 @@ impl WrkBenchmark {
             latency_threshold_ms: latency_threshold_ms,
         }
     }
-    pub fn run(&mut self) -> Result<WrkReport, Error> {
+    pub fn run(&mut self,provider_type: &String,path: &String, chain_type: &String) -> Result<WrkReport, Error> {
         info!("current_dir: {}", self.current_dir);
         info!("wrk_path: {}", self.wrk_path);
         info!("script: {}", self.script);
@@ -60,6 +61,9 @@ impl WrkBenchmark {
             .arg(format!("--"))
             .arg(format!("{}", self.token))
             .arg(format!("{}", self.host))
+            .arg(format!("{}", provider_type))
+            .arg(format!("{}", path))
+            .arg(format!("{}", chain_type))
             .output()
             .expect("failed to execute process");
         let status = output.status;

@@ -985,20 +985,36 @@ impl CheckComponent {
         Ok((check_mk_report, wrk_report))
     }
 
+    fn get_benchmark_url(component: &ComponentInfo) -> String {
+        match component.component_type {
+            ComponentType::Node => {
+                format!("https://{}", component.ip)
+            }
+            ComponentType::Gateway => {
+                format!("https://{}", component.ip)
+            }
+            ComponentType::DApi => Default::default(),
+        }
+    }
+
     pub async fn run_benchmark(
         &self,
         response_time_threshold: f32,
         component: &ComponentInfo,
     ) -> Result<WrkReport, anyhow::Error> {
-        let dapi_url = format!("https://{}", component.ip);
-        let host = match component.component_type {
+        let dapi_url = Self::get_benchmark_url(component);
+        let mut host = Default::default();
+        let mut path = Default::default();
+        match component.component_type {
             ComponentType::Node => {
-                format!("{}.node.mbr.{}", component.id, self.domain)
+                host = format!("{}.node.mbr.{}", component.id, self.domain);
+                path = "/".to_string();
             }
             ComponentType::Gateway => {
-                format!("{}.gw.mbr.{}", component.id, self.domain)
+                host = format!("{}.gw.mbr.{}", component.id, self.domain);
+                path = "/_test_20k".to_string();
             }
-            ComponentType::DApi => String::default(),
+            ComponentType::DApi => {}
         };
 
         let mut benchmark = WrkBenchmark::build(
@@ -1014,7 +1030,11 @@ impl CheckComponent {
             BENCHMARK_WRK_PATH.clone().to_string(),
             response_time_threshold,
         );
-        benchmark.run()
+        benchmark.run(
+            &component.component_type.to_string(),
+            &path,
+            &component.blockchain,
+        )
     }
 
     //Using in fisherman service

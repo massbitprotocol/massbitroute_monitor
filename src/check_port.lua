@@ -16,8 +16,9 @@ local _cmd = {
 }
 
 local _res = shell.run(_cmd)
-if _res.status == 0 then
-    ngx.say(json.encode({status = 0, msg = "success"}))
-else
-    ngx.say(json.encode({status = 1, msg = "failed"}))
-end
+ngx.say(_res.status)
+-- if _res.status == 0 then
+--     ngx.say(json.encode({status = 0, msg = "success"}))
+-- else
+--     ngx.say(json.encode({status = 1, msg = "failed"}))
+-- end

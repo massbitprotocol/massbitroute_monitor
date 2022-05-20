@@ -17,15 +17,16 @@ function request()
     local host = wrk.thread:get("host")
     local provider_type = wrk.thread:get("provider_type")
     local chain_type = wrk.thread:get("chain_type")
+    local path = wrk.thread:get("path")
     if provider_type == "node" then
         local body =""
         if chain_type == "eth" then
             body =
-                '{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["0xde83cb", false]}'
+                '{"id": "blockNumber", "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false]}'
         end
         if chain_type == "dot" then
             body =
-                '{ "jsonrpc": "2.0",  "method": "chain_getBlock", "params": ["0xc0096358534ec8d21d01d34b836eed476a1c343f8724fa2153dc0725ad797a90"],"id": 1}'
+                '{ "jsonrpc": "2.0",  "method": "chain_getBlock", "params": [],"id": 1}'
         end
 
         local headers = {}
@@ -45,8 +46,6 @@ function request()
     if provider_type == "gateway" then
         local headers = {}
         headers["Content-Type"] = "application/json"
-        local host = wrk.thread:get("host")
-        local path = wrk.thread:get("path")
 
         if host then
             headers["Host"] = host
@@ -54,6 +53,4 @@ function request()
 
         return wrk.format("GET", path, headers)
     end
-
-
 end

@@ -1,6 +1,5 @@
 local shell = require "shell-games"
 local json = require "cjson"
-ngx.say("ok")
 local _ip = ngx.var.ip
 local _proto = ngx.var.proto
 local _port = ngx.var.port
@@ -20,4 +19,4 @@ local _cmd = {
 }
 ngx.log(ngx.ERR, table.concat(_cmd, " "))
 local _res = shell.run(_cmd)
-return json.encode(_res)
+ngx.say(json.encode(_res))

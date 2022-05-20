@@ -326,7 +326,7 @@ impl CheckMkReport {
         let success_percent = wrk_report.get_success_percent().unwrap();
         message.push_str(
             format!(
-                "Benchmark report: Percent Latency lower than {}ms: {}%, average latency: {}ms, Success_percent: {}%.",
+                "Percent of requests that latency lower than {}ms: {}%, average latency: {}ms, request success percent: {}%.",
                 response_time_threshold_ms, wrk_report.percent_low_latency*100f32, latency, success_percent
             )
             .as_str(),
@@ -336,18 +336,18 @@ impl CheckMkReport {
             status = CheckMkStatus::Critical as u8;
             message.push_str(
                 format!(
-                    "False latency: percent_low_latency {} < accepted_percent_low_latency {} . ",
-                    wrk_report.percent_low_latency, accepted_percent_low_latency
+                    "False because percent low latency request is too low: {}% (required percent {}%). ",
+                    wrk_report.percent_low_latency*100f32, accepted_percent_low_latency*100f32
                 )
                 .as_str(),
             );
         }
 
-        if success_percent <= success_percent_threshold {
+        if success_percent < success_percent_threshold {
             status = CheckMkStatus::Critical as u8;
             message.push_str(
                 format!(
-                    "False success-percent: test {} <= require {} . ",
+                    "False because of request success percent is too low: {}% (required percent {}%). ",
                     success_percent, success_percent_threshold
                 )
                 .as_str(),
@@ -985,20 +985,36 @@ impl CheckComponent {
         Ok((check_mk_report, wrk_report))
     }
 
+    fn get_benchmark_url(component: &ComponentInfo) -> String {
+        match component.component_type {
+            ComponentType::Node => {
+                format!("https://{}", component.ip)
+            }
+            ComponentType::Gateway => {
+                format!("https://{}", component.ip)
+            }
+            ComponentType::DApi => Default::default(),
+        }
+    }
+
     pub async fn run_benchmark(
         &self,
         response_time_threshold: f32,
         component: &ComponentInfo,
     ) -> Result<WrkReport, anyhow::Error> {
-        let dapi_url = format!("https://{}", component.ip);
-        let host = match component.component_type {
+        let dapi_url = Self::get_benchmark_url(component);
+        let mut host = Default::default();
+        let mut path = Default::default();
+        match component.component_type {
             ComponentType::Node => {
-                format!("{}.node.mbr.{}", component.id, self.domain)
+                host = format!("{}.node.mbr.{}", component.id, self.domain);
+                path = "/".to_string();
             }
             ComponentType::Gateway => {
-                format!("{}.gw.mbr.{}", component.id, self.domain)
+                host = format!("{}.gw.mbr.{}", component.id, self.domain);
+                path = "/_test_20k".to_string();
             }
-            ComponentType::DApi => String::default(),
+            ComponentType::DApi => {}
         };
 
         let mut benchmark = WrkBenchmark::build(
@@ -1014,7 +1030,11 @@ impl CheckComponent {
             BENCHMARK_WRK_PATH.clone().to_string(),
             response_time_threshold,
         );
-        benchmark.run()
+        benchmark.run(
+            &component.component_type.to_string(),
+            &path,
+            &component.blockchain,
+        )
     }
 
     //Using in fisherman service
@@ -1031,21 +1051,6 @@ impl CheckComponent {
         for component in components {
             match self.get_report_component(&component).await {
                 Ok((check_mk_report, wrk_report)) => {
-                    // Store report to portal
-                    let mut store_report = StoreReport::build(
-                        &*LOCAL_IP,
-                        ReporterRole::Fisherman,
-                        &*PORTAL_AUTHORIZATION,
-                        &self.domain,
-                    );
-                    store_report.set_report_data_detail(
-                        &wrk_report,
-                        &check_mk_report,
-                        &component,
-                        ReportType::Benchmark,
-                    );
-                    let res = store_report.send_data(SendPurpose::Store).await;
-                    info!("Store report: {:?}", res.unwrap().text().await);
                     // Store reports
                     reports.push((component.clone(), check_mk_report));
                 }

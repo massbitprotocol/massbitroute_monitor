@@ -1,6 +1,8 @@
 #!/bin/bash
+
 ZONES=( 'as' 'eu' 'na' 'sa' 'oc')
 #ZONES=( 'sa' )
+
 for ZN in "${ZONES[@]}"
 do
   echo "Service status at $ZN"

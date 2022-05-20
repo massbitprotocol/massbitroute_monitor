@@ -50,12 +50,13 @@ impl CheckPingPong for FishermanService {
         // Parallel call
         //let client = Client::new();
         let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
             .timeout(Duration::from_millis(CONFIG.ping_timeout_ms))
             .build()?;
         for i in 0..CONFIG.ping_sample_number {
             let bodies = stream::iter(list_providers_clone.clone())
                 .map(|component| {
-                    let mut url = format!("http://{}/ping", component.ip);
+                    let mut url = format!("https://{}/ping", component.ip);
                     let client = client.clone();
                     let domain = domain.clone();
                     tokio::spawn(async move {

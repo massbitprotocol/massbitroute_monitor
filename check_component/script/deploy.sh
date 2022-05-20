@@ -1,7 +1,7 @@
 #!/bin/bash
 cargo build --release
-#ZONES=( 'sa' )
-ZONES=( 'as' 'eu' 'na' 'sa' 'oc')
+#ZONES=( 'as-vultr' )
+ZONES=( 'as' 'eu' 'na' 'sa' 'oc' 'as-vultr')
 
 for ZN in "${ZONES[@]}"
 do
@@ -21,5 +21,3 @@ do
   echo "Restart service"
   ssh "mbr-verify-$ZN" < restart_verify_service.sh
 done
-
-bash status.sh

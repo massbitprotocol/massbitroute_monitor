@@ -1051,21 +1051,6 @@ impl CheckComponent {
         for component in components {
             match self.get_report_component(&component).await {
                 Ok((check_mk_report, wrk_report)) => {
-                    // Store report to portal
-                    let mut store_report = StoreReport::build(
-                        &*LOCAL_IP,
-                        ReporterRole::Fisherman,
-                        &*PORTAL_AUTHORIZATION,
-                        &self.domain,
-                    );
-                    store_report.set_report_data_detail(
-                        &wrk_report,
-                        &check_mk_report,
-                        &component,
-                        ReportType::Benchmark,
-                    );
-                    let res = store_report.send_data(SendPurpose::Store).await;
-                    info!("Store report: {:?}", res.unwrap().text().await);
                     // Store reports
                     reports.push((component.clone(), check_mk_report));
                 }

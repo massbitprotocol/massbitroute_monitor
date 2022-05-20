@@ -408,8 +408,10 @@ _update() {
 
 _discover_host() {
 	_dirty=$1
+	_dirty_f=$SITE_ROOT/data/tokens_dirty.txt
+	if [ ! -f "${_dirty_f}" ]; then echo 0 >$_dirty_f; fi
 	if [ -z "$_dirty" ]; then
-		_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
+		_dirty=$(cat ${_dirty_f})
 	fi
 
 	if [ -z "$_dirty" ]; then _dirty=0; fi
@@ -418,10 +420,7 @@ _discover_host() {
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	for _type in $_types; do
 		if [ \( "${_type}" == "node" -o "${_type}" == "gateway" \) ]; then
-			# dirty=1
-			#$(cat $SITE_ROOT/data/${_type}_dirty)
-			# if [ -z $dirty ]; then dirty=0; fi
-			# if [ $dirty -eq 1 ]; then
+
 			if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
 				su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 				cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
@@ -440,7 +439,6 @@ _discover_host() {
 				su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 				echo 0 >$SITE_ROOT/data/${_type}_dirty
 			fi
-			# fi
 
 		else
 

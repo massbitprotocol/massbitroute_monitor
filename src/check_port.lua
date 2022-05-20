@@ -9,7 +9,7 @@ if _proto == "udp" then
 end
 
 local _cmd = {
-    "/usr/bin/nc",
+    "timeout 1 /usr/bin/nc",
     _opt,
     _ip,
     _port

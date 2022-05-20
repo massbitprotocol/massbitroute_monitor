@@ -14,5 +14,6 @@ local _cmd = {
     _ip,
     _port
 }
+ngx.log(ngx.ERR, table.concat(_cmd, " "))
 local _res = shell.run(_cmd)
 return json.encode(_res)

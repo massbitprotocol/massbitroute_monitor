@@ -19,4 +19,8 @@ local _cmd = {
 }
 ngx.log(ngx.ERR, table.concat(_cmd, " "))
 local _res = shell.run(_cmd)
-ngx.say(json.encode(_res))
+if _res.status == 0 then
+    ngx.say(json.encode({status = 0, msg = "success"}))
+else
+    ngx.say(json.encode({status = 1, msg = "failed"}))
+end

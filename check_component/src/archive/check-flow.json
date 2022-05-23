@@ -12,7 +12,7 @@
             "header":{"content-type":"application/json"},
             "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\",  false],\"id\": 1}",
             "time_out":5,
-            "return_fields":{"hash":"result/hash","blockNumber":"result/number"}
+            "return_fields":{"hash":"result/hash","blockNumber":"result/number","timestamp": "result/timestamp"}
           },
           "return_name": "baseCall",
           "failed_case":{
@@ -77,7 +77,7 @@
             "header":{"content-type":"application/json"},
             "body": "{ \"jsonrpc\": \"2.0\",  \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\",  false],\"id\": 1}",
             "time_out":5,
-            "return_fields":{"hash":"result/hash","blockNumber":"result/number"}
+            "return_fields":{"hash":"result/hash","blockNumber":"result/number","timestamp": "result/timestamp"}
           },
           "return_name": "baseCall",
           "failed_case":{
@@ -127,7 +127,6 @@
             "conclude": "Critical"
           }
         }
-
       ]
     },
     {

@@ -19,9 +19,9 @@
 
   "ping_parallel_requests": 10,
   "ping_success_ratio_threshold": 0.50,
-  "ping_sample_number": 25,
+  "ping_sample_number": 20,
   "ping_request_response": "pong",
-  "ping_timeout_ms": 100,
+  "ping_timeout_ms": 250,
 
   "check_ping_pong_interval": 2,
   "check_logic_interval": 2,

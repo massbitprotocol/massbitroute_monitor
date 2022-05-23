@@ -37,20 +37,14 @@ lazy_static! {
     pub static ref CHECK_COMPONENT_ENDPOINT: String =
         env::var("CHECK_COMPONENT_ENDPOINT").unwrap_or(String::from("0.0.0.0:3030"));
     pub static ref BASE_ENDPOINT_JSON: String = env::var("BASE_ENDPOINT_JSON").unwrap();
-    pub static ref BENCHMARK_WRK_PATH: String = env::var("BENCHMARK_WRK_PATH").unwrap_or("./".to_string());
-    pub static ref PORTAL_AUTHORIZATION: String = env::var("PORTAL_AUTHORIZATION").expect("There is no env var PORTAL_AUTHORIZATION");
-    pub static ref SIGNER_PHRASE: String = env::var("SIGNER_PHRASE").expect("There is no env var SIGNER_PHRASE");
+    pub static ref BENCHMARK_WRK_PATH: String =
+        env::var("BENCHMARK_WRK_PATH").unwrap_or("./".to_string());
+    pub static ref PORTAL_AUTHORIZATION: String =
+        env::var("PORTAL_AUTHORIZATION").expect("There is no env var PORTAL_AUTHORIZATION");
+    pub static ref SIGNER_PHRASE: String =
+        env::var("SIGNER_PHRASE").expect("There is no env var SIGNER_PHRASE");
     pub static ref LOCAL_IP: String = local_ip_address::local_ip().unwrap().to_string();
-    // pub static ref CHECK_INTERVAL_MS: u64 = 3000;
-    // pub static ref CHECK_TASK_LIST_NODE: Vec<String> = vec![
-    //     "checking_chain_type".to_string(),
-    //     "checking_chain_sync".to_string(),
-    // ];
-    // pub static ref CHECK_TASK_LIST_ALL: Vec<String> = vec![
-    //     "checking_chain_type".to_string(),
-    //     "checking_chain_sync".to_string(),
-    // ];
-    // pub static ref CHECK_TASK_LIST_GATEWAY: Vec<String> = vec!["checking_chain_type".to_string(),];
+    pub static ref HASH_TEST_20K: String = "95c5679435a0a714918dc92b546dc0ba".to_string();
     pub(crate) static ref CONFIG: Config = get_config();
 }
 

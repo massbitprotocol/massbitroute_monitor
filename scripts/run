@@ -313,7 +313,7 @@ _add_monitors_type() {
 		echo >>${tmp}
 		cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
 			if [ -z "$id" ]; then continue; fi
-			if [ $status -ne 1 ]; then continue; fi
+			# if [ $status -ne 1 ]; then continue; fi
 			# if [ $approved -ne 1 ]; then continue; fi
 			_hostname=${_type}-$block-$net-$id
 			echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run

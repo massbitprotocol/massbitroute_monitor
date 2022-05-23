@@ -15,7 +15,7 @@ use std::io::{BufRead, BufReader};
 
 use anyhow::Error;
 use reqwest::RequestBuilder;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{thread, usize};
 
 use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
@@ -29,6 +29,7 @@ use warp::{Rejection, Reply};
 pub use wrap_wrk::{WrkBenchmark, WrkReport};
 
 type BlockChainType = String;
+type NetworkType = String;
 type UrlType = String;
 type TaskType = String;
 type StepResult = HashMap<String, String>;
@@ -101,7 +102,7 @@ pub struct OperatorCompare {
 #[derive(Clone, Debug, Deserialize, Serialize, Default, Hash, PartialEq, Eq)]
 pub struct ComponentInfo {
     pub blockchain: BlockChainType,
-    pub network: String,
+    pub network: NetworkType,
     pub id: ComponentId,
     #[serde(rename = "userId", default)]
     pub user_id: String,
@@ -164,7 +165,7 @@ pub struct CheckComponent {
     pub list_gateways: Vec<ComponentInfo>,
     pub list_dapis: Vec<ComponentInfo>,
     pub list_users: Vec<UserInfo>,
-    pub base_nodes: HashMap<BlockChainType, Vec<EndpointInfo>>,
+    pub base_nodes: HashMap<BlockChainType, HashMap<NetworkType, Vec<EndpointInfo>>>,
     pub check_flows: CheckFlows,
     pub is_loop_check: bool,
     pub is_write_to_file: bool,
@@ -613,13 +614,19 @@ impl CheckComponent {
         if action.is_base_node {
             // Get base_endpoints
             let mut report = Err(anyhow::Error::msg("Cannot found working base node"));
-            let base_endpoints =
-                self.base_nodes
-                    .get(&component.blockchain)
-                    .ok_or(anyhow::Error::msg(format!(
-                        "Cannot found base node for chain {:?}",
-                        &component.blockchain
-                    )))?;
+            let base_endpoints = self
+                .base_nodes
+                .get(&component.blockchain)
+                .ok_or(anyhow::Error::msg(format!(
+                    "Cannot found base node for chain {:?}",
+                    &component.blockchain
+                )))?
+                .get(&component.network)
+                .ok_or(anyhow::Error::msg(format!(
+                    "Cannot found base node for network {:?}",
+                    &component.network
+                )))?;
+            info!("base endpoints: {:?}", &base_endpoints);
             // Calling to Base node retry if failed
             for endpoint in base_endpoints {
                 debug!("try endpoint:{:?}", endpoint);
@@ -798,9 +805,51 @@ impl CheckComponent {
         let response_time_ms = now.elapsed().as_millis();
 
         let str_resp = res??.text().await?;
-        debug!("response call: {:?}", str_resp);
+
         // Prepare return result
-        Self::prepare_result(&str_resp, response_time_ms, action, return_name)
+        let res = Self::prepare_result(&str_resp, response_time_ms, action, return_name);
+        debug!("res: {:?}", res);
+
+        // Check timestamp is reasonable
+        match res {
+            Ok(mut res) => {
+                let create_block_timestamp = res.result.get(&"timestamp".to_string());
+                match create_block_timestamp {
+                    None => {
+                        warn!("There are no timestamp field");
+                        Ok(res)
+                    }
+                    Some(create_block_timestamp) => {
+                        // Parse timestamp
+                        let create_block_timestamp = u64::from_str_radix(
+                            create_block_timestamp.trim_start_matches("0x"),
+                            16,
+                        )?;
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
+                        let duration_from_last_block = now - create_block_timestamp;
+                        debug!(
+                            "Time in Seconds from create block {} to now {} last block:{}",
+                            create_block_timestamp, now, duration_from_last_block
+                        );
+                        if duration_from_last_block > 3600 {
+                            let message = format!(
+                                "The base node is out of sync in {} secs",
+                                duration_from_last_block
+                            );
+                            warn!("{}", message);
+                            res.message.push_str(message.as_str());
+                            Err(Error::msg(message))
+                        } else {
+                            Ok(res)
+                        }
+                    }
+                }
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub async fn run_check_steps(
@@ -1191,7 +1240,7 @@ impl GeneratorBuilder {
             BASE_ENDPOINT_JSON.clone()
         };
 
-        let base_nodes: HashMap<BlockChainType, Vec<EndpointInfo>> =
+        let base_nodes: HashMap<BlockChainType, HashMap<NetworkType, Vec<EndpointInfo>>> =
             serde_json::from_str(&minify(&json)).unwrap_or_default();
         self.inner.base_endpoint_file = path;
         self.inner.base_nodes = base_nodes;

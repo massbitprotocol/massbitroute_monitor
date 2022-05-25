@@ -345,11 +345,12 @@ _add_monitors() {
 	if [ -z "$_blocks" ]; then _blocks="eth"; fi
 	_nets=$(cat $SITE_ROOT/vars/MONITOR_NETWORKS)
 	if [ -z "$_nets" ]; then _nets="mainnet"; fi
+	>$_script_run
 	for _type in $_types; do
 		for _block in $_blocks; do
 			for _net in $_nets; do
 				_script_run=$SITE_ROOT/data/_run_me_${_type}.sh
-				>$_script_run
+
 				_add_monitors_type $_type $_block $_net ${token_file}.tmp $_script_run
 			done
 		done

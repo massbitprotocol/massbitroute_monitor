@@ -252,9 +252,9 @@ _remove_monitors_type() {
 	_site=${_type}-${_block}-${_net}
 	tmp=$(mktemp)
 	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >${tmp}.1
-	cat ${tmp}.1
+	# cat ${tmp}.1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk "/^${_type}/" | sort >${tmp}.2
-	cat ${tmp}.2
+	# cat ${tmp}.2
 	comm -23 ${tmp}.2 ${tmp}.1 | while read h; do
 		echo $h
 		$script _remove_monitor_host $_site $h
@@ -355,19 +355,19 @@ _add_monitors() {
 		done
 	done
 
-	echo cat ${token_file}.tmp
-	cat ${token_file}.tmp
-	echo cat $token_file
-	cat $token_file
+	# echo cat ${token_file}.tmp
+	# cat ${token_file}.tmp
+	# echo cat $token_file
+	# cat $token_file
 	diff -s ${token_file}.tmp $token_file >/dev/null
 	if [ $? -ne 0 ]; then
 		echo 1 >$SITE_ROOT/data/tokens_dirty.txt
 		mv ${token_file}.tmp $token_file
-		echo cat $token_file
-		cat $token_file
+		# echo cat $token_file
+		# cat $token_file
 		bash $SITE_ROOT/scripts/server.sh _kill
-		echo cat $token_file
-		cat $token_file
+		# echo cat $token_file
+		# cat $token_file
 	fi
 }
 

@@ -20,9 +20,10 @@ use std::{thread, usize};
 
 use crate::check_module::check_module::CheckMkStatus::{Unknown, Warning};
 use crate::check_module::check_module::ComponentType::Gateway;
+use crate::check_module::check_path_though::ActionCallListPath;
 use crate::check_module::store_report::ReportType::ReportProvider;
 use crate::check_module::store_report::{ReportType, ReporterRole, SendPurpose, StoreReport};
-use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG, LOCAL_IP, PORTAL_AUTHORIZATION};
+use crate::{BASE_ENDPOINT_JSON, BENCHMARK_WRK_PATH, CONFIG, LOCAL_IP, PORTAL_AUTHORIZATION, ZONE};
 use std::str::FromStr;
 use strum_macros::EnumString;
 use warp::{Rejection, Reply};
@@ -144,6 +145,10 @@ impl ComponentInfo {
             }
             ComponentType::DApi => String::default(),
         }
+    }
+
+    fn get_chain_id(&self) -> String {
+        format!("{}.{}", self.blockchain, self.network)
     }
 }
 
@@ -277,11 +282,11 @@ impl ToString for CheckMkMetric {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct ActionResponse {
-    success: bool,
-    conclude: CheckMkStatus,
-    return_name: String,
-    result: HashMap<String, String>,
-    message: String,
+    pub success: bool,
+    pub conclude: CheckMkStatus,
+    pub return_name: String,
+    pub result: HashMap<String, String>,
+    pub message: String,
 }
 
 #[derive(PartialEq, Clone, Debug, Deserialize, Serialize)]
@@ -369,6 +374,14 @@ impl CheckMkReport {
     fn new_failed_report(msg: String) -> Self {
         let mut resp = CheckMkReport::default();
         resp.success = false;
+        resp.status = CheckMkStatus::Critical as u8;
+        resp.status_detail = msg.to_string();
+        resp
+    }
+    fn new_unknown_report(msg: String) -> Self {
+        let mut resp = CheckMkReport::default();
+        resp.success = true;
+        resp.status = CheckMkStatus::Unknown as u8;
         resp.status_detail = msg.to_string();
         resp
     }
@@ -422,11 +435,12 @@ impl CheckComponent {
         self.list_users.iter().find(|user| &user.id == user_id)
     }
 
-    pub async fn reload_components_list(
-        &mut self,
+    pub async fn get_components_list(
+        &self,
         filter_status: Option<&String>,
         filter_zone: &Zone,
-    ) -> Result<(), anyhow::Error> {
+        filter_chain_id: Option<&String>,
+    ) -> Result<(Vec<ComponentInfo>, Vec<ComponentInfo>), anyhow::Error> {
         // Get nodes
         let url = &self.list_node_id_file;
         debug!("list_node_id url:{}", url);
@@ -446,7 +460,7 @@ impl CheckComponent {
         for component in components.iter_mut() {
             component.component_type = ComponentType::Node;
         }
-        self.list_nodes = components;
+        let mut list_nodes = components;
 
         //Get gateway
         let url = &self.list_gateway_id_file;
@@ -467,24 +481,41 @@ impl CheckComponent {
         for component in components.iter_mut() {
             component.component_type = ComponentType::Gateway;
         }
-        self.list_gateways = components;
+        let mut list_gateways = components;
 
         //Filter components
         if let Some(status) = filter_status {
-            self.list_nodes
-                .retain(|component| &component.status == status);
-            self.list_gateways
-                .retain(|component| &component.status == status);
+            list_nodes.retain(|component| &component.status == status);
+            list_gateways.retain(|component| &component.status == status);
         }
 
         //Filter zone
         //info!("Zone:{:?}", filter_zone);
         if *filter_zone != Zone::GB {
-            self.list_nodes
-                .retain(|component| component.zone == *filter_zone);
-            self.list_gateways
-                .retain(|component| component.zone == *filter_zone);
+            list_nodes.retain(|component| component.zone == *filter_zone);
+            list_gateways.retain(|component| component.zone == *filter_zone);
         }
+
+        //Filter ChainId
+        if let Some(chain_id) = filter_chain_id {
+            list_nodes.retain(|component| component.get_chain_id() == *chain_id);
+            list_gateways.retain(|component| component.get_chain_id() == *chain_id);
+        }
+
+        Ok((list_nodes, list_gateways))
+    }
+
+    pub async fn reload_components_list(
+        &mut self,
+        filter_status: Option<&String>,
+        filter_zone: &Zone,
+        filter_chain_id: Option<&String>,
+    ) -> Result<(), anyhow::Error> {
+        let (list_nodes, list_gateways) = self
+            .get_components_list(filter_status, filter_zone, filter_chain_id)
+            .await?;
+        self.list_nodes = list_nodes;
+        self.list_gateways = list_gateways;
         Ok(())
     }
 
@@ -502,7 +533,7 @@ impl CheckComponent {
             match self.check_flows.get(task.as_str()) {
                 Some(check_flows) => {
                     for check_flow in check_flows {
-                        if &check_flow.blockchain == blockchain
+                        if (&check_flow.blockchain == blockchain || check_flow.blockchain == "all")
                             && &check_flow.component == component_type
                         {
                             check_steps.extend(check_flow.check_steps.clone());
@@ -626,7 +657,7 @@ impl CheckComponent {
                     "Cannot found base node for network {:?}",
                     &component.network
                 )))?;
-            info!("base endpoints: {:?}", &base_endpoints);
+            debug!("base endpoints: {:?}", &base_endpoints);
             // Calling to Base node retry if failed
             for endpoint in base_endpoints {
                 debug!("try endpoint:{:?}", endpoint);
@@ -634,11 +665,13 @@ impl CheckComponent {
                     .call_action_base_node(&action, &step.return_name, &step_result, endpoint)
                     .await;
                 if res.is_ok() {
-                    report = res;
-                    debug!("endpoint {:?} success return: {:?}", endpoint, report);
-                    break;
+                    debug!("endpoint {:?} success return: {:?}", endpoint, res);
+                    return res;
+                } else {
+                    debug!("endpoint {:?} error: {:?}", endpoint, res);
                 }
             }
+            debug!("report call_action: {:?}", report);
             report
         } else {
             // Calling check node only runs once
@@ -774,7 +807,7 @@ impl CheckComponent {
         // Replace body for transport result of previous step
         let body = Self::replace_string(action.body.clone(), step_result)?;
 
-        debug!("body: {:?}", body);
+        debug!("body call_action_base_node: {:?}", body);
         let request_builder = if base_endpoint.x_api_key.is_empty() {
             client
                 .post(url)
@@ -872,15 +905,60 @@ impl CheckComponent {
                 .as_str()
                 .unwrap_or_default()
             {
-                "call" => self.call_action(component, &step_result, &step).await,
+                "call" => {
+                    let res = self.call_action(component, &step_result, &step).await;
+                    debug!("res call_action:{:?}", res);
+                    res
+                }
                 "compare" => {
                     let action: ActionCompare =
                         serde_json::from_value(step.action.clone()).unwrap();
                     debug!("compare action: {:?}", &action);
                     self.compare_action(&action, component, &step.return_name, &step_result)
                 }
+                "call_list_path" => {
+                    let action: ActionCallListPath =
+                        serde_json::from_value(step.action.clone()).unwrap();
+
+                    debug!("action: {:?}", action);
+
+                    let res = self
+                        .get_components_list(
+                            Some(&"staked".to_string()),
+                            &Zone::GB,
+                            Some(&component.get_chain_id()),
+                        )
+                        .await;
+                    debug!("res call_list_path: {:?}", res);
+                    let res = match res {
+                        Ok((list_nodes, list_gateways)) => {
+                            if component.component_type == ComponentType::Gateway {
+                                action
+                                    .call_action_list_path(
+                                        component.clone(),
+                                        list_nodes.clone(),
+                                        self.domain.clone(),
+                                    )
+                                    .await
+                            } else {
+                                action
+                                    .call_action_list_path(
+                                        component.clone(),
+                                        list_gateways.clone(),
+                                        self.domain.clone(),
+                                    )
+                                    .await
+                            }
+                        }
+                        Err(err) => Err(err),
+                    };
+                    debug!("report: {:?}", res);
+                    res
+                }
                 _ => Err(anyhow::Error::msg("not support action")),
             };
+
+            info!("report: {:?}", report);
 
             // Handle report
             match report {
@@ -980,15 +1058,15 @@ impl CheckComponent {
             .get_check_steps(
                 &component_info.blockchain,
                 &component_info.component_type.to_string(),
-                &CONFIG.check_task_list_all,
+                &CONFIG.check_task_list_node,
             )
             .unwrap_or_default();
         debug!("check_steps:{:?}", check_steps);
         if check_steps.is_empty() {
-            check_mk_report = CheckMkReport::new_failed_report("check_steps is empty".to_string())
+            check_mk_report = CheckMkReport::new_unknown_report("check_steps is empty".to_string())
         }
         let res_check_data = self.run_check_steps(check_steps, &component_info).await;
-        info!("res:{:?}", res_check_data);
+        debug!("res:{:?}", res_check_data);
 
         let response_time_threshold = if component_info.component_type == ComponentType::Gateway {
             CONFIG.node_response_time_threshold_ms
@@ -1236,7 +1314,7 @@ impl GeneratorBuilder {
             std::fs::read_to_string(&path)
                 .unwrap_or_else(|err| panic!("Unable to read `{}`: {}", path, err))
         } else {
-            println!("Load base endpoint from env: \n{:?}", *BASE_ENDPOINT_JSON);
+            info!("Load base endpoint from env: \n{:?}", *BASE_ENDPOINT_JSON);
             BASE_ENDPOINT_JSON.clone()
         };
 

@@ -81,6 +81,7 @@ impl CheckComponentServer {
             .and_then(move |body: Value| {
                 info!("#### Received request body ####");
                 info!("{}", body);
+                info!("###############################");
                 let component_info: ComponentInfo = serde_json::from_value(body).unwrap();
                 let sender_another_clone = sender_clone.clone();
                 async move {

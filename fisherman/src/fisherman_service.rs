@@ -220,7 +220,7 @@ impl FishermanService {
 
     pub async fn get_provider_list_from_portal(&mut self) -> Vec<ComponentInfo> {
         self.check_component_service
-            .reload_components_list(Some(&CONFIG.checking_component_status), &ZONE)
+            .reload_components_list(Some(&CONFIG.checking_component_status), &ZONE, None)
             .await;
         // List node and gateway
         let mut list_providers = self.check_component_service.list_nodes.clone();
@@ -285,6 +285,20 @@ impl ComponentReport {
             return false;
         }
         (self.get_success_percent() >= CONFIG.success_percent_threshold)
+            && (self.response_time_ms.unwrap() <= response_threshold)
+    }
+
+    pub fn is_unhealthy(&self, component_type: &ComponentType) -> bool {
+        let response_threshold = match component_type {
+            ComponentType::Node => CONFIG.node_response_time_threshold,
+            ComponentType::Gateway => CONFIG.gateway_response_time_threshold,
+            _ => u32::default(),
+        };
+        // If there is not enough info return false
+        if self.success_number == 0 || self.response_time_ms == None {
+            return false;
+        }
+        (self.get_success_percent() < CONFIG.success_percent_threshold)
             && (self.response_time_ms.unwrap() <= response_threshold)
     }
     pub fn get_success_percent(&self) -> u32 {

@@ -162,7 +162,7 @@ impl StoreReport {
         let client = client_builder.danger_accept_invalid_certs(true).build()?;
         // create body
         let body = self.create_body()?;
-        info!("body: {:?}", body);
+        debug!("body send_data: {:?}", body);
         // get url
         let url = self.get_url(send_purpose);
 

@@ -64,18 +64,18 @@ impl CheckDataCorrectness for FishermanService {
 
         // Display report for debug
         for (component, report) in bad_components.iter() {
-            info!("id: {}, type: {:?}, chain {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, healthy: {}",
+            info!("id: {}, type: {:?}, chain {:?}, request_number: {}, success_number: {}, response_time_ms:{:?}ms, unhealthy: {}",
                     component.id,
                     component.component_type,
                     component.blockchain,
                     report.request_number,
                     report.success_number,
                     report.response_time_ms,
-                    report.is_healthy(&component.component_type)
+                    report.is_unhealthy(&component.component_type)
                 );
         }
         // Filter bad component only
-        bad_components.retain(|component, report| !report.is_healthy(&component.component_type));
+        bad_components.retain(|component, report| report.is_unhealthy(&component.component_type));
         Ok(bad_components)
     }
 }

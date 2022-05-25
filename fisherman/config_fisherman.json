@@ -1,7 +1,7 @@
 {
   "response_time_key_name": "checkCall_response_time_ms",
   "number_of_samples": 5,
-  "sample_interval_ms": 200,
+  "sample_interval_ms": 1000,
   "delay_between_check_loop_ms": 1000,
   "success_percent_threshold": 50,
   "node_response_time_threshold": 2000,

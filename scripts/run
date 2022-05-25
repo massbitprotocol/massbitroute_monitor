@@ -16,7 +16,7 @@ cd $SITE_ROOT
 
 mbr_root=/massbit/massbitroute/app
 service_dir=$mbr_root/src/sites/services
-
+mkagent=$service_dir/mkagent
 export MBR_ENV=${MBR_ENV:-dev}
 export BRANCH=${BRANCH:-$MBR_ENV}
 export MBRAPP_BRANCH=${MBRAPP_BRANCH:-$MBR_ENV}
@@ -88,7 +88,7 @@ _reload() {
 	# _cron
 	_tune_hosts
 
-	bash $SITE_ROOT/etc/mkagent/agents/push.sh _kill
+	bash $mkagent/agents/push.sh _kill
 	$cmd _update
 	$cmd update
 	$cmd start all

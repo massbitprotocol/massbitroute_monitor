@@ -358,7 +358,7 @@ _add_monitors() {
 	# echo cat ${token_file}.tmp
 	# cat ${token_file}.tmp
 	# echo cat $token_file
-	# cat $token_file
+	cat $token_file
 	diff -s ${token_file}.tmp $token_file >/dev/null
 	if [ $? -ne 0 ]; then
 		echo 1 >$SITE_ROOT/data/tokens_dirty.txt

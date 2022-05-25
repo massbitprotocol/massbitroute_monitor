@@ -1,13 +1,14 @@
 pub mod check_module;
 pub mod server_builder;
 pub mod server_config;
+use crate::check_module::check_module::Zone;
+use dotenv;
 use lazy_static::lazy_static;
 use local_ip_address::local_ip;
-use std::net::IpAddr;
-
-use dotenv;
 use serde::Deserialize;
 use std::env;
+use std::net::IpAddr;
+use std::str::FromStr;
 
 pub const CONFIG_FILE: &str = "config_check_component.json";
 
@@ -26,6 +27,7 @@ pub(crate) struct Config {
     pub benchmark_rate: i32,
     pub benchmark_script: String,
     pub benchmark_wrk_path: String,
+    pub check_path_timeout_ms: u64,
     pub success_percent_threshold: u32,
     pub node_response_time_threshold_ms: f32,
     pub gateway_response_time_threshold_ms: f32,
@@ -46,6 +48,10 @@ lazy_static! {
     pub static ref LOCAL_IP: String = local_ip_address::local_ip().unwrap().to_string();
     pub static ref HASH_TEST_20K: String = "95c5679435a0a714918dc92b546dc0ba".to_string();
     pub(crate) static ref CONFIG: Config = get_config();
+    pub static ref ZONE: Zone = {
+        let zone = &env::var("ZONE").unwrap().to_uppercase();
+        Zone::from_str(zone.as_str()).unwrap()
+    };
 }
 
 fn get_config() -> Config {

@@ -1,8 +1,12 @@
 #!/bin/bash
 cargo build --release
 
-#ZONES=( 'as-vultr' )
-ZONES=( 'as' 'eu' 'na' 'sa' 'oc' 'as-vultr')
+if [ -z "$1" ]
+then
+    ZONES=( 'as' 'eu' 'na' 'sa' 'oc' )
+else
+    ZONES=( "$1" )
+fi
 
 
 for ZN in "${ZONES[@]}"

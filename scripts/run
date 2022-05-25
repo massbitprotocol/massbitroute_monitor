@@ -320,7 +320,7 @@ _add_monitors_type() {
 
 			done
 
-			mv ${tmp}.run $_run_file
+			cat ${tmp}.run >>$_run_file
 
 		fi
 		rm ${tmp}*

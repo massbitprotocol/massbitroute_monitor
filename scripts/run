@@ -92,6 +92,10 @@ _reload() {
 	$cmd _update
 	$cmd update
 	$cmd start all
+	if [ -f "$SITE_ROOT/data/tokens_dirty.txt" ]; then
+		echo 1 >$SITE_ROOT/data/tokens_dirty.txt
+	fi
+
 }
 
 _install_repos() {

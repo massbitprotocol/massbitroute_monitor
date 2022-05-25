@@ -87,7 +87,7 @@ _tune_hosts() {
 _reload() {
 	# _cron
 	_tune_hosts
-	bash $SITE_ROOT/scripts/server.sh _kill
+
 	bash $SITE_ROOT/etc/mkagent/agents/push.sh _kill
 	$cmd _update
 	$cmd update
@@ -96,6 +96,7 @@ _reload() {
 	if [ -f "$SITE_ROOT/data/tokens_dirty.txt" ]; then
 		echo 1 >$SITE_ROOT/data/tokens_dirty.txt
 	fi
+	bash $SITE_ROOT/scripts/server.sh _kill
 
 }
 

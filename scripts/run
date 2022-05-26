@@ -201,7 +201,7 @@ _add_monitor_host() {
 			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		fi
 
-		curl -sSfL "$host&action=$action" -d $host_info
+		timeout 10 curl -sSfL "$host&action=$action" -d $host_info
 		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 		touch $_mark
 	fi
@@ -214,7 +214,7 @@ _add_monitor_host() {
 				su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 			fi
 
-			curl -sSfL "$host&action=$action" -d $host_info >$_mark
+			timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
 			su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 		fi
@@ -225,7 +225,7 @@ _add_monitor_host() {
 			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		fi
 
-		curl -sSfL "$host&action=$action" -d $host_info >$_mark
+		timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
 		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 	cat $_mark | jq

@@ -197,11 +197,11 @@ _add_monitor_host() {
 		curl -sSfL "$host&action=$action" -d $host_info
 		touch $_mark
 	fi
-	if [ $_nservices -lt 5 ]; then
-		action="discover_services"
-		host_info='request={"hostname":"'$hostname'"}'
-		curl -sSfL "$host&action=$action" -d $host_info >$_mark
-	fi
+	# if [ $_nservices -lt 5 ]; then
+	action="discover_services"
+	host_info='request={"hostname":"'$hostname'"}'
+	curl -sSfL "$host&action=$action" -d $host_info >$_mark
+	# fi
 	# fi
 }
 

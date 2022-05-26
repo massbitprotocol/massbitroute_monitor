@@ -341,7 +341,7 @@ _add_monitors_type() {
 
 }
 _add_monitors() {
-	_lock=/tmp_add_monitors
+	_lock=/tmp/_add_monitors
 	if [ -f "$_lock" ]; then return; fi
 	touch $_lock
 
@@ -425,7 +425,7 @@ _update() {
 }
 
 _discover_host() {
-	_lock=/tmp_discover_host
+	_lock=/tmp/_discover_host
 	if [ -f "$_lock" ]; then return; fi
 	touch $_lock
 	_dirty=$1

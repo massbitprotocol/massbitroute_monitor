@@ -225,6 +225,7 @@ _add_monitor_host() {
 		curl -sSfL "$host&action=$action" -d $host_info >$_mark
 		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
+	cat $_mark | jq
 }
 
 _redis_monitor() {

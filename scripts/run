@@ -408,7 +408,7 @@ _discover_host() {
 	fi
 
 	if [ -z "$_dirty" ]; then _dirty=0; fi
-	if [ $_dirty -ne 1 ]; then return; fi
+	# if [ $_dirty -ne 1 ]; then return; fi
 
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	for _type in $_types; do

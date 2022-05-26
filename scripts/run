@@ -341,6 +341,10 @@ _add_monitors_type() {
 
 }
 _add_monitors() {
+	_lock=/tmp_add_monitors
+	if [ -f "$_lock" ]; then return; fi
+	touch $_lock
+
 	token_file=$SITE_ROOT/data/tokens.txt
 	token_core_file=$SITE_ROOT/data/tokens_core.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
@@ -386,6 +390,7 @@ _add_monitors() {
 		# echo cat $token_file
 		# cat $token_file
 	fi
+	rm $_lock
 }
 
 _update_repos() {
@@ -420,6 +425,9 @@ _update() {
 }
 
 _discover_host() {
+	_lock=/tmp_discover_host
+	if [ -f "$_lock" ]; then return; fi
+	touch $_lock
 	_dirty=$1
 	_dirty_f=$SITE_ROOT/data/tokens_dirty.txt
 	if [ ! -f "${_dirty_f}" ]; then echo 0 >$_dirty_f; fi
@@ -466,7 +474,7 @@ _discover_host() {
 		fi
 	done
 	echo 0 >$SITE_ROOT/data/tokens_dirty.txt
-
+	rm $_lock
 }
 
 _monitor() {

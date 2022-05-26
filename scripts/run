@@ -186,6 +186,9 @@ _add_monitor_host() {
 	ip=$3
 	group=$4
 	disc=$5
+	timeout 3 curl -skSfL https://$ip/ping
+	if [ $? -ne 0 ]; then return; fi
+
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	if [ -z "$disc" ]; then disc=0; fi
 	_mark=/tmp/${_site}_$hostname

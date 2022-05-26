@@ -190,16 +190,18 @@ _add_monitor_host() {
 	if [ -z "$disc" ]; then disc=0; fi
 	_mark=/tmp/${_site}_$hostname
 	_nservices=$(cat $_mark | jq .result | awk '{sub(/^.*, total\s+/,"");sub(/services.*$/,"");print}')
-	if [ \( $_nservices -lt 5 \) -o \( ! -f "$_mark" \) ]; then
+	if [ -z "$_nservices" ]; then _nservices=0; fi
+	if [ ! -f "$_mark" ]; then
 		action="add_host"
 		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
 		curl -sSfL "$host&action=$action" -d $host_info
 		touch $_mark
 	fi
-	# if [ $disc -eq 1 ]; then
-	action="discover_services"
-	host_info='request={"hostname":"'$hostname'"}'
-	curl -sSfL "$host&action=$action" -d $host_info >$_mark
+	if [ $_nservices -lt 5 ]; then
+		action="discover_services"
+		host_info='request={"hostname":"'$hostname'"}'
+		curl -sSfL "$host&action=$action" -d $host_info >$_mark
+	fi
 	# fi
 }
 

@@ -189,9 +189,11 @@ _add_monitor_host() {
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	if [ -z "$disc" ]; then disc=0; fi
 	_mark=/tmp/${_site}_$hostname
+	_status=$(cat $_mark | jq .result_code)
 	_nservices=$(cat $_mark | jq .result | awk '{sub(/^.*, total\s+/,"");sub(/services.*$/,"");print}')
 
 	if [ -z "$_nservices" ]; then _nservices=0; fi
+	if [ -z "$_status" ]; then _status=0; fi
 	if [ ! -f "$_mark" ]; then
 		action="add_host"
 		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"mbr","tag_agent":"cmk-agent"}}'
@@ -204,18 +206,19 @@ _add_monitor_host() {
 		touch $_mark
 	fi
 	_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
-	if [ \( $_dirty -eq 0 \) -a \( $_nservices -lt 5 \) ]; then
-		action="discover_services"
-		host_info='request={"hostname":"'$hostname'"}'
-		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
-			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	if [ $_dirty -eq 0 ]; then
+		if [ \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
+			action="discover_services"
+			host_info='request={"hostname":"'$hostname'"}'
+			if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
+				su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+			fi
+
+			curl -sSfL "$host&action=$action" -d $host_info >$_mark
+			su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+
 		fi
-
-		curl -sSfL "$host&action=$action" -d $host_info >$_mark
-		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
-
-	fi
-	if [ $_dirty -eq 1 ]; then
+	else
 		action="discover_services"
 		host_info='request={"hostname":"'$hostname'"}'
 		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then

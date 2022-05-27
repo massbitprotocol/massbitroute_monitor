@@ -334,7 +334,7 @@ _add_monitors_type() {
 	# cat ${_token_file}
 	# mk_reload=0
 	_site=${_type}-${_block}-${_net}
-	for _ss in 0-1 1-0 1-1; do
+	for _ss in 0-0 0-1 1-0 1-1; do
 		tmp=$(mktemp)
 		curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/listid-${_block}-${_net}-$_ss -o ${tmp} >/dev/null
 		if [ $? -eq 0 ]; then

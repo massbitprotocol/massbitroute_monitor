@@ -180,12 +180,9 @@ _flush_monitor() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk --flush;rm /omd/sites/mbr/etc/check_mk/main.mk'
 	echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
 }
-_add_monitor_host() {
-	_site=$1
+_check_host_access() {
+	ip=$1
 	hostname=$2
-	ip=$3
-	group=$4
-	disc=$5
 	timeout 3 curl -skSfL https://$ip/_ping
 	if [ $? -ne 0 ]; then
 		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
@@ -194,6 +191,14 @@ _add_monitor_host() {
 		_remove_monitor_host mbr $hostname
 		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
+}
+_add_monitor_host() {
+	_site=$1
+	hostname=$2
+	ip=$3
+	group=$4
+	disc=$5
+	_check_host_access $ip $hostname
 
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	if [ -z "$disc" ]; then disc=0; fi
@@ -335,6 +340,9 @@ _add_monitors_type() {
 			cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
 				if [ -z "$id" ]; then continue; fi
 				_hostname=${_type}-$block-$net-$id
+
+				_check_host_access $ip $_hostname
+
 				echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
 				_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 				echo $_access_token $_hostname $ip >>${_token_file}

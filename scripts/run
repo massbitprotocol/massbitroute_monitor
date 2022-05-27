@@ -153,6 +153,12 @@ _install() {
 	_install_one
 	_supervisor
 }
+_remove_olds() {
+	su - mbr -c 'lq "GET hosts\nColumns: name"' | while read _hostname; do
+		su - mbr -c 'lq "GET services\nFilter: host_name = $_hostname"' | wc -l
+	done
+
+}
 _remove_monitor_host() {
 	_site=$1
 	hostname=$2

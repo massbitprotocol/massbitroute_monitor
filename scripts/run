@@ -182,15 +182,16 @@ _flush_monitor() {
 	echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
 }
 _check_host_access() {
-	ip=$1
-	hostname=$2
-	timeout 3 curl -skSfL https://$ip/_ping
+	_site=$1
+	_ip=$2
+	_hostname=$3
+	timeout 3 curl -skSfL https://$_ip/_ping
 	if [ $? -ne 0 ]; then
 		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
 			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		fi
-		echo _remove_monitor_host mbr $hostname
-		_remove_monitor_host mbr $hostname
+		echo _remove_monitor_host $_site $_hostname
+		_remove_monitor_host $_site $_hostname
 		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 }
@@ -200,7 +201,7 @@ _add_monitor_host() {
 	ip=$3
 	group=$4
 	disc=$5
-	_check_host_access $ip $hostname
+	_check_host_access $_site $ip $hostname
 
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	if [ -z "$disc" ]; then disc=0; fi

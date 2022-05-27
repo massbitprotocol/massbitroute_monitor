@@ -159,6 +159,7 @@ _remove_monitor_host() {
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	action="delete_host"
 	host_info='request={"hostname":"'$hostname'"}'
+	echo curl -sSfL "$host&action=$action" -d $host_info
 	curl -sSfL "$host&action=$action" -d $host_info | jq
 }
 _call() {
@@ -188,6 +189,7 @@ _check_host_access() {
 		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
 			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		fi
+		echo _remove_monitor_host mbr $hostname
 		_remove_monitor_host mbr $hostname
 		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
@@ -341,6 +343,7 @@ _add_monitors_type() {
 				if [ -z "$id" ]; then continue; fi
 				_hostname=${_type}-$block-$net-$id
 
+				echo check_host_access $ip $_hostname
 				_check_host_access $ip $_hostname
 
 				echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run

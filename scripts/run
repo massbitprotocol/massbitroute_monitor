@@ -171,8 +171,9 @@ _remove_olds() {
 	if [ -z "$_nets" ]; then _nets="mainnet"; fi
 	for _type in $_types; do
 		for _block in $_blocks; do
-			_site=${_type}-${_block}-${_net}
+
 			for _net in $_nets; do
+				_site=${_type}-${_block}-${_net}
 				su - mbr -c 'lq "GET hosts\nColumns: name"' | while read _hostname; do
 					_n=$(su - mbr -c 'lq "GET services\nFilter: host_name = '$_hostname'"' | wc -l)
 					if [ $_n -le 3 ]; then

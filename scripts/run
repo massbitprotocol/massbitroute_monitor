@@ -155,7 +155,7 @@ _install() {
 }
 _remove_olds() {
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | while read _hostname; do
-		su - mbr -c 'lq "GET services\nFilter: host_name = $_hostname"' | wc -l
+		su - mbr -c 'lq "GET services\nFilter: host_name = '$_hostname'"' | wc -l
 	done
 
 }

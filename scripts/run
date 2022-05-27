@@ -153,12 +153,6 @@ _install() {
 	_install_one
 	_supervisor
 }
-_remove_olds() {
-	su - mbr -c 'lq "GET hosts\nColumns: name"' | while read _hostname; do
-		su - mbr -c 'lq "GET services\nFilter: host_name = '$_hostname'"' | wc -l
-	done
-
-}
 _remove_monitor_host() {
 	_site=$1
 	hostname=$2
@@ -168,6 +162,31 @@ _remove_monitor_host() {
 	echo curl -sSfL "$host&action=$action" -d $host_info
 	curl -sSfL "$host&action=$action" -d $host_info | jq
 }
+_remove_olds() {
+	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
+	if [ -z "$_types" ]; then _types="gateway"; fi
+	_blocks=$(cat $SITE_ROOT/vars/MONITOR_BLOCKCHAINS)
+	if [ -z "$_blocks" ]; then _blocks="eth"; fi
+	_nets=$(cat $SITE_ROOT/vars/MONITOR_NETWORKS)
+	if [ -z "$_nets" ]; then _nets="mainnet"; fi
+	for _type in $_types; do
+		for _block in $_blocks; do
+			_site=${_type}-${_block}-${_net}
+			for _net in $_nets; do
+				su - mbr -c 'lq "GET hosts\nColumns: name"' | while read _hostname; do
+					_n=$(su - mbr -c 'lq "GET services\nFilter: host_name = '$_hostname'"' | wc -l)
+					if [ $_n -le 3 ]; then
+						_remove_monitor_host $_site $_hostname
+					fi
+
+				done
+			done
+
+		done
+	done
+
+}
+
 _call() {
 	su - mbr -c "touch /omd/sites/mbr/etc/check_mk/main.mk"
 	$@

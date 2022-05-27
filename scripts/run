@@ -187,7 +187,13 @@ _add_monitor_host() {
 	group=$4
 	disc=$5
 	timeout 3 curl -skSfL https://$ip/_ping
-	if [ $? -ne 0 ]; then return; fi
+	if [ $? -ne 0 ]; then
+		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
+			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+		fi
+		_remove_monitor_host mbr $hostname
+		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	fi
 
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	if [ -z "$disc" ]; then disc=0; fi

@@ -23,6 +23,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::Api;
 
+use crate::PORTAL_AUTHORIZATION;
 use anyhow::Error;
 use sp_core::sr25519::Pair;
 use sp_core::Pair as PairTrait;
@@ -155,7 +156,17 @@ impl ComponentStats {
         list_project_url: &String,
         status: &str,
     ) -> Result<(), anyhow::Error> {
-        let res = reqwest::get(list_project_url).await?.text().await?;
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?;
+        let res = client
+            .get(list_project_url)
+            .header("Authorization", &*PORTAL_AUTHORIZATION)
+            .send()
+            .await?
+            .text()
+            .await?;
+
         let mut projects_new: Projects = serde_json::from_str(res.as_str())?;
         // Filter by status
         projects_new

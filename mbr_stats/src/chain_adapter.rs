@@ -15,11 +15,13 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
+use std::time::Duration;
 use substrate_api_client::rpc::WsRpcClient;
 use substrate_api_client::{
     compose_extrinsic, AccountId, Api, ApiResult, UncheckedExtrinsicV4, XtStatus,
 };
 use tokio::sync::RwLock;
+use tokio::time::sleep;
 
 pub const MVP_EXTRINSIC_DAPI: &str = "Dapi";
 const MVP_EXTRINSIC_SUBMIT_PROJECT_USAGE: &str = "submit_project_usage";
@@ -148,6 +150,7 @@ impl ChainAdapter {
             .as_ref()
             .ok_or(anyhow::Error::msg("Error: api is none"))?;
         api.subscribe_events(events_in)?;
+        let mut retry = 10;
         loop {
             let event: ApiResult<ProjectRegisteredEventArgs> = api.wait_for_event(
                 MVP_EXTRINSIC_DAPI,
@@ -181,6 +184,14 @@ impl ChainAdapter {
                 }
                 Err(err) => {
                     info!("wait_for_event error:{:?}", err);
+                    sleep(Duration::from_millis(1000)).await;
+                    retry -= 1;
+                    if retry <= 0 {
+                        return Err(anyhow::Error::msg(format!(
+                            "wait_for_event error in {} times",
+                            retry
+                        )));
+                    }
                     continue;
                 }
             }

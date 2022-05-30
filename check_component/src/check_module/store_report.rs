@@ -124,7 +124,9 @@ impl StoreReport {
         };
         self.provider_id = component.id.clone();
         self.provider_type = component.component_type.clone();
-        self.status_detail = check_mk_report.status_detail.clone();
+        let mut status_detail = check_mk_report.status_detail.clone();
+        status_detail.truncate(CONFIG.max_length_report_detail);
+        self.status_detail = status_detail;
         self.report_type = report_type;
 
         self.request_rate = wrk_report.req_per_sec;

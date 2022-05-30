@@ -87,6 +87,7 @@ _tune_hosts() {
 _reload() {
 	# _cron
 	_tune_hosts
+	# reload it
 
 	bash $mkagent/agents/push.sh _kill
 	$cmd _update

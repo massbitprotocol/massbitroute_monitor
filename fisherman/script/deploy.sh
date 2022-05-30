@@ -1,17 +1,9 @@
 #!/bin/bash
-#if [ -z "$1" ]
-#  then
-#    echo "No environment is supply"
-#    echo "Current env: $ENV"
-#    echo 'Change env to dev try `. ./change_env.sh dev`'
-#    echo 'To deploy try `bash deploy.sh $ENV`'
-#    exit 1
-#fi
 
 cargo build --release
 
-ZONES=( 'as-vultr')
-#ZONES=( 'as' 'eu' 'na' 'sa' 'oc' )
+#ZONES=( 'as-vultr')
+ZONES=( 'as' 'eu' 'na' 'sa' 'oc' )
 
 for ZN in "${ZONES[@]}"
 do

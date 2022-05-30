@@ -13,7 +13,7 @@
   "benchmark_script": "./massbit.lua",
   "benchmark_wrk_path": "./wrk",
 
-  "check_path_timeout_ms": 3000,
+  "check_path_timeout_ms": 4000,
 
   "success_percent_threshold": 80,
   "node_response_time_threshold_ms": 500,

@@ -45,6 +45,9 @@ impl ActionCallListPath {
     fn get_url(gateway: &ComponentInfo, node: &ComponentInfo) -> String {
         format!("https://{}/_node/{}/ping", gateway.ip, node.id)
     }
+    fn get_url_by_ip(gateway: &ComponentInfo, node: &ComponentInfo) -> String {
+        format!("https://{}/_nodeip/{}/_ping", gateway.ip, node.ip)
+    }
     fn get_host(component: &ComponentInfo, domain: &String) -> String {
         match component.component_type {
             ComponentType::Node => {
@@ -91,11 +94,11 @@ impl ActionCallListPath {
                 );
                 // Create url
                 let url = match check_component.component_type {
-                    ComponentType::Node => Self::get_url(&component, &check_component),
+                    ComponentType::Node => Self::get_url_by_ip(&component, &check_component),
                     ComponentType::Gateway => Self::get_url(&check_component, &component),
                     ComponentType::DApi => Default::default(),
                 };
-
+                info!("url: {}", url);
                 // Create client
                 let host = Self::get_host(&check_component, &domain);
                 debug!("host: {}", host);

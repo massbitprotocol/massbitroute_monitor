@@ -5,7 +5,7 @@
   "check_task_list_gateway": ["checking_chain_type", "checking_through_path"],
   "max_json_body_size": 1048576,
   "response_time_key": "response_time_ms",
-  "max_length_report_detail": 512,
+  "max_length_report_detail": 499,
   "benchmark_thread": 5,
   "benchmark_connection": 5,
   "benchmark_duration": "15s",

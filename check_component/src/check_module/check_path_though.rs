@@ -81,11 +81,13 @@ impl ActionCallListPath {
                 let mut conclude = CheckMkStatus::Ok;
                 let mut message: String = String::new();
                 info!(
-                    "Check path from {} {} to {} {}",
+                    "Check path from {} {} {} to {} {} {}",
                     check_component.component_type.to_string(),
                     check_component.id,
+                    check_component.ip,
                     component.component_type.to_string(),
-                    component.id
+                    component.id,
+                    component.ip,
                 );
                 // Create url
                 let url = match check_component.component_type {

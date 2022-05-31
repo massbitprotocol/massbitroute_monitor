@@ -377,23 +377,23 @@ _add_monitors_type() {
 				echo 1 >$SITE_ROOT/data/tokens_dirty.txt
 				cp $tmp /tmp/$_f_cache
 
-				echo >>${tmp}
-				cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
-					if [ -z "$id" ]; then continue; fi
-					_hostname=${_type}-$block-$net-$id
-
-					echo check_host_access $ip $_hostname
-					_check_host_access $_site $ip $_hostname
-
-					echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
-					_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
-					echo $_access_token $_hostname $ip >>${_token_file}
-					# cat ${_token_file}
-
-				done
-
-				cat ${tmp}.run >>$_run_file
 			fi
+			echo >>${tmp}
+			cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
+				if [ -z "$id" ]; then continue; fi
+				_hostname=${_type}-$block-$net-$id
+
+				echo check_host_access $ip $_hostname
+				_check_host_access $_site $ip $_hostname
+
+				echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
+				_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
+				echo $_access_token $_hostname $ip >>${_token_file}
+				# cat ${_token_file}
+
+			done
+
+			cat ${tmp}.run >>$_run_file
 
 		fi
 

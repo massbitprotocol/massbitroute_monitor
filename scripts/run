@@ -368,26 +368,35 @@ _add_monitors_type() {
 	_site=${_type}-${_block}-${_net}
 	for _ss in 0-0 0-1 1-0 1-1; do
 		tmp=$(mktemp)
-		curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/listid-${_block}-${_net}-$_ss -o ${tmp} >/dev/null
+		_f_cache=listid-${_block}-${_net}-$_ss
+		curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
 		if [ $? -eq 0 ]; then
-			echo >>${tmp}
-			cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
-				if [ -z "$id" ]; then continue; fi
-				_hostname=${_type}-$block-$net-$id
+			if [ ! -f "/tmp/$_f_cache" ]; then touch /tmp/$_f_cache; fi
+			diff -s $tmp /tmp/$_f_cache
+			if [ $? -ne 0 ]; then
+				echo 1 >$SITE_ROOT/data/tokens_dirty.txt
+				cp $tmp /tmp/$_f_cache
 
-				echo check_host_access $ip $_hostname
-				_check_host_access $_site $ip $_hostname
+				echo >>${tmp}
+				cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
+					if [ -z "$id" ]; then continue; fi
+					_hostname=${_type}-$block-$net-$id
 
-				echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
-				_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
-				echo $_access_token $_hostname $ip >>${_token_file}
-				# cat ${_token_file}
+					echo check_host_access $ip $_hostname
+					_check_host_access $_site $ip $_hostname
 
-			done
+					echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
+					_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
+					echo $_access_token $_hostname $ip >>${_token_file}
+					# cat ${_token_file}
 
-			cat ${tmp}.run >>$_run_file
+				done
+
+				cat ${tmp}.run >>$_run_file
+			fi
 
 		fi
+
 		rm ${tmp}*
 	done
 

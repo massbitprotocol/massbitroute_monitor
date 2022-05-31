@@ -356,6 +356,7 @@ impl ComponentStats {
                     .await;
 
                 info!("Re-subscribe event, res: {:?}", res);
+                sleep(Duration::from_millis(2000)).await;
             }
         });
 

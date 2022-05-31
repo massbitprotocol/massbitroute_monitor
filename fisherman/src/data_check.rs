@@ -58,7 +58,7 @@ impl CheckDataCorrectness for FishermanService {
         debug!("collect_reports: {:?}", collect_reports);
         // Calculate average report
         for (component, reports) in collect_reports.iter() {
-            info!("component:{:?}", component.id);
+            debug!("component:{:?}", component.id);
             bad_components.insert(component.clone(), ComponentReport::from(reports));
         }
 

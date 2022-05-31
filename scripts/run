@@ -156,6 +156,10 @@ _install() {
 }
 _monitor_activate() {
 	_site=$1
+	if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
+		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	fi
+
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	su - mbr -c "touch /omd/sites/mbr/etc/check_mk/main.mk"
 	action="activate_changes"

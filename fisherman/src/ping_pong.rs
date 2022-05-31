@@ -49,6 +49,7 @@ impl CheckPingPong for FishermanService {
 
         // Parallel call
         //let client = Client::new();
+        debug!("list_providers_clone:{:?}", list_providers_clone);
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .timeout(Duration::from_millis(CONFIG.ping_timeout_ms))
@@ -56,27 +57,23 @@ impl CheckPingPong for FishermanService {
         for i in 0..CONFIG.ping_sample_number {
             let bodies = stream::iter(list_providers_clone.clone())
                 .map(|component| {
-                    let mut url = format!("https://{}/ping", component.ip);
+                    let mut url = format!("https://{}/_ping", component.ip);
                     let client = client.clone();
                     let domain = domain.clone();
                     tokio::spawn(async move {
-                        let resp = client
-                            .get(url)
-                            .header("X-Api-Key", component.token.as_str())
-                            .header("Host", component.get_host_header(&domain.to_string()))
-                            .send()
-                            .await?;
+                        let resp = client.get(url).send().await?;
                         let resp = resp.text().await?;
                         let resp: Result<(ComponentInfo, String)> = Ok((component, resp));
                         resp
                     })
                 })
                 .buffer_unordered(CONFIG.ping_parallel_requests);
+            debug!("bodies: {:?}", bodies);
             bodies
                 .for_each(|b| async {
                     match b {
                         Ok(Ok((component, resp))) => {
-                            //debug!("Ping {} result: {}", component.id, resp);
+                            debug!("Ping {} {} result: {}", component.id, component.ip, resp);
                             if resp == CONFIG.ping_request_response {
                                 *result.write().await.entry(component).or_insert(1f32) += 1f32;
                             }
@@ -115,4 +112,23 @@ impl CheckPingPong for FishermanService {
 
         Ok(result)
     }
+}
+
+#[tokio::test]
+async fn test_ping() {
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .timeout(Duration::from_millis(CONFIG.ping_timeout_ms))
+        .build()
+        .unwrap();
+    let mut url = format!("https://{}/_ping", "43.156.82.22");
+    let resp = client
+        .get(url)
+        .header("X-Api-Key", "key")
+        .header("Host", "host")
+        .send()
+        .await
+        .unwrap();
+    let resp = resp.text().await.unwrap();
+    println!("{}", resp);
 }

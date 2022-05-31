@@ -11,5 +11,5 @@ fi
 for ZN in "${ZONES[@]}"
 do
   echo "Stop fisherman at $ZN"
-  ssh "mbr-verify-$ZN" 'sudo supervisorctl stop fisherman'
+  ssh "mbr-verify-$ZN" 'sudo supervisorctl start fisherman'
 done

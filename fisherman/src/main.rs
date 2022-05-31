@@ -123,7 +123,7 @@ async fn main() {
                         info!("check_ping_pong error: {}", err);
                     }
                 }
-                info!(
+                debug!(
                     "check ping pong list_providers: {:?}",
                     list_providers.read().await
                 );
@@ -156,7 +156,7 @@ async fn main() {
                         info!("check_ping_pong error: {}", err);
                     }
                 }
-                info!(
+                debug!(
                     "check data correctness list_providers: {:?}",
                     list_providers.read().await
                 );
@@ -186,10 +186,7 @@ async fn main() {
                 let mut list_providers_lock = list_providers_org.write().await;
                 *list_providers_lock = new_list_providers;
             }
-            info!(
-                "Update list provider: {:?}",
-                list_providers_org.read().await
-            );
+            info!("List provider updated!",);
         }
     }
 }

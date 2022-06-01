@@ -236,6 +236,8 @@ _add_monitor_host() {
 	ip=$3
 	group=$4
 	disc=$5
+	timeout 3 curl -skSfL https://$ip/_ping
+	if [ $? -ne 0 ]; then return; fi
 	# _check_host_access $_site $ip $hostname
 
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"

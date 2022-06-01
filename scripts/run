@@ -9,7 +9,7 @@ export HOME=$SITE_ROOT
 cd $SITE_ROOT
 
 if [ -e "$SITE_ROOT/cmd_server" ]; then bash $SITE_ROOT/cmd_server _env; fi
-if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
+if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw 2>&1 >/dev/null; fi
 source $SITE_ROOT/scripts/base.sh
 
 cd $SITE_ROOT

@@ -372,8 +372,7 @@ _add_monitors_type() {
 	# cat ${_token_file}
 	# mk_reload=0
 	_site=${_type}-${_block}-${_net}
-	# for _ss in 0-0 0-1 1-0 1-1; do
-	for _ss in 0-0; do
+	for _ss in 0-0 0-1 1-0 1-1; do
 		tmp=$(mktemp)
 		_f_cache=listid-${_block}-${_net}-$_ss
 		curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
@@ -392,8 +391,9 @@ _add_monitors_type() {
 
 				# echo check_host_access $ip $_hostname
 				# _check_host_access $_site $ip $_hostname
-
-				echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
+				if [ "$_ss" == "0-0" ]; then
+					echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
+				fi
 				_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 				echo $_access_token $_hostname $ip >>${_token_file}
 				# cat ${_token_file}

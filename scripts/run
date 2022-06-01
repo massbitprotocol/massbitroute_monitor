@@ -541,7 +541,7 @@ _discover_host() {
 		fi
 	done
 	echo 0 >$SITE_ROOT/data/tokens_dirty.txt
-	_remove_olds
+	# _remove_olds
 	rm $_lock
 }
 

@@ -260,28 +260,28 @@ _add_monitor_host() {
 	touch $_mark
 	# fi
 	_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
-	# if [ $_dirty -eq 0 ]; then
-	# if [ \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
-	action="discover_services"
-	host_info='request={"hostname":"'$hostname'"}'
-	if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
-		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+	if [ $_dirty -eq 0 ]; then
+		if [ \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
+			action="discover_services"
+			host_info='request={"hostname":"'$hostname'"}'
+			if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
+				su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+			fi
+
+			timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
+			su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+
+		fi
+	else
+		action="discover_services"
+		host_info='request={"hostname":"'$hostname'"}'
+		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
+			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
+		fi
+
+		timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
+		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
-
-	timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
-	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
-
-	# fi
-	# else
-	# 	action="discover_services"
-	# 	host_info='request={"hostname":"'$hostname'"}'
-	# 	if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
-	# 		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	# 	fi
-
-	# 	timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
-	# 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
-	# fi
 	cat $_mark | jq
 }
 

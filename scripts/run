@@ -385,7 +385,7 @@ _add_monitors_type() {
 
 			fi
 			echo >>${tmp}
-			cat ${tmp} | while read id user_id block net ip continent country token status approved _remain; do
+			cat ${tmp} | sort -n -k11 -r | while read id user_id block net ip continent country token status approved _remain; do
 				if [ -z "$id" ]; then continue; fi
 				_hostname=${_type}-$block-$net-$id
 

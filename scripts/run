@@ -389,11 +389,22 @@ _add_monitors_type() {
 				if [ -z "$id" ]; then continue; fi
 				_hostname=${_type}-$block-$net-$id
 
-				# echo check_host_access $ip $_hostname
-				# _check_host_access $_site $ip $_hostname
-				if [ "$_ss" == "0-0" ]; then
+				_mark=/tmp/${_site}_$_hostname
+				if [ -f "$_mark" ]; then
+					_status=$(cat $_mark | jq .result_code)
+					_nservices=$(cat $_mark | jq .result | awk '{sub(/^.*, total\s+/,"");sub(/services.*$/,"");print}')
+					if [ \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
+						echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
+					fi
+				else
 					echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
 				fi
+
+				# echo check_host_access $ip $_hostname
+				# _check_host_access $_site $ip $_hostname
+				# if [ "$_ss" == "0-0" ]; then
+
+				# fi
 				_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
 				echo $_access_token $_hostname $ip >>${_token_file}
 				# cat ${_token_file}

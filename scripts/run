@@ -78,6 +78,26 @@ _prepare() {
 
 }
 _tune_hosts() {
+
+	_rule_f=/opt/omd/sites/mbr/etc/check_mk/conf.d/wato/rules.mk
+	grep 'extra_host_conf["notification_options"]' $_rule_f
+	_mk_reload=0
+	if [ $? -ne 0 ]; then
+		_mk_reload=1
+		echo 'extra_host_conf["notification_options"] = [( "n", ALL_HOSTS),]' >>$_rule_f
+
+	fi
+
+	grep 'extra_host_conf["check_command"]' $_rule_f
+	if [ $? -ne 0 ]; then
+		_mk_reload=1
+		echo 'extra_host_conf["check_command"] = [( "check-mk-host-tcp!443", ALL_HOSTS),]' >>$_rule_f
+
+	fi
+	if [ $_mk_reload -eq 1 ]; then
+		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
+	fi
+
 	if [ -z "$MONITOR_DOMAIN" ]; then return; fi
 	grep $MONITOR_DOMAIN /etc/hosts >/dev/null
 	if [ $? -ne 0 ]; then

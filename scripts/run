@@ -80,8 +80,8 @@ _prepare() {
 _tune_hosts() {
 
 	_rule_f=/opt/omd/sites/mbr/etc/check_mk/conf.d/wato/rules.mk
-	grep 'extra_host_conf["notification_options"]' $_rule_f
 	_mk_reload=0
+	grep 'extra_host_conf["notification_options"]' $_rule_f
 	if [ $? -ne 0 ]; then
 		_mk_reload=1
 		echo 'extra_host_conf["notification_options"] = [( "n", ALL_HOSTS),]' >>$_rule_f

@@ -96,6 +96,20 @@ _tune_hosts() {
 
 	fi
 
+	grep 'extra_host_conf\[\"notifications_enabled\"\]' $_rule_f
+	if [ $? -ne 0 ]; then
+		_mk_reload=1
+		echo 'extra_host_conf["notifications_enabled"] = [( "0", ALL_HOSTS),]' >>$_rule_f
+
+	fi
+
+	grep 'extra_service_conf\[\"notifications_enabled\"\]' $_rule_f
+	if [ $? -ne 0 ]; then
+		_mk_reload=1
+		echo 'extra_service_conf["notifications_enabled"] = [( "0", ALL_HOSTS, ALL_SERVICES),]' >>$_rule_f
+
+	fi
+
 	if [ $_mk_reload -eq 1 ]; then
 		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi

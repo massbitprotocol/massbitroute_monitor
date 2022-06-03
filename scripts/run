@@ -81,6 +81,7 @@ _tune_hosts() {
 
 	_rule_f=/opt/omd/sites/mbr/etc/check_mk/conf.d/wato/rules.mk
 	_mk_reload=0
+
 	grep 'extra_host_conf\[\"notification_options\"\]' $_rule_f
 	if [ $? -ne 0 ]; then
 		_mk_reload=1
@@ -94,6 +95,7 @@ _tune_hosts() {
 		echo 'extra_host_conf["check_command"] = [( "check-mk-host-tcp!443", ALL_HOSTS),]' >>$_rule_f
 
 	fi
+
 	if [ $_mk_reload -eq 1 ]; then
 		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
@@ -251,6 +253,8 @@ _check_host_access() {
 	fi
 }
 _add_monitor_host() {
+	nstale=$(su - mbr -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
+	if [ $nstale -gt 200 ]; then return; fi
 	_site=$1
 	hostname=$2
 	ip=$3

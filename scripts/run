@@ -254,7 +254,7 @@ _check_host_access() {
 }
 _add_monitor_host() {
 	nstale=$(su - mbr -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
-	if [ $nstale -gt 200 ]; then return; fi
+	if [ $nstale -gt 1000 ]; then return; fi
 	_site=$1
 	hostname=$2
 	ip=$3

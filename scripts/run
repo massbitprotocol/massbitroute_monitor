@@ -407,7 +407,7 @@ _add_monitors_type() {
 	if [ ! -f "$_token_file" ]; then touch $_token_file; fi
 	_run_file=$5
 
-	if [ ! -f "$SITE_ROOT/data/dirty" ]; then
+	if [ -f "$SITE_ROOT/data/dirty" ]; then
 		_force=$(cat $SITE_ROOT/data/dirty)
 	fi
 	if [ -z "$_force" ]; then _force=0; fi

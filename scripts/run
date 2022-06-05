@@ -407,13 +407,17 @@ _add_monitors_type() {
 	if [ ! -f "$_token_file" ]; then touch $_token_file; fi
 	_run_file=$5
 
+	if [ ! -f "$SITE_ROOT/data/dirty" ]; then
+		_force=$(cat $SITE_ROOT/data/dirty)
+	fi
+	if [ -z "$_force" ]; then _force=0; fi
 	# cat ${_token_file}
 	# mk_reload=0
 	_site=${_type}-${_block}-${_net}
 	for _ss in 0-0 0-1 1-0 1-1; do
 		tmp=$(mktemp)
 		_f_cache=listid-${_block}-${_net}-$_ss
-		curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
+		timeout 3 curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
 		if [ $? -eq 0 ]; then
 			if [ ! -f "/tmp/$_f_cache" ]; then touch /tmp/$_f_cache; fi
 			diff -s $tmp /tmp/$_f_cache
@@ -431,7 +435,7 @@ _add_monitors_type() {
 				if [ -f "$_mark" ]; then
 					_status=$(cat $_mark | jq .result_code)
 					_nservices=$(cat $_mark | jq .result | awk '{sub(/^.*, total\s+/,"");sub(/services.*$/,"");print}')
-					if [ \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
+					if [ \( $_force -eq 1 \) -o \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
 						echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
 					fi
 				else

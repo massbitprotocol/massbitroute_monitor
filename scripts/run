@@ -298,8 +298,9 @@ _add_monitor_host() {
 	touch $_mark
 	# fi
 	_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
+	_force=$(cat $SITE_ROOT/data/dirty)
 	if [ $_dirty -eq 0 ]; then
-		if [ \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
+		if [ \( $_force -eq 1 \) -o \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
 			action="discover_services"
 			host_info='request={"hostname":"'$hostname'"}'
 			if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then

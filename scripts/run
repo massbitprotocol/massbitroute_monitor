@@ -249,7 +249,7 @@ _call() {
 }
 
 _flush_monitor() {
-	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk --flush;rm /omd/sites/mbr/etc/check_mk/main.mk'
+	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk --flush;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
 	echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
 }
 _check_host_access() {

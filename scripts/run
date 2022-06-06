@@ -34,6 +34,10 @@ export SESSION_BRANCH=${SESSION_BRANCH:-$MBR_ENV}
 export GIT_BRANCH=${GIT_BRANCH:-$MBR_ENV}
 export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
 
+_force=$(cat $SITE_ROOT/data/dirty)
+NSTALE=$(cat $SITE_ROOT/data/nstale)
+if [ -z "$NSTALE" ]; then NSTALE=100; fi
+
 _repo() {
 	REPOS="\
 $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
@@ -268,7 +272,7 @@ _check_host_access() {
 }
 _add_monitor_host() {
 	nstale=$(su - mbr -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
-	if [ $nstale -gt 100 ]; then return; fi
+	if [ $nstale -gt $NSTALE ]; then return; fi
 	_site=$1
 	hostname=$2
 	ip=$3
@@ -298,7 +302,7 @@ _add_monitor_host() {
 	touch $_mark
 	# fi
 	_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
-	_force=$(cat $SITE_ROOT/data/dirty)
+
 	if [ $_dirty -eq 0 ]; then
 		if [ \( $_force -eq 1 \) -o \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
 			action="discover_services"

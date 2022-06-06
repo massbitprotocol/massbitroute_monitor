@@ -345,10 +345,9 @@ _redis_monitor() {
 # }
 _refresh_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
-	su - mbr -c 'cmk -v -I;cmk -R'
-	# su - mbr -c 'cmk -v -II mbr-monitor-eu-1;cmk -v -I;cmk -R'
-
+	su - mbr -c 'cmk -v -II --flush;cmk -R'
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
+	echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
 }
 
 _remove_monitors_type() {

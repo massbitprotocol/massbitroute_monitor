@@ -241,6 +241,7 @@ _remove_orphan() {
 					else
 						_ok=1
 					fi
+					rm $tmp
 
 				done
 				if [ $_ok -eq 0 ]; then

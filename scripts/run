@@ -569,6 +569,7 @@ _add_monitors() {
 		# echo cat $token_file
 		# cat $token_file
 	fi
+	_remove_orphan
 	rm $_lock
 }
 

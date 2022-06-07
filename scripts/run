@@ -262,7 +262,7 @@ _remove_orphan() {
 					rm $tmp1 $tmp2
 				fi
 				rm $tmpa
-				_monitor_activate $_site
+				#_monitor_activate $_site
 			done
 		done
 	done

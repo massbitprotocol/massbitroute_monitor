@@ -250,13 +250,13 @@ _remove_orphan() {
 					cat $tmpa | awk '{print $1}' | sort >$tmp1
 
 					su - mbr -c 'lq "GET hosts\nColumns: name"' | cut -d'-' -f4- | sort >$tmp2
-					echo "tmp1"
-					cat $tmp1
-					echo "tmp2"
-					cat $tmp2
-					comm $tmp1 $tmp2
+					# echo "tmp1"
+					# cat $tmp1
+					# echo "tmp2"
+					# cat $tmp2
+					# comm $tmp1 $tmp2
 					comm -13 $tmp1 $tmp2 | while read _id; do
-						echo _remove_monitor_host $_site ${_site}-${_id}
+						_remove_monitor_host $_site ${_site}-${_id}
 					done
 					rm $tmp1 $tmp2
 				fi

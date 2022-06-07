@@ -255,7 +255,7 @@ _remove_orphan() {
 					echo "tmp2"
 					cat $tmp2
 					comm $tmp1 $tmp2
-					comm -23 $tmp1 $tmp2 | while read _id; do
+					comm -13 $tmp1 $tmp2 | while read _id; do
 						echo _remove_monitor_host $_site ${_site}-${_id}
 					done
 					rm $tmp1 $tmp2

@@ -17,7 +17,7 @@ do
   rsync -avz ../src/archive/base-endpoint.json "mbr-verify-$ZN:~/base-endpoint.json"
   rsync -avz ../config_check_component.json "mbr-verify-$ZN:~/config_check_component.json"
   rsync -avz ../../scripts/benchmark/massbit.lua "mbr-verify-$ZN:~/massbit.lua"
-  rsync -avz ../../scripts/benchmark/wrk "mbr-verify-$ZN:~/wrk"
+  #rsync -avz ../../scripts/benchmark/wrk "mbr-verify-$ZN:~/wrk"
   rsync -avz ../.env "mbr-verify-$ZN:~/.env"
 
   cat run.tpl | sed "s/\[\[ZONE\]\]/$ZN/g" | sed "s/\[\[ENV\]\]/$ENV/g" > _run_$ZN.sh

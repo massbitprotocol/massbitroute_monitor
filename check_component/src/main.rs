@@ -5,8 +5,11 @@ use logger::core::init_logger;
 use mbr_check_component::check_module::check_module::{
     CheckComponent, CheckMkReport, ComponentInfo,
 };
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::thread;
+use std::thread::sleep;
+use std::time::Duration;
 
 use log::{debug, info, warn};
 use logger;
@@ -91,9 +94,20 @@ async fn main() {
             info!("spawn thread!");
             // Process each socket concurrently.
             loop {
-                let component = receiver.recv().await;
-
-                if let Some(component) = component {
+                let mut components = VecDeque::new();
+                while let Ok(component) = receiver.try_recv() {
+                    if !components.contains(&component) {
+                        components.push_back(component);
+                    } else {
+                        warn!("Component existed in queue:{:?} ", component);
+                    }
+                }
+                info!(
+                    "List received {} components:{:?} ",
+                    components.len(),
+                    components
+                );
+                while let Some(component) = components.pop_front() {
                     info!("Verify component:{:?}", component);
                     let res = check_component.get_report_component(&component).await;
                     match res {
@@ -125,9 +139,8 @@ async fn main() {
                         }
                         Err(err) => {}
                     }
-                } else {
-                    info!("RError:{:?}", component);
                 }
+                sleep(Duration::from_millis(2000));
             }
             warn!("Job queue is dead!");
         });

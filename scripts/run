@@ -502,7 +502,7 @@ _add_monitors_type() {
 				if [ -f "$_mark" ]; then
 					_status=$(cat $_mark | jq .result_code)
 					_nservices=$(cat $_mark | jq .result | awk '{sub(/^.*, total\s+/,"");sub(/services.*$/,"");print}')
-					if [ \( $_force -eq 1 \) -o \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
+					if [ \( "$_ss" == "0-0" \) -o \( $_force -eq 1 \) -o \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
 						echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
 					fi
 				else

@@ -123,6 +123,11 @@ _tune_hosts() {
 	if [ $? -ne 0 ]; then
 		echo 127.0.0.1 $MONITOR_DOMAIN >>/etc/hosts
 	fi
+	rm -rf /var/log/journal/*
+	truncate -s 0 /var/log/syslog.*
+	truncate -s 0 /var/log/auth.log.*
+	truncate -s 0 $SITE_ROOT/logs/*
+	truncate -s 0 $SITE_ROOT/logs/nginx/*
 }
 _reload() {
 	# _cron

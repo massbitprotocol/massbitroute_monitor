@@ -630,6 +630,11 @@ export GIT_PUBLIC_URL="https://github.com"
 export MBR_ENV=$MBR_ENV
 EOF
 	fi
+
+	if [ -n "$MONITOR_TYPES" ]; then echo $MONITOR_TYPES >$SITE_ROOT/vars/MONITOR_TYPES; fi
+	if [ -n "$MONITOR_NETWORKS" ]; then echo $MONITOR_NETWORKS >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
+	if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo $MONITOR_BLOCKCHAINS >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
+
 	_st_update=0
 	_update_repos
 	_st_update=$?

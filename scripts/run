@@ -7,7 +7,7 @@ script=$(realpath $0)
 SITE_ROOT=$(realpath $(dirname $script)/..)
 export HOME=$SITE_ROOT
 cd $SITE_ROOT
-
+curl="/usr/bin/curl -skSfL"
 if [ -e "$SITE_ROOT/cmd_server" ]; then bash $SITE_ROOT/cmd_server _env; fi
 if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw 2>&1 >/dev/null; fi
 source $SITE_ROOT/scripts/base.sh
@@ -17,28 +17,31 @@ cd $SITE_ROOT
 mbr_root=/massbit/massbitroute/app
 service_dir=$mbr_root/src/sites/services
 mkagent=$service_dir/mkagent
-export MBR_ENV=${MBR_ENV:-dev}
-export BRANCH=${BRANCH:-$MBR_ENV}
-export MBRAPP_BRANCH=${MBRAPP_BRANCH:-$MBR_ENV}
-export ASDF_BRANCH=${ASDF_BRANCH:-$MBR_ENV}
-export GBC_BRANCH=${GBC_BRANCH:-$MBR_ENV}
-export SSL_BRANCH=${SSL_BRANCH:-$MBR_ENV}
-export GWMAN_BRANCH=${GWMAN_BRANCH:-$MBR_ENV}
-export NODE_BRANCH=${NODE_BRANCH:-$MBR_ENV}
-export GATEWAY_BRANCH=${GATEWAY_BRANCH:-$MBR_ENV}
-export STAT_BRANCH=${STAT_BRANCH:-$MBR_ENV}
-export MONITOR_BRANCH=${MONITOR_BRANCH:-$MBR_ENV}
-export MONITORDEPLOY_BRANCH=${MONITORDEPLOY_BRANCH:-$MBR_ENV}
-export API_BRANCH=${API_BRANCH:-$MBR_ENV}
-export SESSION_BRANCH=${SESSION_BRANCH:-$MBR_ENV}
-export GIT_BRANCH=${GIT_BRANCH:-$MBR_ENV}
-export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
 
 _force=$(cat $SITE_ROOT/data/dirty)
 NSTALE=$(cat $SITE_ROOT/data/nstale)
 if [ -z "$NSTALE" ]; then NSTALE=100; fi
 
 _repo() {
+	if [ -e "$SITE_ROOT/cmd_server" ]; then bash $SITE_ROOT/cmd_server _env; fi
+	if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
+
+	export MBR_ENV=${MBR_ENV:-dev}
+	export BRANCH=${BRANCH:-$MBR_ENV}
+	# export MBRAPP_BRANCH=${MBRAPP_BRANCH:-$MBR_ENV}
+	# export ASDF_BRANCH=${ASDF_BRANCH:-$MBR_ENV}
+	export GBC_BRANCH=${GBC_BRANCH:-$MBR_ENV}
+	export SSL_BRANCH=${SSL_BRANCH:-$MBR_ENV}
+	# export GWMAN_BRANCH=${GWMAN_BRANCH:-$MBR_ENV}
+	# export NODE_BRANCH=${NODE_BRANCH:-$MBR_ENV}
+	# export GATEWAY_BRANCH=${GATEWAY_BRANCH:-$MBR_ENV}
+	# export STAT_BRANCH=${STAT_BRANCH:-$MBR_ENV}
+	export MONITOR_BRANCH=${MONITOR_BRANCH:-$MBR_ENV}
+	export MONITORDEPLOY_BRANCH=${MONITORDEPLOY_BRANCH:-$MBR_ENV}
+	# export API_BRANCH=${API_BRANCH:-$MBR_ENV}
+	# export SESSION_BRANCH=${SESSION_BRANCH:-$MBR_ENV}
+	# export GIT_BRANCH=${GIT_BRANCH:-$MBR_ENV}
+	export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
 	REPOS="\
 $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
 /etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
@@ -68,8 +71,8 @@ _prepare() {
 	echo "Prepare"
 	cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
 
-	apt update
-	apt install -y parallel python3 python3-pip parallel
+	# apt update
+	# apt install -y parallel python3 python3-pip parallel
 	pip install --upgrade pip
 	pip install -r requirements.txt
 
@@ -123,6 +126,11 @@ _tune_hosts() {
 	if [ $? -ne 0 ]; then
 		echo 127.0.0.1 $MONITOR_DOMAIN >>/etc/hosts
 	fi
+	rm -rf /var/log/journal/*
+	truncate -s 0 /var/log/syslog.*
+	truncate -s 0 /var/log/auth.log.*
+	truncate -s 0 $SITE_ROOT/logs/*
+	truncate -s 0 $SITE_ROOT/logs/nginx/*
 }
 _reload() {
 	# _cron
@@ -156,34 +164,42 @@ _init() {
 		echo "Need GIT_PRIVATE_READ_URL"
 		exit 1
 	fi
-	if [ ! -f "$SITE_ROOT/.env" ]; then
-		echo "$MBR_ENV" >$SITE_ROOT/.env
-	fi
+	# if [ ! -f "$SITE_ROOT/.env" ]; then
+	# 	echo "$MBR_ENV" >$SITE_ROOT/.env
+	# fi
+
+	cat <<EOF >$SITE_ROOT/.env
+export GIT_PUBLIC_URL="https://github.com"
+export MBR_ENV=$MBR_ENV
+EOF
 
 	source $SITE_ROOT/.env
+	_repo
 
 	_git_clone $GIT_PRIVATE_READ_URL/massbitroute/env.git /massbit/massbitroute/app/src/env $MBR_ENV
 	_git_clone $GIT_PUBLIC_URL/massbitprotocol/massbitroute_gbc.git /massbit/massbitroute/app/gbc
 
-	bash $SITE_ROOT/cmd_server _env
-	source $SITE_ROOT/.env_raw
+	# bash $SITE_ROOT/cmd_server _env
+	# source $SITE_ROOT/.env_raw
 	_repo
 }
 
 _supervisor() {
 	ln -sf /massbit/massbitroute/app/gbc /massbit/massbitroute/app/src/gbc
 	ln -sf /massbit/massbitroute/app/gbc/bin/openresty /usr/local/openresty
-	apt-get update
-	apt-get install -y git apache2-utils supervisor jq python-is-python2 libssl-dev \
-		liburcu-dev libev-dev libsodium-dev libtool libunwind-dev libmaxminddb-dev
-
-	systemctl enable supervisor
-	systemctl start supervisor
+	# apt-get update
+	# apt-get install -y git apache2-utils supervisor jq python-is-python2 libssl-dev \
+	# 	liburcu-dev libev-dev libsodium-dev libtool libunwind-dev libmaxminddb-dev
+	if [ -f "/usr/bin/systemctl" ]; then
+		systemctl enable supervisor
+		systemctl start supervisor
+	fi
 
 	mkdir -p /etc/supervisor/conf.d
 	cp supervisor.conf /etc/supervisor/conf.d/${TYPE}.conf
-
-	supervisorctl update
+	if [ "$MBR_MODE" != "docker" ]; then
+		supervisorctl update
+	fi
 }
 _install_one() {
 	_init
@@ -204,7 +220,7 @@ _monitor_activate() {
 	su - mbr -c "touch /omd/sites/mbr/etc/check_mk/main.mk"
 	action="activate_changes"
 	host_info='request={"sites":["mbr"]}'
-	curl -sSfL "$host&action=$action" -d $host_info | jq
+	$curl "$host&action=$action" -d $host_info | jq
 }
 _remove_monitor_host() {
 	_site=$1
@@ -212,8 +228,8 @@ _remove_monitor_host() {
 	host="https://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	action="delete_host"
 	host_info='request={"hostname":"'$hostname'"}'
-	echo curl -sSfL "$host&action=$action" -d $host_info
-	curl -sSfL "$host&action=$action" -d $host_info | jq
+	echo $curl "$host&action=$action" -d $host_info
+	$curl "$host&action=$action" -d $host_info | jq
 }
 _remove_orphan() {
 
@@ -235,7 +251,7 @@ _remove_orphan() {
 				for _ss in 0-0 0-1 1-0 1-1; do
 					_f_cache=listid-${_block}-${_net}-$_ss
 					tmp=$(mktemp)
-					timeout 10 curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
+					timeout 10 $curl https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
 					if [ $? -eq 0 ]; then
 						cat $tmp >>$tmpa
 						echo >>$tmpa
@@ -314,7 +330,7 @@ _check_host_access() {
 	_site=$1
 	_ip=$2
 	_hostname=$3
-	timeout 3 curl -skSfL https://$_ip/_ping
+	timeout 3 $curl https://$_ip/_ping
 	if [ $? -ne 0 ]; then
 		if [ ! -f "/omd/sites/mbr/etc/check_mk/main.mk" ]; then
 			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
@@ -341,7 +357,7 @@ _add_monitor_host() {
 	nstale=$(su - mbr -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
 	if [ $nstale -gt $NSTALE ]; then return; fi
 
-	timeout 3 curl -skSfL https://$ip/_ping
+	timeout 3 $curl https://$ip/_ping
 	if [ $? -ne 0 ]; then return; fi
 	# _check_host_access $_site $ip $hostname
 
@@ -360,7 +376,7 @@ _add_monitor_host() {
 		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 
-	timeout 10 curl -sSfL "$host&action=$action" -d $host_info
+	timeout 10 $curl "$host&action=$action" -d $host_info
 	su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	touch $_mark
 	# fi
@@ -374,7 +390,7 @@ _add_monitor_host() {
 				su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 			fi
 
-			timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
+			timeout 10 $curl "$host&action=$action" -d $host_info >$_mark
 			su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 
 		fi
@@ -385,7 +401,7 @@ _add_monitor_host() {
 			su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 		fi
 
-		timeout 10 curl -sSfL "$host&action=$action" -d $host_info >$_mark
+		timeout 10 $curl "$host&action=$action" -d $host_info >$_mark
 		su - mbr -c 'rm /omd/sites/mbr/etc/check_mk/main.mk'
 	fi
 
@@ -424,7 +440,7 @@ _remove_monitors_type() {
 	_net=$3
 	_site=${_type}-${_block}-${_net}
 	tmp=$(mktemp)
-	curl -sk https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >${tmp}.1
+	$curl https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >${tmp}.1
 	# cat ${tmp}.1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk "/^${_type}/" | sort >${tmp}.2
 	# cat ${tmp}.2
@@ -485,7 +501,7 @@ _add_monitors_type() {
 	for _ss in 0-0 0-1 1-0 1-1; do
 		tmp=$(mktemp)
 		_f_cache=listid-${_block}-${_net}-$_ss
-		timeout 3 curl -sSfL https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
+		timeout 3 $curl https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
 		if [ $? -eq 0 ]; then
 			if [ ! -f "/tmp/$_f_cache" ]; then touch /tmp/$_f_cache; fi
 			diff -s $tmp /tmp/$_f_cache
@@ -598,8 +614,8 @@ _add_host_file() {
 		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
 	fi
 	cat /etc/hosts.bk >/tmp/hosts
-	echo curl -s https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
-	curl -s https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
+	echo $curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
+	$curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
 	if [ -f "/tmp/hosts.1" ]; then
 		cat /tmp/hosts.1 >>/tmp/hosts
 		cat /tmp/hosts >/etc/hosts
@@ -608,6 +624,17 @@ _add_host_file() {
 }
 _update() {
 	echo "Update"
+	if [ ! -f "$SITE_ROOT/.env" ]; then
+		cat <<EOF >$SITE_ROOT/.env
+export GIT_PUBLIC_URL="https://github.com"
+export MBR_ENV=$MBR_ENV
+EOF
+	fi
+
+	if [ -n "$MONITOR_TYPES" ]; then echo $MONITOR_TYPES >$SITE_ROOT/vars/MONITOR_TYPES; fi
+	if [ -n "$MONITOR_NETWORKS" ]; then echo $MONITOR_NETWORKS >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
+	if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo $MONITOR_BLOCKCHAINS >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
+
 	_st_update=0
 	_update_repos
 	_st_update=$?

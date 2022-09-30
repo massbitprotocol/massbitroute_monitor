@@ -18,10 +18,6 @@ mbr_root=/massbit/massbitroute/app
 service_dir=$mbr_root/src/sites/services
 mkagent=$service_dir/mkagent
 
-_force=$(cat $SITE_ROOT/data/dirty)
-NSTALE=$(cat $SITE_ROOT/data/nstale)
-if [ -z "$NSTALE" ]; then NSTALE=100; fi
-
 git="git -C $SITE_ROOT"
 
 dir="/massbit/massbitroute/app/src/sites/services/$TYPE"
@@ -409,6 +405,10 @@ _update_stat() {
 	su - mbr -c "lq 'GET services\nFilter: host_name = $hostname\nFilter: description ~ mbr-node-[a-zA-Z0-9-]{36}$\nColumns: description\nStats: avg perf_data'" | awk 'NF == 3 {split($1,v,";");id=v[1];gsub(/mbr-node-/,"",id);rtt=v[2];gsub(/rtt=/,"",rtt);size=$2;gsub(/size=/,"",size);time=$3;gsub(/time=/,"",time);time1=time*1000000;if(size > 0 && time1 > 0 ) {speed=sprintf("%.f",size/time);print id,speed}}' | sort -rn -k2 >$_path/mbr-node
 }
 _add_monitor_host() {
+	_force=$(cat $SITE_ROOT/data/dirty)
+	NSTALE=$(cat $SITE_ROOT/data/nstale)
+	if [ -z "$NSTALE" ]; then NSTALE=100; fi
+
 	_site=$1
 	hostname=$2
 	ip=$3

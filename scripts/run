@@ -614,8 +614,8 @@ _add_monitors() {
 	if [ -f "$_lock" ]; then return; fi
 	touch $_lock
 
-	token_file=$SITE_ROOT/data/tokens.txt
-	token_core_file=$SITE_ROOT/data/tokens_core.txt
+	token_file=/tmp/tokens.txt
+	token_core_file=/tmp/tokens_core.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
 	cp $token_core_file ${token_file}.tmp

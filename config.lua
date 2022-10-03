@@ -33,7 +33,7 @@ stdout_logfile=_SITE_ROOT_/logs/monitor_discover_dapi.log
 ]],
     supervisor = [[
 [program:monitor_discover_host]
-command=/bin/bash _SITE_ROOT_/scripts/run loop 10 _discover_host
+command=/bin/bash _SITE_ROOT_/scripts/run loop _discover_host
 autorestart=true
 redirect_stderr=true
 stopasgroup=true

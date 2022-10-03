@@ -118,7 +118,7 @@ _prepare() {
 		$SITE_ROOT/db
 
 	echo "Install check_mk"
-	cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
+	cd /massbit/massbitroute/app/src/sites/services/monitor
 	./scripts/install.sh _init
 
 	# apt update

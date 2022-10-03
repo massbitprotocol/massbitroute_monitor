@@ -75,7 +75,7 @@ _repo_private() {
 		echo "MBR_ENV missing"
 		exit 1
 	fi
-	if [ \( -z "$GIT_PRIVATE_READ_URL" \) -o \( -z "$GIT_PRIVATE_DOMAIN" ] \) ]; then
+	if [ \( -z "$GIT_PRIVATE_READ_URL" \) -o \( -z "$GIT_PRIVATE_DOMAIN" \) ]; then
 		echo "GIT_PRIVATE_READ_URL|GIT_PRIVATE_DOMAIN missing"
 		exit 1
 	fi

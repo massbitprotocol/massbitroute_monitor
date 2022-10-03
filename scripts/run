@@ -117,7 +117,9 @@ _prepare() {
 		$SITE_ROOT/tmp \
 		$SITE_ROOT/db
 
-	# cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
+	echo "Install check_mk"
+	cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
+	./scripts/install.sh _init
 
 	# apt update
 	# apt install -y parallel python3 python3-pip parallel

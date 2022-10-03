@@ -22,4 +22,8 @@ _add() {
 	omd start $_name
 	su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd cmkadmin"
 }
+_init() {
+	_install
+	_add mbr
+}
 $@

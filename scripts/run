@@ -14,6 +14,7 @@ source $SITE_ROOT/scripts/base.sh
 
 cd $SITE_ROOT
 
+curl="curl -skL"
 mbr_root=/massbit/massbitroute/app
 service_dir=$mbr_root/src/sites/services
 mkagent=$service_dir/mkagent

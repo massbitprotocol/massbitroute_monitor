@@ -134,57 +134,57 @@ _prepare() {
 	#	bash $SITE_ROOT/scripts/install.sh
 
 }
-_tune_hosts() {
+# _tune_hosts() {
 
-	_rule_f=/opt/omd/sites/mbr/etc/check_mk/conf.d/wato/rules.mk
-	_mk_reload=0
+# 	_rule_f=/opt/omd/sites/mbr/etc/check_mk/conf.d/wato/rules.mk
+# 	_mk_reload=0
 
-	grep 'extra_host_conf\[\"notification_options\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_host_conf["notification_options"] = [( "n", ALL_HOSTS),]' >>$_rule_f
+# 	grep 'extra_host_conf\[\"notification_options\"\]' $_rule_f
+# 	if [ $? -ne 0 ]; then
+# 		_mk_reload=1
+# 		echo 'extra_host_conf["notification_options"] = [( "n", ALL_HOSTS),]' >>$_rule_f
 
-	fi
+# 	fi
 
-	grep 'extra_host_conf\[\"check_command\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_host_conf["check_command"] = [( "check-mk-host-tcp!443", ALL_HOSTS),]' >>$_rule_f
+# 	grep 'extra_host_conf\[\"check_command\"\]' $_rule_f
+# 	if [ $? -ne 0 ]; then
+# 		_mk_reload=1
+# 		echo 'extra_host_conf["check_command"] = [( "check-mk-host-tcp!443", ALL_HOSTS),]' >>$_rule_f
 
-	fi
+# 	fi
 
-	grep 'extra_host_conf\[\"notifications_enabled\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_host_conf["notifications_enabled"] = [( "0", ALL_HOSTS),]' >>$_rule_f
+# 	grep 'extra_host_conf\[\"notifications_enabled\"\]' $_rule_f
+# 	if [ $? -ne 0 ]; then
+# 		_mk_reload=1
+# 		echo 'extra_host_conf["notifications_enabled"] = [( "0", ALL_HOSTS),]' >>$_rule_f
 
-	fi
+# 	fi
 
-	grep 'extra_service_conf\[\"notifications_enabled\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_service_conf["notifications_enabled"] = [( "0", ALL_HOSTS, ALL_SERVICES),]' >>$_rule_f
+# 	grep 'extra_service_conf\[\"notifications_enabled\"\]' $_rule_f
+# 	if [ $? -ne 0 ]; then
+# 		_mk_reload=1
+# 		echo 'extra_service_conf["notifications_enabled"] = [( "0", ALL_HOSTS, ALL_SERVICES),]' >>$_rule_f
 
-	fi
+# 	fi
 
-	if [ $_mk_reload -eq 1 ]; then
-		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
-	fi
+# 	if [ $_mk_reload -eq 1 ]; then
+# 		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
+# 	fi
 
-	if [ -z "$MONITOR_DOMAIN" ]; then return; fi
-	grep $MONITOR_DOMAIN /etc/hosts >/dev/null
-	if [ $? -ne 0 ]; then
-		echo 127.0.0.1 $MONITOR_DOMAIN >>/etc/hosts
-	fi
-	rm -rf /var/log/journal/*
-	truncate -s 0 /var/log/syslog.*
-	truncate -s 0 /var/log/auth.log.*
-	truncate -s 0 $SITE_ROOT/logs/*
-	truncate -s 0 $SITE_ROOT/logs/nginx/*
-}
+# 	if [ -z "$MONITOR_DOMAIN" ]; then return; fi
+# 	grep $MONITOR_DOMAIN /etc/hosts >/dev/null
+# 	if [ $? -ne 0 ]; then
+# 		echo 127.0.0.1 $MONITOR_DOMAIN >>/etc/hosts
+# 	fi
+# 	rm -rf /var/log/journal/*
+# 	truncate -s 0 /var/log/syslog.*
+# 	truncate -s 0 /var/log/auth.log.*
+# 	truncate -s 0 $SITE_ROOT/logs/*
+# 	truncate -s 0 $SITE_ROOT/logs/nginx/*
+# }
 _reload() {
 	# _cron
-	_tune_hosts
+	# _tune_hosts
 	# reload it v1
 
 	bash $mkagent/agents/push.sh _kill
@@ -684,19 +684,19 @@ _update_repos() {
 	return $_update_status
 }
 
-_add_host_file() {
-	if [ ! -f "/etc/hosts.bk" ]; then
-		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
-	fi
-	cat /etc/hosts.bk >/tmp/hosts
-	echo $curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
-	$curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
-	if [ -f "/tmp/hosts.1" ]; then
-		cat /tmp/hosts.1 >>/tmp/hosts
-		cat /tmp/hosts >/etc/hosts
-		rm /tmp/hosts.1
-	fi
-}
+# _add_host_file() {
+# 	if [ ! -f "/etc/hosts.bk" ]; then
+# 		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
+# 	fi
+# 	cat /etc/hosts.bk >/tmp/hosts
+# 	echo $curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
+# 	$curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
+# 	if [ -f "/tmp/hosts.1" ]; then
+# 		cat /tmp/hosts.1 >>/tmp/hosts
+# 		cat /tmp/hosts >/etc/hosts
+# 		rm /tmp/hosts.1
+# 	fi
+# }
 _update() {
 	echo "Update"
 	if [ ! -f "$SITE_ROOT/.env" ]; then
@@ -714,7 +714,7 @@ EOF
 	_update_repos
 	_st_update=$?
 
-	_add_host_file
+	# _add_host_file
 	return $_st_update
 }
 

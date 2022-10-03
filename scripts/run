@@ -779,6 +779,7 @@ _env_update() {
 	if [ -n "$MONITOR_NETWORKS" ]; then echo "$MONITOR_NETWORKS" >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
 }
 _monitor() {
+	_env_update
 
 	_update
 	is_reload=$?

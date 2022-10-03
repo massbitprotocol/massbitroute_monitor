@@ -634,6 +634,7 @@ _add_monitors() {
 	_nets=$(cat $SITE_ROOT/vars/MONITOR_NETWORKS)
 	if [ -z "$_nets" ]; then _nets="mainnet"; fi
 
+	mkdir -p $SITE_ROOT/data
 	for _type in $_types; do
 		_script_run=$SITE_ROOT/data/_run_me_${_type}.sh
 		>${_script_run}.tmp

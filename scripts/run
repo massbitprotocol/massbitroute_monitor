@@ -33,6 +33,7 @@ arg="request_format=python&output_format=json"
 # host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 pip="pip install"
 
+
 _repo() {
 	if [ -z "$MBR_ENV" ]; then
 		echo "MBR_ENV missing"
@@ -122,71 +123,10 @@ _prepare() {
 	cd /massbit/massbitroute/app/src/sites/services/monitor
 	./scripts/install.sh _init
 
-	# apt update
-	# apt install -y parallel python3 python3-pip parallel
-	# pip install --upgrade pip
-	# pip install -r requirements.txt
-
-	# cd $SITE_ROOT
-	# mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db $SITE_ROOT/vars
-
-	# rm -rf $SITE_ROOT/tmp/*
-	# echo "mbr-monitor" >$SITE_ROOT/vars/TYPE
-	#	bash $SITE_ROOT/scripts/install.sh
-
 }
-# _tune_hosts() {
 
-# 	_rule_f=/opt/omd/sites/mbr/etc/check_mk/conf.d/wato/rules.mk
-# 	_mk_reload=0
-
-# 	grep 'extra_host_conf\[\"notification_options\"\]' $_rule_f
-# 	if [ $? -ne 0 ]; then
-# 		_mk_reload=1
-# 		echo 'extra_host_conf["notification_options"] = [( "n", ALL_HOSTS),]' >>$_rule_f
-
-# 	fi
-
-# 	grep 'extra_host_conf\[\"check_command\"\]' $_rule_f
-# 	if [ $? -ne 0 ]; then
-# 		_mk_reload=1
-# 		echo 'extra_host_conf["check_command"] = [( "check-mk-host-tcp!443", ALL_HOSTS),]' >>$_rule_f
-
-# 	fi
-
-# 	grep 'extra_host_conf\[\"notifications_enabled\"\]' $_rule_f
-# 	if [ $? -ne 0 ]; then
-# 		_mk_reload=1
-# 		echo 'extra_host_conf["notifications_enabled"] = [( "0", ALL_HOSTS),]' >>$_rule_f
-
-# 	fi
-
-# 	grep 'extra_service_conf\[\"notifications_enabled\"\]' $_rule_f
-# 	if [ $? -ne 0 ]; then
-# 		_mk_reload=1
-# 		echo 'extra_service_conf["notifications_enabled"] = [( "0", ALL_HOSTS, ALL_SERVICES),]' >>$_rule_f
-
-# 	fi
-
-# 	if [ $_mk_reload -eq 1 ]; then
-# 		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
-# 	fi
-
-# 	if [ -z "$MONITOR_DOMAIN" ]; then return; fi
-# 	grep $MONITOR_DOMAIN /etc/hosts >/dev/null
-# 	if [ $? -ne 0 ]; then
-# 		echo 127.0.0.1 $MONITOR_DOMAIN >>/etc/hosts
-# 	fi
-# 	rm -rf /var/log/journal/*
-# 	truncate -s 0 /var/log/syslog.*
-# 	truncate -s 0 /var/log/auth.log.*
-# 	truncate -s 0 $SITE_ROOT/logs/*
-# 	truncate -s 0 $SITE_ROOT/logs/nginx/*
-# }
 _reload() {
-	# _cron
-	# _tune_hosts
-	# reload it v1
+
 
 	bash $mkagent/agents/push.sh _kill
 	$cmd _update
@@ -248,9 +188,7 @@ _install_repos() {
 _supervisor() {
 	ln -sf /massbit/massbitroute/app/gbc /massbit/massbitroute/app/src/gbc
 	ln -sf /massbit/massbitroute/app/gbc/bin/openresty /usr/local/openresty
-	# apt-get update
-	# apt-get install -y git apache2-utils supervisor jq python-is-python2 libssl-dev \
-	# 	liburcu-dev libev-dev libsodium-dev libtool libunwind-dev libmaxminddb-dev
+
 	if [ -f "/usr/bin/systemctl" ]; then
 		systemctl enable supervisor
 		systemctl start supervisor
@@ -263,7 +201,7 @@ _supervisor() {
 	fi
 }
 _install_one() {
-	#	_init
+
 	_prepare
 	_install_repos
 }
@@ -476,22 +414,7 @@ _add_monitor_host() {
 _redis_monitor() {
 	/opt/omd/versions/2.0.0p18.cre/bin/redis-cli -s /omd/sites/mbr/tmp/run/redis $@
 }
-# _add_core_monitors() {
-# 	_add_monitor_host mbr-stat-eu-1 34.88.224.156 mbr-stat
-# 	_add_monitor_host mbr-stat-eu-2 34.88.146.128 mbr-stat
 
-# 	_add_monitor_host mbr-portal-as-1 34.126.181.168 mbr-portal
-# 	_add_monitor_host mbr-portal-as-2 34.126.176.201 mbr-portal
-
-# 	_add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
-# 	_add_monitor_host mbr-monitor-eu-2 34.88.133.22 mbr-monitor
-
-# 	_add_monitor_host mbr-git-eu-1 34.88.161.189 mbr-git
-# 	_add_monitor_host mbr-git-eu-2 34.88.202.210 mbr-git
-
-# 	_add_monitor_host mbr-api-eu-1 34.88.231.165 mbr-api
-# 	_add_monitor_host mbr-api-as-1 34.87.189.191 mbr-api
-# }
 _refresh_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	su - mbr -c 'cmk -v -II --flush;cmk -R'
@@ -686,19 +609,7 @@ _update_repos() {
 	return $_update_status
 }
 
-# _add_host_file() {
-# 	if [ ! -f "/etc/hosts.bk" ]; then
-# 		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
-# 	fi
-# 	cat /etc/hosts.bk >/tmp/hosts
-# 	echo $curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
-# 	$curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
-# 	if [ -f "/tmp/hosts.1" ]; then
-# 		cat /tmp/hosts.1 >>/tmp/hosts
-# 		cat /tmp/hosts >/etc/hosts
-# 		rm /tmp/hosts.1
-# 	fi
-# }
+
 _update() {
 	echo "Update"
 	if [ ! -f "$SITE_ROOT/.env" ]; then

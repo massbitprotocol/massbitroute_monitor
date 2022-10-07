@@ -7,7 +7,7 @@ fi
 
 SITE_ROOT=$1
 
-export TOKEN_FILE=$SITE_ROOT/data/tokens.txt
+export TOKEN_FILE=/tmp/tokens.txt
 if [ ! -f "$TOKEN_FILE" ]; then touch $TOKEN_FILE; fi
 
 list="$SITE_ROOT/scripts/server.py"

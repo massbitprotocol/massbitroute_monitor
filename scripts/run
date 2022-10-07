@@ -1,58 +1,23 @@
 #!/bin/bash
 TYPE="monitor"
+
 GRAFANA_VERSION=v8.2.1
 PROMETHEUS_VERSION=v2.30.3
 
-script=$(realpath $0)
-SITE_ROOT=$(realpath $(dirname $script)/..)
+SITE_ROOT=$(realpath $(dirname $(realpath $0))/..)
+script=$SITE_ROOT/scripts
+
 export HOME=$SITE_ROOT
-cd $SITE_ROOT
-curl="/usr/bin/curl -skSfL"
-if [ -e "$SITE_ROOT/cmd_server" ]; then bash $SITE_ROOT/cmd_server _env; fi
-if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw 2>&1 >/dev/null; fi
+ROOT_DIR=$SITE_ROOT
+
 source $SITE_ROOT/scripts/base.sh
 
 cd $SITE_ROOT
 
+curl="curl -skL"
 mbr_root=/massbit/massbitroute/app
 service_dir=$mbr_root/src/sites/services
 mkagent=$service_dir/mkagent
-
-_force=$(cat $SITE_ROOT/data/dirty)
-NSTALE=$(cat $SITE_ROOT/data/nstale)
-if [ -z "$NSTALE" ]; then NSTALE=100; fi
-
-_repo() {
-	if [ -e "$SITE_ROOT/cmd_server" ]; then bash $SITE_ROOT/cmd_server _env; fi
-	if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
-
-	export MBR_ENV=${MBR_ENV:-dev}
-	export BRANCH=${BRANCH:-$MBR_ENV}
-	# export MBRAPP_BRANCH=${MBRAPP_BRANCH:-$MBR_ENV}
-	# export ASDF_BRANCH=${ASDF_BRANCH:-$MBR_ENV}
-	export GBC_BRANCH=${GBC_BRANCH:-$MBR_ENV}
-	export SSL_BRANCH=${SSL_BRANCH:-$MBR_ENV}
-	# export GWMAN_BRANCH=${GWMAN_BRANCH:-$MBR_ENV}
-	# export NODE_BRANCH=${NODE_BRANCH:-$MBR_ENV}
-	# export GATEWAY_BRANCH=${GATEWAY_BRANCH:-$MBR_ENV}
-	# export STAT_BRANCH=${STAT_BRANCH:-$MBR_ENV}
-	export MONITOR_BRANCH=${MONITOR_BRANCH:-$MBR_ENV}
-	export MONITORDEPLOY_BRANCH=${MONITORDEPLOY_BRANCH:-$MBR_ENV}
-	# export API_BRANCH=${API_BRANCH:-$MBR_ENV}
-	# export SESSION_BRANCH=${SESSION_BRANCH:-$MBR_ENV}
-	# export GIT_BRANCH=${GIT_BRANCH:-$MBR_ENV}
-	export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
-	REPOS="\
-$SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
-/etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
- $mbr_root/gbc|https://github.com/massbitprotocol/massbitroute_gbc|$GBC_BRANCH \
-  $service_dir/mkagent|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_mkagent.git|$MKAGENT_BRANCH \
- $SITE_ROOT|https://github.com/massbitprotocol/massbitroute_monitor|$MONITOR_BRANCH \
- $SITE_ROOT/data|$GIT_PRIVATE_READ_URL/massbitroute/monitordeploy.git|$MONITORDEPLOY_BRANCH \
-"
-}
-
-_repo
 
 git="git -C $SITE_ROOT"
 
@@ -61,81 +26,105 @@ mbr_cli="$dir/mbr"
 script_run="$dir/scripts/run"
 cmd="$dir/cmd_server"
 nginx="$cmd nginx"
-service_dir=/massbit/massbitroute/app/src/sites/services
+# service_dir=/massbit/massbitroute/app/src/sites/services
 
 sec="_username=automation&_secret=$CHECK_MK_AUTOMATION_SECRET"
 arg="request_format=python&output_format=json"
-host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
+# host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 pip="pip install"
+
+_repo() {
+	if [ -z "$MBR_ENV" ]; then
+		echo "MBR_ENV missing"
+		exit 1
+	fi
+	if [ -z "$GIT_PUBLIC_URL" ]; then
+		echo "GIT_PUBLIC_URL missing"
+		exit 1
+	fi
+
+	# if [ -e "$SITE_ROOT/cmd_server" ]; then bash $SITE_ROOT/cmd_server _env; fi
+	# if [ -f "$SITE_ROOT/.env_raw" ]; then source $SITE_ROOT/.env_raw; fi
+
+	# export MBR_ENV=${MBR_ENV:-dev}
+	# export BRANCH=${BRANCH:-$MBR_ENV}
+
+	export ASDF_BRANCH=${ASDF_BRANCH:-$MBR_ENV}
+
+	# export GBC_BRANCH=${GBC_BRANCH:-$MBR_ENV}
+	export SSL_BRANCH=${SSL_BRANCH:-$MBR_ENV}
+
+	export MONITOR_BRANCH=${MONITOR_BRANCH:-$MBR_ENV}
+	# export MONITORDEPLOY_BRANCH=${MONITORDEPLOY_BRANCH:-$MBR_ENV}
+	export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
+	REPOS=""
+
+	# 	REPOS="\
+	# $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
+	# /etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
+	#  $mbr_root/gbc|https://github.com/massbitprotocol/massbitroute_gbc|$GBC_BRANCH \
+	#   $service_dir/mkagent|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_mkagent.git|$MKAGENT_BRANCH \
+	#  $SITE_ROOT|https://github.com/massbitprotocol/massbitroute_monitor|$MONITOR_BRANCH \
+	#  $SITE_ROOT/data|$GIT_PRIVATE_READ_URL/massbitroute/monitordeploy.git|$MONITORDEPLOY_BRANCH \
+	# "
+}
+
+# _repo
+
+_repo_private() {
+	if [ -z "$MBR_ENV" ]; then
+		echo "MBR_ENV missing"
+		exit 1
+	fi
+	if [ -z "$GIT_PRIVATE_READ_URL" ]; then
+		echo "GIT_PRIVATE_READ_URL missing"
+		exit 1
+	fi
+	if [ -z "$GIT_PRIVATE_BRANCH" ]; then
+		echo "GIT_PRIVATE_BRANCH missing"
+		exit 1
+	fi
+
+	export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
+
+	export GBC_BRANCH=${GBC_BRANCH:-$MBR_ENV}
+	export ASDF_BRANCH=${ASDF_BRANCH:-$MBR_ENV}
+	export MONITOR_BRANCH=${MONITOR_BRANCH:-$MBR_ENV}
+
+	export ENV_BRANCH=${ENV_BRANCH:-$GIT_PRIVATE_BRANCH}
+	export SSL_BRANCH=${SSL_BRANCH:-$GIT_PRIVATE_BRANCH}
+	# export GWMANDEPLOY_BRANCH=${GWMANDEPLOY_BRANCH:-$GIT_PRIVATE_BRANCH}
+	# export APIDEPLOY_BRANCH=${APIDEPLOY_BRANCH:-$GIT_PRIVATE_BRANCH}
+
+	# export NODE_BRANCH=${NODE_BRANCH:-$MBR_ENV}
+	# export GATEWAY_BRANCH=${GATEWAY_BRANCH:-$MBR_ENV}
+	# export API_BRANCH=${API_BRANCH:-$MBR_ENV}
+
+	_env
+	REPOS_PRIVATE="\
+$SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$ENV_BRANCH \
+/etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
+"
+	REPOS_RUNTIME="\ 
+
+"
+}
+
 _prepare() {
 	echo "Prepare"
-	cd /massbit/massbitroute/app/src/sites/services/monitor/scripts
+	mkdir -p \
+		$SITE_ROOT/logs/nginx \
+		$SITE_ROOT/db \
+		$SITE_ROOT/tmp \
+		$SITE_ROOT/db
 
-	# apt update
-	# apt install -y parallel python3 python3-pip parallel
-	pip install --upgrade pip
-	pip install -r requirements.txt
-
-	cd $SITE_ROOT
-	mkdir -p $SITE_ROOT/logs/nginx $SITE_ROOT/db $SITE_ROOT/tmp $SITE_ROOT/db $SITE_ROOT/vars
-
-	# rm -rf $SITE_ROOT/tmp/*
-	echo "mbr-monitor" >$SITE_ROOT/vars/TYPE
-	#	bash $SITE_ROOT/scripts/install.sh
+	echo "Install check_mk"
+	cd /massbit/massbitroute/app/src/sites/services/monitor
+	./scripts/install.sh _init
 
 }
-_tune_hosts() {
 
-	_rule_f=/opt/omd/sites/mbr/etc/check_mk/conf.d/wato/rules.mk
-	_mk_reload=0
-
-	grep 'extra_host_conf\[\"notification_options\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_host_conf["notification_options"] = [( "n", ALL_HOSTS),]' >>$_rule_f
-
-	fi
-
-	grep 'extra_host_conf\[\"check_command\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_host_conf["check_command"] = [( "check-mk-host-tcp!443", ALL_HOSTS),]' >>$_rule_f
-
-	fi
-
-	grep 'extra_host_conf\[\"notifications_enabled\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_host_conf["notifications_enabled"] = [( "0", ALL_HOSTS),]' >>$_rule_f
-
-	fi
-
-	grep 'extra_service_conf\[\"notifications_enabled\"\]' $_rule_f
-	if [ $? -ne 0 ]; then
-		_mk_reload=1
-		echo 'extra_service_conf["notifications_enabled"] = [( "0", ALL_HOSTS, ALL_SERVICES),]' >>$_rule_f
-
-	fi
-
-	if [ $_mk_reload -eq 1 ]; then
-		su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk;cmk -R;rm /omd/sites/mbr/etc/check_mk/main.mk'
-	fi
-
-	if [ -z "$MONITOR_DOMAIN" ]; then return; fi
-	grep $MONITOR_DOMAIN /etc/hosts >/dev/null
-	if [ $? -ne 0 ]; then
-		echo 127.0.0.1 $MONITOR_DOMAIN >>/etc/hosts
-	fi
-	rm -rf /var/log/journal/*
-	truncate -s 0 /var/log/syslog.*
-	truncate -s 0 /var/log/auth.log.*
-	truncate -s 0 $SITE_ROOT/logs/*
-	truncate -s 0 $SITE_ROOT/logs/nginx/*
-}
 _reload() {
-	# _cron
-	_tune_hosts
-	# reload it v1
 
 	bash $mkagent/agents/push.sh _kill
 	$cmd _update
@@ -148,48 +137,21 @@ _reload() {
 	bash $SITE_ROOT/scripts/server.sh _kill
 
 }
-
 _install_repos() {
-	_git_config
-	_repo
-	for _pathgit in $REPOS; do
-		_path=$(echo $_pathgit | cut -d'|' -f1)
-		_url=$(echo $_pathgit | cut -d'|' -f2)
-		_branch=$(echo $_pathgit | cut -d'|' -f3)
-		_git_clone $_url $_path $_branch
-	done
-}
-_init() {
-	if [ -z "$GIT_PRIVATE_READ_URL" ]; then
-		echo "Need GIT_PRIVATE_READ_URL"
+	if [ -z "$MBR_ENV" ]; then
+		echo "MBR_ENV missing"
 		exit 1
 	fi
-	# if [ ! -f "$SITE_ROOT/.env" ]; then
-	# 	echo "$MBR_ENV" >$SITE_ROOT/.env
-	# fi
-
-	cat <<EOF >$SITE_ROOT/.env
-export GIT_PUBLIC_URL="https://github.com"
-export MBR_ENV=$MBR_ENV
-EOF
-
-	source $SITE_ROOT/.env
 	_repo
-
-	_git_clone $GIT_PRIVATE_READ_URL/massbitroute/env.git /massbit/massbitroute/app/src/env $MBR_ENV
-	_git_clone $GIT_PUBLIC_URL/massbitprotocol/massbitroute_gbc.git /massbit/massbitroute/app/gbc
-
-	# bash $SITE_ROOT/cmd_server _env
-	# source $SITE_ROOT/.env_raw
-	_repo
+	_install_sources $REPOS
+	_install_status=$?
+	return $_install_status
 }
 
 _supervisor() {
 	ln -sf /massbit/massbitroute/app/gbc /massbit/massbitroute/app/src/gbc
 	ln -sf /massbit/massbitroute/app/gbc/bin/openresty /usr/local/openresty
-	# apt-get update
-	# apt-get install -y git apache2-utils supervisor jq python-is-python2 libssl-dev \
-	# 	liburcu-dev libev-dev libsodium-dev libtool libunwind-dev libmaxminddb-dev
+
 	if [ -f "/usr/bin/systemctl" ]; then
 		systemctl enable supervisor
 		systemctl start supervisor
@@ -202,7 +164,6 @@ _supervisor() {
 	fi
 }
 _install_one() {
-	_init
 	_prepare
 	_install_repos
 }
@@ -347,6 +308,10 @@ _update_stat() {
 	su - mbr -c "lq 'GET services\nFilter: host_name = $hostname\nFilter: description ~ mbr-node-[a-zA-Z0-9-]{36}$\nColumns: description\nStats: avg perf_data'" | awk 'NF == 3 {split($1,v,";");id=v[1];gsub(/mbr-node-/,"",id);rtt=v[2];gsub(/rtt=/,"",rtt);size=$2;gsub(/size=/,"",size);time=$3;gsub(/time=/,"",time);time1=time*1000000;if(size > 0 && time1 > 0 ) {speed=sprintf("%.f",size/time);print id,speed}}' | sort -rn -k2 >$_path/mbr-node
 }
 _add_monitor_host() {
+	_force=$(cat $SITE_ROOT/data/dirty)
+	NSTALE=$(cat $SITE_ROOT/data/nstale)
+	if [ -z "$NSTALE" ]; then NSTALE=100; fi
+
 	_site=$1
 	hostname=$2
 	ip=$3
@@ -411,22 +376,7 @@ _add_monitor_host() {
 _redis_monitor() {
 	/opt/omd/versions/2.0.0p18.cre/bin/redis-cli -s /omd/sites/mbr/tmp/run/redis $@
 }
-# _add_core_monitors() {
-# 	_add_monitor_host mbr-stat-eu-1 34.88.224.156 mbr-stat
-# 	_add_monitor_host mbr-stat-eu-2 34.88.146.128 mbr-stat
 
-# 	_add_monitor_host mbr-portal-as-1 34.126.181.168 mbr-portal
-# 	_add_monitor_host mbr-portal-as-2 34.126.176.201 mbr-portal
-
-# 	_add_monitor_host mbr-monitor-eu-1 35.228.36.179 mbr-monitor 1
-# 	_add_monitor_host mbr-monitor-eu-2 34.88.133.22 mbr-monitor
-
-# 	_add_monitor_host mbr-git-eu-1 34.88.161.189 mbr-git
-# 	_add_monitor_host mbr-git-eu-2 34.88.202.210 mbr-git
-
-# 	_add_monitor_host mbr-api-eu-1 34.88.231.165 mbr-api
-# 	_add_monitor_host mbr-api-as-1 34.87.189.191 mbr-api
-# }
 _refresh_monitors() {
 	su - mbr -c 'touch /omd/sites/mbr/etc/check_mk/main.mk'
 	su - mbr -c 'cmk -v -II --flush;cmk -R'
@@ -552,8 +502,8 @@ _add_monitors() {
 	if [ -f "$_lock" ]; then return; fi
 	touch $_lock
 
-	token_file=$SITE_ROOT/data/tokens.txt
-	token_core_file=$SITE_ROOT/data/tokens_core.txt
+	token_file=/tmp/tokens.txt
+	token_core_file=/tmp/tokens_core.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
 	cp $token_core_file ${token_file}.tmp
@@ -570,6 +520,7 @@ _add_monitors() {
 	_nets=$(cat $SITE_ROOT/vars/MONITOR_NETWORKS)
 	if [ -z "$_nets" ]; then _nets="mainnet"; fi
 
+	mkdir -p $SITE_ROOT/data
 	for _type in $_types; do
 		_script_run=$SITE_ROOT/data/_run_me_${_type}.sh
 		>${_script_run}.tmp
@@ -602,26 +553,24 @@ _add_monitors() {
 }
 
 _update_repos() {
-	_git_config
-	_repo
-	_update_sources $REPOS
-	_st_repo=$?
-	return $_st_repo
+	if [ -z "$MBR_ENV" ]; then
+		echo "MBR_ENV missing"
+		exit 1
+	fi
+	if [ -z "$GIT_PRIVATE_READ_URL" ]; then
+		echo "Need GIT_PRIVATE_READ_URL"
+		exit 1
+	fi
+	_repo_private
+	_update_sources $REPOS_PRIVATE
+	_update_status=$?
+	_update_sources $REPOS_RUNTIME
+	if [ $_update_status -eq 0 ]; then
+		_update_status=$?
+	fi
+	return $_update_status
 }
 
-_add_host_file() {
-	if [ ! -f "/etc/hosts.bk" ]; then
-		sed '/.mbr/d' /etc/hosts >/etc/hosts.bk
-	fi
-	cat /etc/hosts.bk >/tmp/hosts
-	echo $curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
-	$curl https://api.$DOMAIN/deploy/info/hosts -o /tmp/hosts.1
-	if [ -f "/tmp/hosts.1" ]; then
-		cat /tmp/hosts.1 >>/tmp/hosts
-		cat /tmp/hosts >/etc/hosts
-		rm /tmp/hosts.1
-	fi
-}
 _update() {
 	echo "Update"
 	if [ ! -f "$SITE_ROOT/.env" ]; then
@@ -639,7 +588,7 @@ EOF
 	_update_repos
 	_st_update=$?
 
-	_add_host_file
+	# _add_host_file
 	return $_st_update
 }
 
@@ -697,7 +646,14 @@ _discover_host() {
 	rm $_lock
 }
 
+_env_update() {
+	mkdir -p $SITE_ROOT/vars
+	if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo "$MONITOR_BLOCKCHAINS" >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
+	if [ -n "$MONITOR_TYPES" ]; then echo "$MONITOR_TYPES" >$SITE_ROOT/vars/MONITOR_TYPES; fi
+	if [ -n "$MONITOR_NETWORKS" ]; then echo "$MONITOR_NETWORKS" >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
+}
 _monitor() {
+	_env_update
 
 	_update
 	is_reload=$?

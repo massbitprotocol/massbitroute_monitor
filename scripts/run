@@ -33,6 +33,7 @@ arg="request_format=python&output_format=json"
 # host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 pip="pip install"
 
+
 _repo() {
 	if [ -z "$MBR_ENV" ]; then
 		echo "MBR_ENV missing"
@@ -126,6 +127,7 @@ _prepare() {
 
 _reload() {
 
+
 	bash $mkagent/agents/push.sh _kill
 	$cmd _update
 	$cmd update
@@ -148,6 +150,41 @@ _install_repos() {
 	return $_install_status
 }
 
+# _install_repos() {
+# 	_git_config
+# 	_repo
+# 	for _pathgit in $REPOS; do
+# 		_path=$(echo $_pathgit | cut -d'|' -f1)
+# 		_url=$(echo $_pathgit | cut -d'|' -f2)
+# 		_branch=$(echo $_pathgit | cut -d'|' -f3)
+# 		_git_clone $_url $_path $_branch
+# 	done
+# }
+# _init() {
+# 	if [ -z "$GIT_PRIVATE_READ_URL" ]; then
+# 		echo "Need GIT_PRIVATE_READ_URL"
+# 		exit 1
+# 	fi
+# 	# if [ ! -f "$SITE_ROOT/.env" ]; then
+# 	# 	echo "$MBR_ENV" >$SITE_ROOT/.env
+# 	# fi
+
+# 	cat <<EOF >$SITE_ROOT/.env
+# export GIT_PUBLIC_URL="https://github.com"
+# export MBR_ENV=$MBR_ENV
+# EOF
+
+# 	source $SITE_ROOT/.env
+# 	_repo
+
+# 	_git_clone $GIT_PRIVATE_READ_URL/massbitroute/env.git /massbit/massbitroute/app/src/env $MBR_ENV
+# 	_git_clone $GIT_PUBLIC_URL/massbitprotocol/massbitroute_gbc.git /massbit/massbitroute/app/gbc
+
+# 	# bash $SITE_ROOT/cmd_server _env
+# 	# source $SITE_ROOT/.env_raw
+# 	_repo
+# }
+
 _supervisor() {
 	ln -sf /massbit/massbitroute/app/gbc /massbit/massbitroute/app/src/gbc
 	ln -sf /massbit/massbitroute/app/gbc/bin/openresty /usr/local/openresty
@@ -164,6 +201,7 @@ _supervisor() {
 	fi
 }
 _install_one() {
+
 	_prepare
 	_install_repos
 }
@@ -570,6 +608,7 @@ _update_repos() {
 	fi
 	return $_update_status
 }
+
 
 _update() {
 	echo "Update"

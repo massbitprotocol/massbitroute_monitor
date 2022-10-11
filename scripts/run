@@ -719,20 +719,6 @@ _omd_update() {
 
 }
 
-_omd_update() {
-	_name=$OMD_USERNAME
-	_pass=$OMD_PASSWORD
-	/etc/init.d/apache2 start
-	if [ ! -d "/opt/omd/sites/$_name" ]; then
-		omd create $_name
-	fi
-	omd start $_name
-	if [ -n "$_pass" ]; then
-		su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd $_name $_pass"
-	fi
-
-}
-
 _monitor() {
 	_env_update
 

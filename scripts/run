@@ -709,11 +709,11 @@ _omd_update() {
 	fi
 
 	if [ -n "$CHECK_MK_AUTOMATION_SECRET" ]; then
-		su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd automation $CHECK_MK_AUTOMATION_SECRET"
+		su - $_name -c "htpasswd  -b /opt/omd/sites/$_name/etc/htpasswd automation $CHECK_MK_AUTOMATION_SECRET"
 	fi
 
 	if [ -n "$OMD_ADMIN" ]; then
-		su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_ADMIN"
+		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_ADMIN"
 	fi
 
 }

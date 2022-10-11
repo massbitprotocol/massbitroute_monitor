@@ -713,6 +713,7 @@ _omd_update() {
 		su - $_name -c "htpasswd  -b /opt/omd/sites/$_name/etc/htpasswd automation $CHECK_MK_AUTOMATION_SECRET"
 	fi
 
+
 	if [ -n "$OMD_PASSWORD" ]; then
 		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_PASSWORD"
 	fi

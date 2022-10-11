@@ -699,7 +699,7 @@ _env_update() {
 }
 _omd_update() {
 
-	_name=$1
+	_name=$OMD_USERNAME
 	if [ ! -d "/opt/omd/sites/$_name" ]; then
 		omd create $_name
 	fi

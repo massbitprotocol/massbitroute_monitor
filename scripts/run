@@ -703,7 +703,15 @@ _omd_update() {
 		omd create $_name
 	fi
 
-	omd start $_name
+	omd status | grep 'Overall state:  running'
+	if [ $? -ne 0 ]; then
+		omd start $_name
+	fi
+
+	if [ -n "$CHECK_MK_AUTOMATION_SECRET" ]; then
+		su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd automation $CHECK_MK_AUTOMATION_SECRET"
+	fi
+
 	if [ -n "$OMD_ADMIN" ]; then
 		su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_ADMIN"
 	fi

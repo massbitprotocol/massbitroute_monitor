@@ -110,6 +110,15 @@ $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$ENV_BRANCH \
 "
 }
 
+_omd_install() {
+	cd $SITE_ROOT
+	cat scripts/checkmk/checkmka* >/tmp/check-mk-raw-2.0.0p17_0.focal_amd64.deb
+	apt-get update
+	dpkg -i /tmp/check-mk-raw-2.0.0p17_0.focal_amd64.deb
+	apt-get -f install -y
+	sed 's/Listen 80/Listen 8000/' -i /etc/apache2/ports.conf
+	rsync -avz etc/check_mk/* /opt/omd/versions/2.0.0p17.cre/lib/python3/cmk/
+}
 _prepare() {
 	echo "Prepare"
 	mkdir -p \
@@ -119,8 +128,7 @@ _prepare() {
 		$SITE_ROOT/db
 
 	echo "Install check_mk"
-	cd /massbit/massbitroute/app/src/sites/services/monitor
-	./scripts/install.sh _init
+	_omd_install
 
 }
 
@@ -689,9 +697,37 @@ _env_update() {
 	if [ -n "$MONITOR_NETWORKS" ]; then echo "$MONITOR_NETWORKS" >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
 
 }
+_omd_update() {
+	_name=$1
+	if [ ! -d "/opt/omd/sites/$_name" ]; then
+		omd create $_name
+	fi
+
+	omd start $_name
+	if [ -n "$OMD_ADMIN" ]; then
+		su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_ADMIN"
+	fi
+
+}
+
+_omd_update() {
+	_name=$OMD_USERNAME
+	_pass=$OMD_PASSWORD
+	/etc/init.d/apache2 start
+	if [ ! -d "/opt/omd/sites/$_name" ]; then
+		omd create $_name
+	fi
+	omd start $_name
+	if [ -n "$_pass" ]; then
+		su - $_name -c "htpasswd /opt/omd/sites/$_name/etc/htpasswd $_name $_pass"
+	fi
+
+}
+
 _monitor() {
 	_env_update
 
+	_omd_update
 	_update
 	is_reload=$?
 

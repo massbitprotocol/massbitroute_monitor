@@ -33,7 +33,6 @@ arg="request_format=python&output_format=json"
 # host="https://$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 pip="pip install"
 
-
 _repo() {
 	if [ -z "$MBR_ENV" ]; then
 		echo "MBR_ENV missing"
@@ -126,7 +125,6 @@ _prepare() {
 }
 
 _reload() {
-
 
 	bash $mkagent/agents/push.sh _kill
 	$cmd _update
@@ -609,19 +607,18 @@ _update_repos() {
 	return $_update_status
 }
 
-
 _update() {
 	echo "Update"
-	if [ ! -f "$SITE_ROOT/.env" ]; then
-		cat <<EOF >$SITE_ROOT/.env
-export GIT_PUBLIC_URL="https://github.com"
-export MBR_ENV=$MBR_ENV
-EOF
-	fi
+	# 	if [ ! -f "$SITE_ROOT/.env" ]; then
+	# 		cat <<EOF >$SITE_ROOT/.env
+	# export GIT_PUBLIC_URL="https://github.com"
+	# export MBR_ENV=$MBR_ENV
+	# EOF
+	# 	fi
 
-	if [ -n "$MONITOR_TYPES" ]; then echo $MONITOR_TYPES >$SITE_ROOT/vars/MONITOR_TYPES; fi
-	if [ -n "$MONITOR_NETWORKS" ]; then echo $MONITOR_NETWORKS >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
-	if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo $MONITOR_BLOCKCHAINS >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
+	# if [ -n "$MONITOR_TYPES" ]; then echo $MONITOR_TYPES >$SITE_ROOT/vars/MONITOR_TYPES; fi
+	# if [ -n "$MONITOR_NETWORKS" ]; then echo $MONITOR_NETWORKS >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
+	# if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo $MONITOR_BLOCKCHAINS >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
 
 	_st_update=0
 	_update_repos
@@ -690,6 +687,7 @@ _env_update() {
 	if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo "$MONITOR_BLOCKCHAINS" >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
 	if [ -n "$MONITOR_TYPES" ]; then echo "$MONITOR_TYPES" >$SITE_ROOT/vars/MONITOR_TYPES; fi
 	if [ -n "$MONITOR_NETWORKS" ]; then echo "$MONITOR_NETWORKS" >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
+
 }
 _monitor() {
 	_env_update
@@ -705,6 +703,7 @@ _monitor() {
 
 _run() {
 	rm -rf $SITE_ROOT/tmp/*
+	_update
 	$SITE_ROOT/start_server
 }
 

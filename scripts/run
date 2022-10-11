@@ -699,7 +699,7 @@ _env_update() {
 }
 _omd_update() {
 
-	_name=$1
+	_name=$OMD_USERNAME
 	if [ ! -d "/opt/omd/sites/$_name" ]; then
 		omd create $_name
 	fi
@@ -713,8 +713,9 @@ _omd_update() {
 		su - $_name -c "htpasswd  -b /opt/omd/sites/$_name/etc/htpasswd automation $CHECK_MK_AUTOMATION_SECRET"
 	fi
 
-	if [ -n "$OMD_ADMIN" ]; then
-		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_ADMIN"
+
+	if [ -n "$OMD_PASSWORD" ]; then
+		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_PASSWORD"
 	fi
 
 }

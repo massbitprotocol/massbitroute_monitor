@@ -716,6 +716,8 @@ _omd_update() {
 	if [ -n "$OMD_PASSWORD" ]; then
 		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_PASSWORD"
 	fi
+	/etc/init.d/apache2 start
+	/etc/init.d/apache2 restart
 
 }
 

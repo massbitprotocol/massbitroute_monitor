@@ -614,6 +614,29 @@ _update_repos() {
 	fi
 	return $_update_status
 }
+_omd_update() {
+
+	_name=$OMD_USERNAME
+	if [ ! -d "/opt/omd/sites/$_name" ]; then
+		omd create $_name
+	fi
+
+	omd status | grep 'Overall state:  running'
+	if [ $? -ne 0 ]; then
+		omd start $_name
+	fi
+
+	if [ \( -n "$ADMIN_USERNAME" \) -a \( -n "$ADMIN_PASSWORD" \) ]; then
+		su - $_name -c "htpasswd  -b /opt/omd/sites/$_name/etc/htpasswd $ADMIN_USERNAME $ADMIN_PASSWORD"
+	fi
+
+	if [ -n "$OMD_PASSWORD" ]; then
+		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_PASSWORD"
+	fi
+	/etc/init.d/apache2 start
+	/etc/init.d/apache2 restart
+
+}
 
 _update() {
 	echo "Update"
@@ -628,6 +651,7 @@ _update() {
 	# if [ -n "$MONITOR_NETWORKS" ]; then echo $MONITOR_NETWORKS >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
 	# if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo $MONITOR_BLOCKCHAINS >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
 
+	_omd_update
 	_st_update=0
 	_update_repos
 	_st_update=$?
@@ -697,34 +721,10 @@ _env_update() {
 	if [ -n "$MONITOR_NETWORKS" ]; then echo "$MONITOR_NETWORKS" >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
 
 }
-_omd_update() {
-
-	_name=$OMD_USERNAME
-	if [ ! -d "/opt/omd/sites/$_name" ]; then
-		omd create $_name
-	fi
-
-	omd status | grep 'Overall state:  running'
-	if [ $? -ne 0 ]; then
-		omd start $_name
-	fi
-
-	if [ \( -n "$ADMIN_USERNAME" \) -a \( -n "$ADMIN_PASSWORD" \) ]; then
-		su - $_name -c "htpasswd  -b /opt/omd/sites/$_name/etc/htpasswd $ADMIN_USERNAME $ADMIN_PASSWORD"
-	fi
-
-	if [ -n "$OMD_PASSWORD" ]; then
-		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_PASSWORD"
-	fi
-	/etc/init.d/apache2 start
-	/etc/init.d/apache2 restart
-
-}
 
 _monitor() {
 	_env_update
 
-	_omd_update
 	_update
 	is_reload=$?
 

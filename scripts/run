@@ -651,7 +651,7 @@ _update_tag() {
 	git="git -C $SITE_ROOT"
 	_v=$($git config --get remote.origin.url | awk -F'/' '{print $NF}')
 	tmp=$(mktemp)
-	curl -sfkL http://$PORTAL_DOMAIN/deploy/info/version/$_v >$tmp
+	$curl http://$PORTAL_DOMAIN/deploy/info/version/$_v >$tmp
 	if [ $? -ne 0 ]; then
 		rm $tmp
 		return 0

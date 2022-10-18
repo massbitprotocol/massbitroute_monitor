@@ -10,7 +10,15 @@ script=$SITE_ROOT/scripts
 export HOME=$SITE_ROOT
 ROOT_DIR=$SITE_ROOT
 
+source $SITE_ROOT/env/env.sh
 source $SITE_ROOT/scripts/base.sh
+
+if [ -z "$DOMAIN" ]; then
+	echo "DOMAIN missing"
+	exit 1
+fi
+
+export PORTAL_DOMAIN=portal.$DOMAIN
 
 cd $SITE_ROOT
 
@@ -549,6 +557,7 @@ _add_monitors() {
 	token_file=/tmp/tokens.txt
 	token_core_file=/tmp/tokens_core.txt
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
+	if [ ! -f "$token_core_file" ]; then touch $token_core_file; fi
 
 	cp $token_core_file ${token_file}.tmp
 

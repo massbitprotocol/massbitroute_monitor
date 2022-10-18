@@ -22,7 +22,7 @@ export PORTAL_DOMAIN=portal.$DOMAIN
 
 cd $SITE_ROOT
 
-curl="curl -skL"
+curl="curl -sfkL"
 mbr_root=/massbit/massbitroute/app
 service_dir=$mbr_root/src/sites/services
 mkagent=$service_dir/mkagent

@@ -256,7 +256,7 @@ _remove_orphan() {
 				for _ss in 0-0 0-1 1-0 1-1; do
 					_f_cache=listid-${_block}-${_net}-$_ss
 					tmp=$(mktemp)
-					timeout 10 $curl https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
+					timeout 10 $curl http://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
 					if [ $? -eq 0 ]; then
 						cat $tmp >>$tmpa
 						echo >>$tmpa
@@ -434,7 +434,7 @@ _remove_monitors_type() {
 	_net=$3
 	_site=${_type}-${_block}-${_net}
 	tmp=$(mktemp)
-	$curl https://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >${tmp}.1
+	$curl http://$PORTAL_DOMAIN/deploy/info/$_type/listid | awk -v type=$_type '$9 == 1 && $10 == 1 {print type"-"$3"-"$4"-"$1}' | sort >${tmp}.1
 	# cat ${tmp}.1
 	su - mbr -c 'lq "GET hosts\nColumns: name"' | awk "/^${_type}/" | sort >${tmp}.2
 	# cat ${tmp}.2
@@ -495,7 +495,7 @@ _add_monitors_type() {
 	for _ss in 0-0 0-1 1-0 1-1; do
 		tmp=$(mktemp)
 		_f_cache=listid-${_block}-${_net}-$_ss
-		timeout 3 $curl https://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
+		timeout 3 $curl http://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
 		if [ $? -eq 0 ]; then
 			if [ ! -f "/tmp/$_f_cache" ]; then touch /tmp/$_f_cache; fi
 			diff -s $tmp /tmp/$_f_cache

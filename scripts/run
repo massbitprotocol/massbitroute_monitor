@@ -28,6 +28,15 @@ mbr_cli="$dir/mbr"
 script_run="$dir/scripts/run"
 cmd="$dir/cmd_server"
 nginx="$cmd nginx"
+
+if [ ! -f "$SITE_ROOT/data/dirty" ]; then
+	echo 0 >$SITE_ROOT/data/dirty
+fi
+
+if [ ! -f "$SITE_ROOT/data/nstale" ]; then
+	echo 100 >$SITE_ROOT/data/nstale
+fi
+
 # service_dir=/massbit/massbitroute/app/src/sites/services
 
 arg="request_format=python&output_format=json"

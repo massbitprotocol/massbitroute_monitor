@@ -630,11 +630,11 @@ _omd_update() {
 	fi
 
 	if [ \( -n "$ADMIN_USERNAME" \) -a \( -n "$ADMIN_PASSWORD" \) ]; then
-		su - $_name -c "htpasswd  -b /opt/omd/sites/$_name/etc/htpasswd $ADMIN_USERNAME $ADMIN_PASSWORD"
+		su - $_name -c "htpasswd  -b /opt/omd/sites/$_site/etc/htpasswd $ADMIN_USERNAME $ADMIN_PASSWORD"
 	fi
 
 	if [ -n "$OMD_PASSWORD" ]; then
-		su - $_name -c "htpasswd -b /opt/omd/sites/$_name/etc/htpasswd $_name $OMD_PASSWORD"
+		su - $_name -c "htpasswd -b /opt/omd/sites/$_site/etc/htpasswd $_name $OMD_PASSWORD"
 	fi
 	/etc/init.d/apache2 start
 

@@ -13,6 +13,7 @@ ROOT_DIR=$SITE_ROOT
 source $SITE_ROOT/env/env.sh
 source $SITE_ROOT/scripts/base.sh
 
+PORTAL_DOMAIN=portal.$DOMAIN
 cd $SITE_ROOT
 
 curl="curl -sfkL"
@@ -647,7 +648,7 @@ _omd_update() {
 }
 
 _update_tag() {
-	PORTAL_DOMAIN=portal.$DOMAIN
+
 	git="git -C $SITE_ROOT"
 	_v=$($git config --get remote.origin.url | awk -F'/' '{print $NF}')
 	tmp=$(mktemp)

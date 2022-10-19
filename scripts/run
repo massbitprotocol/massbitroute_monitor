@@ -618,14 +618,15 @@ _update_repos() {
 }
 _omd_update() {
 
+	_site=$OMD_SITE
 	_name=$OMD_USERNAME
-	if [ ! -d "/opt/omd/sites/$_name" ]; then
-		omd create $_name
+	if [ ! -d "/opt/omd/sites/$_site" ]; then
+		omd create $_site
 	fi
 
 	omd status | grep 'Overall state:  running'
 	if [ $? -ne 0 ]; then
-		omd start $_name
+		omd start $_site
 	fi
 
 	if [ \( -n "$ADMIN_USERNAME" \) -a \( -n "$ADMIN_PASSWORD" \) ]; then

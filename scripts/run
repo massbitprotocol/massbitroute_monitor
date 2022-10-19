@@ -220,7 +220,7 @@ _monitor_activate() {
 	_site=$1
 	sec="_username=$OMD_USERNAME&_secret=$OMD_SECRET"
 	if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
-		su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+		su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	fi
 
 	host="http://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
@@ -308,7 +308,7 @@ _remove_olds() {
 					_n=$(su - $OMD_SITE -c 'lq "GET services\nFilter: host_name = '$_hostname'"' | wc -l)
 					if [ $_n -le 3 ]; then
 						if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
-							su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+							su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 						fi
 						_remove_monitor_host $_site $_hostname
 					fi
@@ -330,7 +330,7 @@ _call() {
 }
 
 _flush_monitor() {
-	su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk;cmk --flush;cmk -R;rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk;cmk --flush;cmk -R;rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
 }
 _check_host_access() {
@@ -340,11 +340,11 @@ _check_host_access() {
 	timeout 3 $curl https://$_ip/_ping
 	if [ $? -ne 0 ]; then
 		if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
-			su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+			su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 		fi
 		echo _remove_monitor_host $_site $_hostname
 		_remove_monitor_host $_site $_hostname
-		su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+		su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	fi
 }
 _update_stat() {
@@ -385,11 +385,11 @@ _add_monitor_host() {
 	action="add_host"
 	host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'$OMD_SITE'","tag_agent":"cmk-agent"}}'
 	if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
-		su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+		su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	fi
 
 	timeout 10 $curl "$host&action=$action" -d $host_info
-	su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+	su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	touch $_mark
 	# fi
 	_dirty=$(cat $SITE_ROOT/data/tokens_dirty.txt)
@@ -399,22 +399,22 @@ _add_monitor_host() {
 			action="discover_services"
 			host_info='request={"hostname":"'$hostname'"}'
 			if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
-				su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+				su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 			fi
 
 			timeout 10 $curl "$host&action=$action" -d $host_info >$_mark
-			su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+			su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 
 		fi
 	else
 		action="discover_services"
 		host_info='request={"hostname":"'$hostname'"}'
 		if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
-			su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+			su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 		fi
 
 		timeout 10 $curl "$host&action=$action" -d $host_info >$_mark
-		su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+		su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	fi
 
 	cat $_mark | jq
@@ -425,9 +425,9 @@ _redis_monitor() {
 }
 
 _refresh_monitors() {
-	su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	su - $OMD_SITE -c 'cmk -v -II --flush;cmk -R'
-	su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+	su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
 }
 
@@ -451,11 +451,11 @@ _remove_monitors_type() {
 _remove_monitors() {
 	_block=$1
 	_net=$2
-	su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	for _type in gateway node; do
 		_remove_monitors_type $_type $_block $_net
 	done
-	su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+	su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 }
 
 _add_monitors_internal() {
@@ -736,16 +736,16 @@ _discover_host() {
 					done
 				done
 
-				su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+				su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 				echo 0 >$SITE_ROOT/data/${_type}_dirty
 			fi
 
 		else
 
-			su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+			su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 			cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
 			_monitor_activate ${_type}
-			su - $OMD_SITE -c 'rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
+			su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 
 		fi
 	done

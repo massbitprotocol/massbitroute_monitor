@@ -13,13 +13,6 @@ ROOT_DIR=$SITE_ROOT
 source $SITE_ROOT/env/env.sh
 source $SITE_ROOT/scripts/base.sh
 
-if [ -z "$DOMAIN" ]; then
-	echo "DOMAIN missing"
-	exit 1
-fi
-
-export PORTAL_DOMAIN=portal.$DOMAIN
-
 cd $SITE_ROOT
 
 curl="curl -sfkL"
@@ -114,8 +107,8 @@ $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$ENV_BRANCH \
 /etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
 "
 	REPOS_RUNTIME="\ 
-
 "
+
 }
 
 _omd_install() {

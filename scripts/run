@@ -474,7 +474,7 @@ _add_monitors_internal() {
 
 		tmp=$(mktemp)
 		cat $token_core_file | cut -d' ' -f2- | while read opt; do
-			echo $script _add_monitor_host internal $opt 1 >>${tmp}
+			echo $script_run _add_monitor_host internal $opt 1 >>${tmp}
 		done
 		mv $tmp $script_run_internal
 	fi
@@ -519,10 +519,10 @@ _add_monitors_type() {
 					if [ -z "$_nservices" ]; then _nservices=0; fi
 					if [ -z "$_status" ]; then _status=1; fi
 					if [ \( "$_ss" == "0-0" \) -o \( $_force -eq 1 \) -o \( $_status -ne 0 \) -o \( $_nservices -lt 5 \) ]; then
-						echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 $_ss >>${tmp}.run
+						echo $script_run _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 $_ss >>${tmp}.run
 					fi
 				else
-					echo $script _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
+					echo $script_run _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
 				fi
 
 				# echo check_host_access $ip $_hostname

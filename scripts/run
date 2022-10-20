@@ -29,7 +29,7 @@ script_run="$dir/scripts/run"
 cmd="$dir/cmd_server"
 nginx="$cmd nginx"
 GIT_PUBLIC_URL="https://github.com"
-
+mkdir -p $SITE_ROOT/data
 if [ ! -f "$SITE_ROOT/data/dirty" ]; then
 	echo 0 >$SITE_ROOT/data/dirty
 fi

@@ -28,6 +28,7 @@ mbr_cli="$dir/mbr"
 script_run="$dir/scripts/run"
 cmd="$dir/cmd_server"
 nginx="$cmd nginx"
+GIT_PUBLIC_URL="https://github.com"
 
 if [ ! -f "$SITE_ROOT/data/dirty" ]; then
 	echo 0 >$SITE_ROOT/data/dirty
@@ -59,9 +60,9 @@ _repo() {
 	# export MBR_ENV=${MBR_ENV:-dev}
 	# export BRANCH=${BRANCH:-$MBR_ENV}
 
-	export ASDF_BRANCH=${ASDF_BRANCH:-$MBR_ENV}
+	export ASDF_BRANCH=latest
 
-	# export GBC_BRANCH=${GBC_BRANCH:-$MBR_ENV}
+	export GBC_BRANCH=latest
 	export SSL_BRANCH=${SSL_BRANCH:-$MBR_ENV}
 
 	export MONITOR_BRANCH=${MONITOR_BRANCH:-$MBR_ENV}
@@ -71,10 +72,11 @@ _repo() {
 
 	REPOS="\
 	   $service_dir/mkagent|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_mkagent.git|$MKAGENT_BRANCH \
+	 $mbr_root/gbc|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_gbc|$GBC_BRANCH \
+	 $mbr_root/gbc/bin/.asdf|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_asdf|$ASDF_BRANCH \
 "
 	# $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
 	# /etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
-	#  $mbr_root/gbc|https://github.com/massbitprotocol/massbitroute_gbc|$GBC_BRANCH \
 
 	#  $SITE_ROOT|https://github.com/massbitprotocol/massbitroute_monitor|$MONITOR_BRANCH \
 	#  $SITE_ROOT/data|$GIT_PRIVATE_READ_URL/massbitroute/monitordeploy.git|$MONITORDEPLOY_BRANCH \
@@ -620,6 +622,8 @@ _update_repos() {
 		echo "Need GIT_PRIVATE_READ_URL"
 		exit 1
 	fi
+	_repo
+	_update_sources $REPOS
 	_repo_private
 	_update_sources $REPOS_PRIVATE
 	_update_status=$?

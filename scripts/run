@@ -422,6 +422,10 @@ _remove_monitors() {
 }
 
 _add_monitors_internal() {
+	_lock=/tmp/_add_monitors
+	if [ -f "$_lock" ]; then return; fi
+	touch $_lock
+
 	_type=internal
 	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
 
@@ -452,6 +456,7 @@ _add_monitors_internal() {
 		bash $SITE_ROOT/scripts/server.sh _kill
 
 	fi
+	rm $_lock
 }
 
 _add_monitors_type() {

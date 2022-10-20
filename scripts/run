@@ -339,6 +339,7 @@ _add_monitor_host() {
 	if [ -z "$disc" ]; then disc=0; fi
 	_mark=/tmp/${_site}_$hostname
 	_status=$(cat $_mark | jq .result_code)
+	if [ $_status -ne 0 ]; then return; fi
 	_nservices=$(cat $_mark | jq .result | awk '{sub(/^.*, total\s+/,"");sub(/services.*$/,"");print}')
 
 	if [ -z "$_nservices" ]; then _nservices=0; fi

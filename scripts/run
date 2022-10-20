@@ -679,7 +679,6 @@ _discover_host() {
 	fi
 
 	if [ -z "$_dirty" ]; then _dirty=0; fi
-	# if [ $_dirty -ne 1 ]; then return; fi
 
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	for _type in $_types; do
@@ -692,8 +691,7 @@ _discover_host() {
 			if [ -z "$_nets" ]; then _nets="mainnet"; fi
 
 			if [ -f "$SITE_ROOT/data/_run_me_${_type}.sh" ]; then
-				# su - $OMD_SITE -c 'touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk'
-				# cat $SITE_ROOT/data/_run_me_${_type}.sh | parallel -j$(nproc)
+
 				cat $SITE_ROOT/data/_run_me_${_type}.sh | while read cmd; do bash $cmd; done
 
 				for _block in $_blocks; do
@@ -719,6 +717,7 @@ _discover_host() {
 	echo 0 >$SITE_ROOT/data/tokens_dirty.txt
 	# _remove_olds
 	rm $_lock
+	_refresh_monitors
 }
 
 _env_update() {

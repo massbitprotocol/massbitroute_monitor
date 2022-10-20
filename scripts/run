@@ -425,7 +425,11 @@ _add_monitors_internal() {
 	_type=internal
 	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
 
+	token_file=/tmp/tokens.txt
 	token_core_file=$SITE_ROOT/data/tokens_core.txt
+	if [ ! -f "$token_file" ]; then touch $token_file; fi
+	if [ ! -f "$token_core_file" ]; then touch $token_core_file; fi
+
 	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o $token_core_file
 	if [ $? -ne 0 ]; then return; fi
 	_listid=$SITE_ROOT/data/${_type}_listid
@@ -443,6 +447,10 @@ _add_monitors_internal() {
 			echo $script_run _add_monitor_host internal $opt 1 >>${tmp}
 		done
 		mv $tmp $script_run_internal
+
+		mv $token_core_file $token_file
+		bash $SITE_ROOT/scripts/server.sh _kill
+
 	fi
 }
 
@@ -607,9 +615,6 @@ _omd_update() {
 	su - $OMD_SITE -c "mkdir -p /omd/sites/mbr/var/check_mk/web/$OMD_USERNAME"
 	echo $OMD_SECRET >/omd/sites/$OMD_SITE/var/check_mk/web/$OMD_USERNAME/automation.secret
 
-	# if [ -n "$OMD_PASSWORD" ]; then
-	# 	su - $_site -c "htpasswd -b /opt/omd/sites/$_site/etc/htpasswd $_name $OMD_PASSWORD"
-	# fi
 	/etc/init.d/apache2 start
 
 }
@@ -643,16 +648,6 @@ _update_tag() {
 
 _update() {
 	echo "Update"
-	# 	if [ ! -f "$SITE_ROOT/.env" ]; then
-	# 		cat <<EOF >$SITE_ROOT/.env
-	# export GIT_PUBLIC_URL="https://github.com"
-	# export MBR_ENV=$MBR_ENV
-	# EOF
-	# 	fi
-
-	# if [ -n "$MONITOR_TYPES" ]; then echo $MONITOR_TYPES >$SITE_ROOT/vars/MONITOR_TYPES; fi
-	# if [ -n "$MONITOR_NETWORKS" ]; then echo $MONITOR_NETWORKS >$SITE_ROOT/vars/MONITOR_NETWORKS; fi
-	# if [ -n "$MONITOR_BLOCKCHAINS" ]; then echo $MONITOR_BLOCKCHAINS >$SITE_ROOT/vars/MONITOR_BLOCKCHAINS; fi
 
 	_omd_update
 	_st_update=0

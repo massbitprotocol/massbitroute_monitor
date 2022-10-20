@@ -515,7 +515,7 @@ _add_monitors() {
 
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	if [ "$_types" == "internal" ]; then
-		echo $HOSTNAME >$SITE_ROOT/vars/ID
+		# echo $HOSTNAME >$SITE_ROOT/vars/ID
 		_add_monitors_internal
 		return
 	fi

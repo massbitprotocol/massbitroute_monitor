@@ -418,7 +418,9 @@ _remove_monitors() {
 _add_monitors_internal() {
 	_type=internal
 	script_run_internal=$SITE_ROOT/data/_run_me_internal.sh
+
 	token_core_file=$SITE_ROOT/data/tokens_core.txt
+	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o $token_core_file
 	_listid=$SITE_ROOT/data/${_type}_listid
 	_dirty=$SITE_ROOT/data/${_type}_dirty
 	if [ ! -f "$_listid" ]; then

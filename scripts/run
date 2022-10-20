@@ -66,14 +66,16 @@ _repo() {
 
 	export MONITOR_BRANCH=${MONITOR_BRANCH:-$MBR_ENV}
 	# export MONITORDEPLOY_BRANCH=${MONITORDEPLOY_BRANCH:-$MBR_ENV}
-	export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
-	REPOS=""
+	#export MKAGENT_BRANCH=${MKAGENT_BRANCH:-$MBR_ENV}
+	export MKAGENT_BRANCH=latest
 
-	# 	REPOS="\
+	REPOS="\
+	   $service_dir/mkagent|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_mkagent.git|$MKAGENT_BRANCH \
+"
 	# $SITE_ROOT/env|$GIT_PRIVATE_READ_URL/massbitroute/env.git|$MBR_ENV \
 	# /etc/letsencrypt|$GIT_PRIVATE_READ_URL/massbitroute/ssl.git|$SSL_BRANCH \
 	#  $mbr_root/gbc|https://github.com/massbitprotocol/massbitroute_gbc|$GBC_BRANCH \
-	#   $service_dir/mkagent|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_mkagent.git|$MKAGENT_BRANCH \
+
 	#  $SITE_ROOT|https://github.com/massbitprotocol/massbitroute_monitor|$MONITOR_BRANCH \
 	#  $SITE_ROOT/data|$GIT_PRIVATE_READ_URL/massbitroute/monitordeploy.git|$MONITORDEPLOY_BRANCH \
 	# "

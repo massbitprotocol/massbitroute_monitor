@@ -606,7 +606,7 @@ _omd_update() {
 	fi
 
 	su - $OMD_SITE -c "mkdir -p /omd/sites/$OMD_SITE/etc/check_mk/multisite.d/wato"
-	echo "multisite_users.update({'cmkadmin': {'alias': 'cmkadmin', 'roles': ['admin'], 'locked': False}, 'automation': {'alias': 'Check_MK Automation - used for calling web services', 'automation_secret': '"$AUTOMATION_SECRET"', 'roles': ['admin'], 'locked': False, 'language': 'en'}, 'mison201': {'roles': ['user'], 'locked': True, 'alias': '"$OMD_USERNAME"', 'automation_secret': '"$OMD_SECRET"', 'force_authuser': False, 'nav_hide_icons_title': None, 'icons_per_item': None, 'show_mode': None}})" >/omd/sites/$OMD_SITE/etc/check_mk/multisite.d/wato/users.mk
+	echo "multisite_users.update({'cmkadmin': {'alias': 'cmkadmin', 'roles': ['admin'], 'locked': False}, 'automation': {'alias': 'Check_MK Automation - used for calling web services', 'automation_secret': '"$AUTOMATION_SECRET"', 'roles': ['admin'], 'locked': False, 'language': 'en'}, 'mison201': {'roles': ['admin'], 'locked': True, 'alias': '"$OMD_USERNAME"', 'automation_secret': '"$OMD_SECRET"', 'force_authuser': False, 'nav_hide_icons_title': None, 'icons_per_item': None, 'show_mode': None}})" >/omd/sites/$OMD_SITE/etc/check_mk/multisite.d/wato/users.mk
 	su - $OMD_SITE -c "mkdir -p /omd/sites/mbr/var/check_mk/web/$OMD_USERNAME"
 	echo $OMD_SECRET >/omd/sites/$OMD_SITE/var/check_mk/web/$OMD_USERNAME/automation.secret
 

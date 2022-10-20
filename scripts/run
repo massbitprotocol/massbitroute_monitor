@@ -326,8 +326,11 @@ _add_monitor_host() {
 	nstale=$(su - $OMD_SITE -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
 	if [ $nstale -gt $NSTALE ]; then return; fi
 
-	timeout 3 $curl https://$ip/_ping
-	if [ $? -ne 0 ]; then return; fi
+	if [ "$_site" != "internal" ]; then
+		timeout 3 $curl https://$ip/_ping
+		if [ $? -ne 0 ]; then return; fi
+	fi
+
 	# _check_host_access $_site $ip $hostname
 
 	host="http://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"

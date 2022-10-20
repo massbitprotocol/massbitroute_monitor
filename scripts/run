@@ -519,9 +519,6 @@ _add_monitors_type() {
 
 }
 _add_monitors() {
-	_lock=/tmp/_add_monitors
-	if [ -f "$_lock" ]; then return; fi
-	touch $_lock
 
 	token_file=/tmp/tokens.txt
 	token_core_file=/tmp/tokens_core.txt
@@ -536,7 +533,9 @@ _add_monitors() {
 		_add_monitors_internal
 		return
 	else
-
+		_lock=/tmp/_add_monitors
+		if [ -f "$_lock" ]; then return; fi
+		touch $_lock
 		if [ -z "$_types" ]; then _types="gateway"; fi
 		_blocks=$(cat $SITE_ROOT/vars/MONITOR_BLOCKCHAINS)
 		if [ -z "$_blocks" ]; then _blocks="eth"; fi

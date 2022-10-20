@@ -424,6 +424,7 @@ _add_monitors_internal() {
 
 	token_core_file=$SITE_ROOT/data/tokens_core.txt
 	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o $token_core_file
+	if [ $? -ne 0 ]; then return; fi
 	_listid=$SITE_ROOT/data/${_type}_listid
 	_dirty=$SITE_ROOT/data/${_type}_dirty
 	if [ ! -f "$_listid" ]; then

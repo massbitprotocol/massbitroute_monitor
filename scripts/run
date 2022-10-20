@@ -534,6 +534,7 @@ _add_monitors() {
 	if [ "$_types" == "internal" ]; then
 		# echo $HOSTNAME >$SITE_ROOT/vars/ID
 		_add_monitors_internal
+		return
 	else
 
 		if [ -z "$_types" ]; then _types="gateway"; fi

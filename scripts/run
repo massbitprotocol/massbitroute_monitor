@@ -198,6 +198,8 @@ _remove_monitor_host() {
 _remove_orphan() {
 
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
+	if [ "$_types" == "internal" ]; then return; fi
+
 	if [ -z "$_types" ]; then _types="gateway"; fi
 	_blocks=$(cat $SITE_ROOT/vars/MONITOR_BLOCKCHAINS)
 	if [ -z "$_blocks" ]; then _blocks="eth"; fi

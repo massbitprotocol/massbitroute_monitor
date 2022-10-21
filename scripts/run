@@ -683,12 +683,14 @@ _update() {
 }
 
 _discover_host() {
+	_script_run=$SITE_ROOT/data/_run_me.sh
+	if [ ! -f "$_script_run" ]; then return; fi
 	_lock=/tmp/_discover_host
 	if [ -f "$_lock" ]; then return; fi
 	touch $_lock
 
 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
-	cat $SITE_ROOT/data/_run_me | while read cmd; do bash $cmd; done
+	cat $_script_run | while read cmd; do bash $cmd; done
 
 	for _type in $_types; do
 		for _block in $_blocks; do

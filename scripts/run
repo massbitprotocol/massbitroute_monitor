@@ -431,7 +431,7 @@ _add_monitors_internal() {
 
 	token_file=/tmp/tokens.txt
 	# token_core_file=/tmp/tokens_core.txt
-	# if [ ! -f "$token_file" ]; then touch $token_file; fi
+	if [ ! -f "$token_file" ]; then touch $token_file; fi
 	# if [ ! -f "$token_core_file" ]; then touch $token_core_file; fi
 
 	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o ${token_file}.tmp

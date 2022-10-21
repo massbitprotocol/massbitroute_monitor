@@ -570,20 +570,20 @@ _add_monitors() {
 	if [ "$_types" == "internal" ]; then
 		# echo $HOSTNAME >$SITE_ROOT/vars/ID
 		_add_monitors_internal
-		return
+		# return
 	else
 		_add_monitors_node_gateway
 
 	fi
-	cat $token_file
-	diff -s ${token_file}.tmp $token_file >/dev/null
-	if [ $? -ne 0 ]; then
-		echo 1 >$SITE_ROOT/data/tokens_dirty.txt
-		mv ${token_file}.tmp $token_file
-		bash $SITE_ROOT/scripts/server.sh _kill
+	# cat $token_file
+	# diff -s ${token_file}.tmp $token_file >/dev/null
+	# if [ $? -ne 0 ]; then
+	# 	echo 1 >$SITE_ROOT/data/tokens_dirty.txt
+	# 	mv ${token_file}.tmp $token_file
+	# 	bash $SITE_ROOT/scripts/server.sh _kill
 
-	fi
-	_remove_orphan
+	# fi
+	# _remove_orphan
 
 }
 

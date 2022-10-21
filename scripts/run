@@ -373,12 +373,14 @@ _add_monitor_host() {
 
 	# 	fi
 	# else
+
 	action="discover_services"
 	host_info='request={"hostname":"'$hostname'"}'
 	# if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
 	# su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	# fi
 
+	tmp=$(mktemp)
 	$curl "$host&action=$action" -d $host_info >$_mark
 	su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	#fi
@@ -454,7 +456,7 @@ _add_monitors_internal() {
 
 		tmp=$(mktemp)
 		cat $token_file | cut -d' ' -f2- | while read opt; do
-			if [ -z "$opt" ]; then continue; fi
+			#			if [ -z "$opt" ]; then continue; fi
 			echo $script_run _add_monitor_host internal $opt 1 >>${tmp}
 		done
 		mv $tmp $_script_run
@@ -525,6 +527,7 @@ _add_monitors_node_gateway() {
 	_lock=/tmp/_add_monitors
 	if [ -f "$_lock" ]; then return; fi
 	touch $_lock
+	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	if [ -z "$_types" ]; then _types="gateway"; fi
 	_blocks=$(cat $SITE_ROOT/vars/MONITOR_BLOCKCHAINS)
 	if [ -z "$_blocks" ]; then _blocks="eth"; fi
@@ -695,7 +698,7 @@ _discover_host() {
 
 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	cat $_script_run | while read cmd; do bash $cmd; done
-
+	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	for _type in $_types; do
 		if [ "$_type" == "internal" ]; then
 			_monitor_activate internal

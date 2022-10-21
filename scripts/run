@@ -131,7 +131,7 @@ _reload() {
 	$cmd _update
 	$cmd update
 	$cmd start all
-	$script _add_monitors
+	$script_run _add_monitors
 	if [ -f "$SITE_ROOT/data/tokens_dirty.txt" ]; then
 		echo 1 >$SITE_ROOT/data/tokens_dirty.txt
 	fi
@@ -406,7 +406,7 @@ _remove_monitors_type() {
 	# cat ${tmp}.2
 	comm -23 ${tmp}.2 ${tmp}.1 | while read h; do
 		echo $h
-		$script _remove_monitor_host $_site $h
+		$script_run _remove_monitor_host $_site $h
 	done
 	rm ${tmp}*
 	_monitor_activate ${_site}
@@ -767,7 +767,7 @@ _monitor() {
 	is_reload=$?
 
 	if [ $is_reload -ne 0 ]; then
-		$script _reload
+		$script_run _reload
 	fi
 	$0 _add_monitors
 }

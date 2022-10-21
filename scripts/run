@@ -189,6 +189,7 @@ _monitor_activate() {
 _remove_monitor_host() {
 	_site=$1
 	hostname=$2
+	sec="_username=$OMD_USERNAME&_secret=$OMD_SECRET"
 	host="http://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 	action="delete_host"
 	host_info='request={"hostname":"'$hostname'"}'

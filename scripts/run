@@ -176,12 +176,12 @@ _install() {
 _monitor_activate() {
 	_site=$1
 	sec="_username=$OMD_USERNAME&_secret=$OMD_SECRET"
-	if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
-		su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
-	fi
+	# if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
+	# 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
+	# fi
 
 	host="http://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
-	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
+	# su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	action="activate_changes"
 	host_info='request={"sites":["'$OMD_SITE'"]}'
 	$curl "$host&action=$action" -d $host_info | jq

@@ -345,14 +345,16 @@ _add_monitor_host() {
 
 	# if [ -z "$_nservices" ]; then _nservices=0; fi
 	# if [ -z "$_status" ]; then _status=0; fi
-	# if [ ! -f "$_mark" ]; then
-	action="add_host"
-	host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'$OMD_SITE'","tag_agent":"cmk-agent"}}'
+	if [ ! -f "$_mark" ]; then
+		action="add_host"
+		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'$OMD_SITE'","tag_agent":"cmk-agent"}}'
+		$curl "$host&action=$action" -d $host_info
+	fi
 	# if [ ! -f "/omd/sites/$OMD_SITE/etc/check_mk/main.mk" ]; then
 	# 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	# fi
 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
-	$curl "$host&action=$action" -d $host_info
+
 	# su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	# touch $_mark
 	# fi

@@ -397,7 +397,7 @@ _refresh_monitors() {
 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 	su - $OMD_SITE -c 'cmk -v -II --flush;cmk -R'
 	su - $OMD_SITE -c "rm /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
-	echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
+	# echo 1 >/massbit/massbitroute/app/src/sites/services/monitor/data/tokens_dirty.txt
 }
 
 _remove_monitors_type() {
@@ -691,6 +691,8 @@ _update() {
 }
 
 _discover_host() {
+	nstale=$(su - $OMD_SITE -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
+	if [ $nstale -gt 5 ]; then return; fi
 	_script_run=$SITE_ROOT/data/_run_me.sh
 	if [ ! -f "$_script_run" ]; then return; fi
 	_lock=/tmp/_discover_host

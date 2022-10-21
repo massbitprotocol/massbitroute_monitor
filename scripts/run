@@ -437,6 +437,7 @@ _add_monitors_internal() {
 	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o ${token_file}.tmp
 	if [ $? -ne 0 ]; then
 		>$token_file
+		rm $_lock
 		return
 	fi
 	_dirty=/tmp/_dirty
@@ -559,12 +560,12 @@ _add_monitors_node_gateway() {
 
 _add_monitors() {
 
-	token_file=/tmp/tokens.txt
+	# token_file=/tmp/tokens.txt
 
-	if [ ! -f "$token_file" ]; then touch $token_file; fi
-	if [ ! -f "$token_core_file" ]; then touch $token_core_file; fi
+	# if [ ! -f "$token_file" ]; then touch $token_file; fi
+	# if [ ! -f "$token_core_file" ]; then touch $token_core_file; fi
 
-	cp $token_core_file ${token_file}.tmp
+	# cp $token_core_file ${token_file}.tmp
 
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	if [ "$_types" == "internal" ]; then

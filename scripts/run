@@ -412,6 +412,8 @@ _add_monitors_node_gateway() {
 	if [ ! -f "$_token_file" ]; then touch $_token_file; fi
 	_run_file=$5
 
+	_run_file_tmp=$(mktemp)
+	_token_file_tmp=$(mktemp)
 	_site=${_type}-${_block}-${_net}
 	for _ss in 0-1 1-0 1-1; do
 		tmp=$(mktemp)
@@ -423,17 +425,19 @@ _add_monitors_node_gateway() {
 			if [ -z "$id" ]; then continue; fi
 			_hostname=${_type}-$block-$net-$id
 
-			echo $script_run _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${tmp}.run
+			echo $script_run _add_monitor_host $_site $_hostname $ip mbr-${_type}-$block-$net 1 >>${_run_file_tmp}
 
 			_access_token=$(echo -n ${_hostname} | sha1sum | cut -d' ' -f1)
-			echo $_access_token $_hostname $ip $_type >>${_token_file}
+			echo $_access_token $_hostname $ip $_type >>${_token_file_tmp}
 
 		done
 
-		cat ${tmp}.run >>$_run_file
+		# cat ${tmp}.run >>$_run_file
 
 		rm ${tmp}*
 	done
+	mv $_run_file_tmp $_run_file
+	mv $_token_file_tmp $_token_file
 
 }
 # _add_monitors_node_gateway() {

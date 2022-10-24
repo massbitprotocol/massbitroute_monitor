@@ -586,8 +586,8 @@ _update() {
 }
 
 _discover_host() {
-	nstale=$(su - $OMD_SITE -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
-	if [ $nstale -gt 0 ]; then return; fi
+	# nstale=$(su - $OMD_SITE -c 'lq "GET services\nStats: state >= 0\nStats: staleness >= 1"' | cut -d';' -f2)
+	# if [ $nstale -gt 0 ]; then return; fi
 	_script_run=$SITE_ROOT/data/_run_me.sh
 	if [ ! -f "$_script_run" ]; then return; fi
 	_lock=/tmp/_discover_host

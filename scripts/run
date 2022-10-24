@@ -419,8 +419,10 @@ _add_monitors_node_gateway() {
 		tmp=$(mktemp)
 		_f_cache=listid-${_block}-${_net}-$_ss
 		$curl http://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
+
 		if [ $? -ne 0 ]; then continue; fi
 		if [ ! -f "$tmp" ]; then continue; fi
+		echo >>$tmp
 		cat ${tmp} | awk 'NF > 10' | sort -n -k11 -r | while read id user_id block net ip continent country token status approved _remain; do
 			if [ -z "$id" ]; then continue; fi
 			_hostname=${_type}-$block-$net-$id

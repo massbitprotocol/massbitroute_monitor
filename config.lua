@@ -30,8 +30,6 @@ killasgroup=true
 stopsignal=INT
 stdout_logfile=_SITE_ROOT_/logs/monitor_discover_dapi.log
 
-]],
-    supervisor = [[
 [program:monitor_discover_host]
 command=/bin/bash _SITE_ROOT_/scripts/run loop _discover_host
 autorestart=true
@@ -41,6 +39,8 @@ killasgroup=true
 stopsignal=INT
 stdout_logfile=_SITE_ROOT_/logs/monitor_discover_host.log
 
+]],
+    supervisor = [[
 [program:monitor_server]
 command=/bin/bash _SITE_ROOT_/scripts/server.sh _SITE_ROOT_
 autorestart=true

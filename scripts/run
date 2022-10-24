@@ -50,6 +50,7 @@ _repo() {
 	export GBC_BRANCH=latest
 	export MKAGENT_BRANCH=latest
 
+	_env
 	REPOS="\
 	   $service_dir/mkagent|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_mkagent.git|$MKAGENT_BRANCH \
 	 $mbr_root/gbc|$GIT_PUBLIC_URL/massbitprotocol/massbitroute_gbc|$GBC_BRANCH \

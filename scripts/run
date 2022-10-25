@@ -378,7 +378,7 @@ _add_monitors_internal() {
 
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
-	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o ${token_file}
+	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o ${token_file}.tmp
 	if [ $? -ne 0 ]; then
 		# 	>$token_file
 		rm $_lock
@@ -388,10 +388,12 @@ _add_monitors_internal() {
 	# if [ ! -f "$_dirty" ]; then
 	# 	echo 0 >$_dirty
 	# fi
-	# diff -s ${token_file}.tmp $token_file >/dev/null
-	# if [ $? -ne 0 ]; then
-	# 	echo 1 >$_dirty
-	# 	cp ${token_file}.tmp $token_file
+	diff -s ${token_file}.tmp $token_file >/dev/null
+	if [ $? -ne 0 ]; then
+		# 	echo 1 >$_dirty
+		cp ${token_file}.tmp $token_file
+		bash $SITE_ROOT/scripts/server.sh _kill
+	fi
 
 	tmp=$(mktemp)
 	cat $token_file | cut -d' ' -f2- | while read opt; do
@@ -399,7 +401,7 @@ _add_monitors_internal() {
 		echo $script_run _add_monitor_host internal $opt 1 >>${tmp}
 	done
 	mv $tmp $_script_run
-	bash $SITE_ROOT/scripts/server.sh _kill
+
 	#	fi
 	rm $_lock
 }

@@ -446,7 +446,14 @@ _add_monitors_node_gateway() {
 		rm ${tmp}*
 	done
 	mv $_run_file_tmp $_run_file
-	mv $_token_file_tmp $_token_file
+
+	diff -s $_token_file_tmp $_token_file >/dev/null
+	if [ $? -ne 0 ]; then
+		mv $_token_file_tmp $_token_file
+		bash $SITE_ROOT/scripts/server.sh _kill
+	fi
+
+	#	mv $_token_file_tmp $_token_file
 
 }
 # _add_monitors_node_gateway() {

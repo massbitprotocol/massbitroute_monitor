@@ -378,29 +378,29 @@ _add_monitors_internal() {
 
 	if [ ! -f "$token_file" ]; then touch $token_file; fi
 
-	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o ${token_file}.tmp
+	$curl http://$PORTAL_DOMAIN/deploy/info/monitor/internal -o ${token_file}
 	if [ $? -ne 0 ]; then
-		>$token_file
+		# 	>$token_file
 		rm $_lock
 		return
 	fi
-	_dirty=/tmp/_dirty
-	if [ ! -f "$_dirty" ]; then
-		echo 0 >$_dirty
-	fi
-	diff -s ${token_file}.tmp $token_file >/dev/null
-	if [ $? -ne 0 ]; then
-		echo 1 >$_dirty
-		cp ${token_file}.tmp $token_file
+	# _dirty=/tmp/_dirty
+	# if [ ! -f "$_dirty" ]; then
+	# 	echo 0 >$_dirty
+	# fi
+	# diff -s ${token_file}.tmp $token_file >/dev/null
+	# if [ $? -ne 0 ]; then
+	# 	echo 1 >$_dirty
+	# 	cp ${token_file}.tmp $token_file
 
-		tmp=$(mktemp)
-		cat $token_file | cut -d' ' -f2- | while read opt; do
-			#			if [ -z "$opt" ]; then continue; fi
-			echo $script_run _add_monitor_host internal $opt 1 >>${tmp}
-		done
-		mv $tmp $_script_run
-		bash $SITE_ROOT/scripts/server.sh _kill
-	fi
+	tmp=$(mktemp)
+	cat $token_file | cut -d' ' -f2- | while read opt; do
+		#			if [ -z "$opt" ]; then continue; fi
+		echo $script_run _add_monitor_host internal $opt 1 >>${tmp}
+	done
+	mv $tmp $_script_run
+	bash $SITE_ROOT/scripts/server.sh _kill
+	#	fi
 	rm $_lock
 }
 
@@ -417,8 +417,7 @@ _add_monitors_node_gateway() {
 	_site=${_type}-${_block}-${_net}
 	for _ss in 0-1 1-0 1-1; do
 		tmp=$(mktemp)
-		_f_cache=listid-${_block}-${_net}-$_ss
-		$curl http://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
+		$curl http://$PORTAL_DOMAIN/deploy/info/${_type}/listid-${_block}-${_net}-$_ss -o ${tmp} >/dev/null
 
 		if [ $? -ne 0 ]; then
 			rm $tmp

@@ -397,7 +397,7 @@ _add_monitors_internal() {
 
 	tmp=$(mktemp)
 	cat $token_file | cut -d' ' -f2- | while read opt; do
-		#			if [ -z "$opt" ]; then continue; fi
+		if [ -z "$opt" ]; then continue; fi
 		echo $script_run _add_monitor_host internal $opt 1 >>${tmp}
 	done
 	mv $tmp $_script_run

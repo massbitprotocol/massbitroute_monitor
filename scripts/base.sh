@@ -59,9 +59,11 @@ _git_clone() {
 
 	fi
 
-	git -C $_dir pull origin $_branch | grep -i "updating" >/dev/null
+	git -C $_dir remote update
+	git -C $_dir status -uno | grep -i "Your branch is behind" >/dev/null
 	if [ $? -eq 0 ]; then
 		_clone_status=1
+		git -C $_dir pull origin $_branch
 	fi
 
 	return $_clone_status

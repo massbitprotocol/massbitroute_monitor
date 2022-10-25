@@ -621,6 +621,8 @@ _discover_host() {
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
 	for _type in $_types; do
 		if [ "$_type" == "internal" ]; then
+			_script_run=$SITE_ROOT/data/_run_me.sh
+			cat $_script_run | while read cmd; do bash $cmd; done
 			_monitor_activate internal
 		else
 			for _block in $_blocks; do

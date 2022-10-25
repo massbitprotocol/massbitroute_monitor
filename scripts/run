@@ -540,10 +540,10 @@ _update_repos() {
 		_update_status=$?
 	fi
 
-	_update_sources $REPOS_RUNTIME
-	if [ $_update_status -eq 0 ]; then
-		_update_status=$?
-	fi
+	# _update_sources $REPOS_RUNTIME
+	# if [ $_update_status -eq 0 ]; then
+	# 	_update_status=$?
+	# fi
 	return $_update_status
 }
 _omd_update() {

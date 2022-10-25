@@ -26,6 +26,7 @@ git="git -C $SITE_ROOT"
 dir="/massbit/massbitroute/app/src/sites/services/$TYPE"
 mbr_cli="$dir/mbr"
 script_run="$dir/scripts/run"
+chmod +x $script_run
 cmd="$dir/cmd_server"
 nginx="$cmd nginx"
 GIT_PUBLIC_URL="https://github.com"
@@ -531,13 +532,18 @@ _update_repos() {
 		exit 1
 	fi
 	_repo
+	_update_status=0
 	_update_sources $REPOS
-	_update_status=$?
+	_st=$?
+	if [ $_update_status -eq 0 ]; then
+		_update_status=$_st
+	fi
 
 	_repo_private
 	_update_sources $REPOS_PRIVATE
+	_st=$?
 	if [ $_update_status -eq 0 ]; then
-		_update_status=$?
+		_update_status=$_st
 	fi
 
 	# _update_sources $REPOS_RUNTIME
@@ -604,12 +610,17 @@ _update() {
 
 	_omd_update
 	_st_update=0
+
 	_update_repos
-	_st_update=$?
+	_st=$?
+	if [ $_st_update -eq 0 ]; then
+		_st_update=$_st
+	fi
 
 	_update_tag
+	_st=$?
 	if [ $_st_update -eq 0 ]; then
-		_st_update=$?
+		_st_update=$_st
 	fi
 	# _add_host_file
 	return $_st_update
@@ -665,9 +676,9 @@ _monitor() {
 	is_reload=$?
 
 	if [ $is_reload -ne 0 ]; then
-		$script_run _reload
+		bash $script_run _reload
 	fi
-	$0 _add_monitors
+	bash $0 _add_monitors
 }
 
 _run() {

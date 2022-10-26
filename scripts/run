@@ -309,7 +309,7 @@ _add_monitor_host() {
 
 	host="http://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 
-	# _mark=/tmp/${_site}_$hostname
+	_mark=/tmp/${_site}_$hostname
 
 	# if [ ! -f "$_mark" ]; then
 	action="add_host"

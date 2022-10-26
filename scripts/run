@@ -199,7 +199,7 @@ _remove_orphan() {
 
 				tmpa=$(mktemp)
 
-				for _ss in 0-0 0-1 1-0 1-1; do
+				for _ss in 1-1; do
 					_f_cache=listid-${_block}-${_net}-$_ss
 					tmp=$(mktemp)
 					$curl http://$PORTAL_DOMAIN/deploy/info/${_type}/$_f_cache -o ${tmp} >/dev/null
@@ -418,7 +418,7 @@ _add_monitors_node_gateway() {
 	_run_file_tmp=$(mktemp)
 	_token_file_tmp=$(mktemp)
 	_site=${_type}-${_block}-${_net}
-	for _ss in 0-1 1-0 1-1; do
+	for _ss in 1-1; do
 		tmp=$(mktemp)
 		$curl http://$PORTAL_DOMAIN/deploy/info/${_type}/listid-${_block}-${_net}-$_ss -o ${tmp} >/dev/null
 

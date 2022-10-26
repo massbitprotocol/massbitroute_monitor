@@ -637,6 +637,8 @@ _discover_host() {
 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 
 	_types=$(cat $SITE_ROOT/vars/MONITOR_TYPES)
+	_blocks=$(cat $SITE_ROOT/vars/MONITOR_BLOCKCHAINS)
+	_nets=$(cat $SITE_ROOT/vars/MONITOR_NETWORKS)
 	_script_run=$SITE_ROOT/data/_run_me.sh
 	for _type in $_types; do
 		if [ "$_type" == "internal" ]; then

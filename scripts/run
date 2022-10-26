@@ -309,13 +309,13 @@ _add_monitor_host() {
 
 	host="http://${_site}.$MONITOR_DOMAIN/mbr/check_mk/webapi.py?$sec&$arg"
 
-	_mark=/tmp/${_site}_$hostname
+	# _mark=/tmp/${_site}_$hostname
 
-	if [ ! -f "$_mark" ]; then
-		action="add_host"
-		host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'$OMD_SITE'","tag_agent":"cmk-agent"}}'
-		$curl "$host&action=$action" -d $host_info
-	fi
+	# if [ ! -f "$_mark" ]; then
+	action="add_host"
+	host_info='request={"hostname":"'$hostname'","folder":"'$group'","attributes":{"ipaddress":"'$ip'","site":"'$OMD_SITE'","tag_agent":"cmk-agent"}}'
+	$curl "$host&action=$action" -d $host_info
+	# fi
 
 	su - $OMD_SITE -c "touch /omd/sites/$OMD_SITE/etc/check_mk/main.mk"
 

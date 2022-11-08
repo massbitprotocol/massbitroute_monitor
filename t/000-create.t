@@ -9,14 +9,12 @@ $ENV{TEST_NGINX_HTML_DIR} ||= html_dir();
 $ENV{TEST_NGINX_BINARY} =
 "/massbit/massbitroute/app/src/sites/services/api/bin/openresty/nginx/sbin/nginx";
 our $main_config = <<'_EOC_';
- load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_http_link_func_module.so;
+  load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_http_link_func_module.so;
       load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_http_geoip2_module.so;
       load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_stream_geoip2_module.so;
-      load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_http_vhost_traffic_monitorus_module.so;
-      load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_http_stream_server_traffic_monitorus_module.so;
-      load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_stream_server_traffic_monitorus_module.so;
-
-env BIND_ADDRESS;
+      load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_http_vhost_traffic_status_module.so;
+      load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_http_stream_server_traffic_status_module.so;
+      load_module /massbit/massbitroute/app/src/sites/services/monitor/bin/openresty/nginx/modules/ngx_stream_server_traffic_status_module.so;
 _EOC_
 
 our $http_config = <<'_EOC_';

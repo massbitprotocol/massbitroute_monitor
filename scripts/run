@@ -59,6 +59,52 @@ _repo() {
 "
 }
 
+_run_test() {
+	cd $SITE_ROOT
+	export PATH=$PATH:$SITE_ROOT/bin/openresty/nginx/sbin
+
+	supervisorctl stop mbr_${TYPE}_monitor
+
+	if [ ! -f "$SITE_ROOT/src/env.lua" ];then
+	   touch $SITE_ROOT/src/env.lua
+	   else
+	       > $SITE_ROOT/src/env.lua
+	fi
+	   
+       
+
+	env_src=$SITE_ROOT/env/env.lua
+	if [ -f "$env_src" ]; then
+		sed /PARTNER_ID/d -i $env_src
+		sed /SID/d -i $env_src
+		sed '/}/i ["PARTNER_ID"]="fc78b64c5c33f3f270700b0c4d3e7998188035ab",' -i $env_src
+		sed '/}/i ["SID"]="403716b0f58a7d6ddec769f8ca6008f2c1c0cea6"' -i $env_src
+
+		cp $env_src $SITE_ROOT/src/env.lua
+		_reload
+	fi
+
+	if [ $# -ne 0 ]; then
+		prove -r $@
+	else
+		prove -r t
+	fi
+
+}
+
+_install_test() {
+	apt update
+	apt install -y make
+	export PERL_MM_USE_DEFAULT=1
+	yes | cpan -i Test::Nginx
+	cd $SITE_ROOT
+	ls -d $SITE_ROOT/.cpan/build/* /root/.cpan/build/* | while read d; do
+		cd $d
+		make install
+		cd -
+	done
+}
+
 _repo_private() {
 	if [ -z "$MBR_ENV" ]; then
 		echo "MBR_ENV missing"

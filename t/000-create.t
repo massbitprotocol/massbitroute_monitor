@@ -95,6 +95,6 @@ __DATA__
 --- http_config eval: $::http_config
 --- config eval: $::config
 --- request
-GET /mbr/check_mk/index.py
+GET /mbr/check_mk/login.py?_origtarget=index.py
 --- error_code: 200
 --- no_error_log
